@@ -4,6 +4,18 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### InformerMetricsProvider: add batch size, batch termination, and events enqueued metrics
+
+Custom implementations of `cache.InformerMetricsProvider` must implement
+`NewBatchSizeMetric`, `NewBatchTerminationMetric`, and
+`NewEventsEnqueuedMetric`.
+
+```
+- ./tools/cache.InformerMetricsProvider.NewBatchSizeMetric: added
+- ./tools/cache.InformerMetricsProvider.NewBatchTerminationMetric: added
+- ./tools/cache.InformerMetricsProvider.NewEventsEnqueuedMetric: added
+```
+
 ### WAS building blocks applyconfigurations moved to scheduling/v1
 
 Workload Aware Scheduling building-block applyconfigurations graduated from

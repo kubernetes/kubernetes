@@ -281,14 +281,17 @@ func (f *RealFIFO) addToItems_locked(deltaActionType DeltaType, skipTransform bo
 		}
 	}
 
-	f.items = append(f.items, Delta{
-		Type:   deltaActionType,
-		Object: obj,
-	})
-	f.cond.Broadcast()
-	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
+	f.enqueueLocked(Delta{Type: deltaActionType, Object: obj})
 
 	return nil
+}
+
+// enqueueLocked appends d to the queue and wakes up consumers.
+func (f *RealFIFO) enqueueLocked(d Delta) {
+	f.items = append(f.items, d)
+	f.cond.Broadcast()
+	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
+	f.metrics.eventsEnqueued.Inc()
 }
 
 // addReplaceToItemsLocked appends to the delta list.
@@ -311,23 +314,13 @@ func (f *RealFIFO) addReplaceToItemsLocked(objs []interface{}, resourceVersion s
 		ResourceVersion: resourceVersion,
 		Objects:         objs,
 	}
-	f.items = append(f.items, Delta{
-		Type:   ReplacedAll,
-		Object: info,
-	})
-	f.cond.Broadcast()
-	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
+	f.enqueueLocked(Delta{Type: ReplacedAll, Object: info})
 
 	return nil
 }
 
 func (f *RealFIFO) addResyncToItemsLocked() error {
-	f.items = append(f.items, Delta{
-		Type:   SyncAll,
-		Object: SyncAllInfo{},
-	})
-	f.cond.Broadcast()
-	f.metrics.numberOfQueuedItem.Set(float64(len(f.items)))
+	f.enqueueLocked(Delta{Type: SyncAll, Object: SyncAllInfo{}})
 
 	return nil
 }
@@ -474,6 +467,38 @@ var batchable = map[DeltaType]bool{
 	Deleted:  true,
 }
 
+// collectBatchLocked takes up to f.batchSize deltas from the head of f.items
+// and reports why it stopped. The taken slots are zeroed but f.items is not
+// resliced; the caller does that.
+func (f *RealFIFO) collectBatchLocked() ([]Delta, BatchTerminationReason) {
+	deltas := make([]Delta, 0, min(len(f.items), f.batchSize))
+	moveDeltaToProcessList := func(i int) {
+		deltas = append(deltas, f.items[i])
+		// The underlying array still exists and references this object, so the
+		// object will not be garbage collected unless we zero the reference.
+		f.items[i] = Delta{}
+	}
+	for i := 0; i < f.batchSize && i < len(f.items); i++ {
+		if f.initialPopulationCount > 0 && i >= f.initialPopulationCount {
+			return deltas, BatchInitialPopulationBoundary
+		}
+		item := f.items[i]
+		if !batchable[item.Type] {
+			if len(deltas) == 0 {
+				// if an unbatchable delta is first in the list, process just that one by itself
+				moveDeltaToProcessList(i)
+			}
+			// close the batch when an unbatchable delta is encountered
+			return deltas, BatchUnbatchableDelta
+		}
+		moveDeltaToProcessList(i)
+	}
+	if len(deltas) == f.batchSize {
+		return deltas, BatchFull
+	}
+	return deltas, BatchQueueDrained
+}
+
 // PopBatch pops as many items as possible to be processed as a batch using processBatch,
 // or pop a single item using processSingle if multiple items cannot be batched.
 //
@@ -499,28 +524,10 @@ func (f *RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProc
 	}
 
 	isInInitialList := !f.hasSynced_locked()
-	deltas := make([]Delta, 0, min(len(f.items), f.batchSize))
-	moveDeltaToProcessList := func(i int) {
-		deltas = append(deltas, f.items[i])
-		// The underlying array still exists and references this object, so the object will not be garbage collected unless we zero the reference.
-		f.items[i] = Delta{}
-	}
-	for i := 0; i < f.batchSize && i < len(f.items); i++ {
-		if f.initialPopulationCount > 0 && i >= f.initialPopulationCount {
-			break
-		}
-		item := f.items[i]
-		if !batchable[item.Type] {
-			if len(deltas) == 0 {
-				// if an unbatchable delta is first in the list, process just that one by itself
-				moveDeltaToProcessList(i)
-			}
-			// close the batch when an unbatchable delta is encountered
-			break
-		}
-		moveDeltaToProcessList(i)
-	}
+	deltas, reason := f.collectBatchLocked()
 	f.items = f.items[len(deltas):]
+	f.metrics.batchSize.Observe(float64(len(deltas)))
+	f.metrics.batchTerminations[reason].Inc()
 	// Decrement initialPopulationCount if needed.
 	// This is done in a defer so we only do this *after* processing is complete,
 	// so concurrent calls to hasSynced will not incorrectly return true while processing is still happening.
@@ -572,11 +579,7 @@ func (f *RealFIFO) Bookmark(resourceVersion string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	f.items = append(f.items, Delta{
-		Type:   Bookmark,
-		Object: BookmarkInfo{ResourceVersion: resourceVersion},
-	})
-	f.cond.Broadcast()
+	f.enqueueLocked(Delta{Type: Bookmark, Object: BookmarkInfo{ResourceVersion: resourceVersion}})
 	return nil
 }
 

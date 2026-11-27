@@ -3194,6 +3194,88 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: batch_size
+  subsystem: informer
+  help: Number of deltas popped from the FIFO and processed together as a single batch.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - name
+  - resource
+  - version
+  buckets:
+  - 1
+  - 2
+  - 5
+  - 10
+  - 25
+  - 50
+  - 100
+  - 250
+  - 500
+  - 1000
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
+- name: batch_terminations_total
+  subsystem: informer
+  help: Number of FIFO batches closed, by the reason the batch stopped accumulating
+    deltas.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - name
+  - reason
+  - resource
+  - version
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
+- name: events_enqueued_total
+  subsystem: informer
+  help: Number of deltas added to the FIFO.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - name
+  - resource
+  - version
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
 - name: processing_latency_seconds
   subsystem: informer
   help: Time taken to process events after popping from the queue.
