@@ -1060,6 +1060,113 @@ func TestStoreCreateHooks(t *testing.T) {
 	}
 }
 
+type persistedCreateErrorStorage struct {
+	storage.Interface
+	getError error
+}
+
+func (s persistedCreateErrorStorage) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	if err := s.Interface.Create(ctx, key, obj, out, ttl); err != nil {
+		return err
+	}
+	return errors.NewAlreadyExists(schema.GroupResource{Resource: "pods"}, "foo")
+}
+
+func (s persistedCreateErrorStorage) Get(ctx context.Context, key string, options storage.GetOptions, obj runtime.Object) error {
+	if s.getError != nil {
+		return s.getError
+	}
+	return s.Interface.Get(ctx, key, options, obj)
+}
+
+func TestStoreCreatePreservesBeginCreateAfterAmbiguousStorageError(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	registry.Storage.Storage = persistedCreateErrorStorage{Interface: registry.Storage.Storage, getError: context.DeadlineExceeded}
+	var finishedSuccessfully bool
+	registry.BeginCreate = func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error) {
+		return func(_ context.Context, success bool) {
+			finishedSuccessfully = success
+		}, nil
+	}
+
+	obj := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	if _, err := registry.Create(ctx, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err == nil {
+		t.Fatal("expected create to fail")
+	}
+	if !finishedSuccessfully {
+		t.Fatal("expected BeginCreate resources to be preserved after an ambiguous storage error")
+	}
+}
+
+func TestStoreCreatePreservesBeginCreateWhenReadbackMatchesCreatedObject(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	registry.Storage.Storage = persistedCreateErrorStorage{Interface: registry.Storage.Storage}
+	var finishedSuccessfully bool
+	registry.BeginCreate = func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error) {
+		return func(_ context.Context, success bool) {
+			finishedSuccessfully = success
+		}, nil
+	}
+
+	obj := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	if _, err := registry.Create(ctx, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err == nil {
+		t.Fatal("expected create to fail")
+	}
+	if !finishedSuccessfully {
+		t.Fatal("expected BeginCreate resources to be preserved when readback matches the created object")
+	}
+}
+
+func TestStoreCreateRevertsBeginCreateWhenObjectAlreadyExists(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	existing := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	if _, err := registry.Create(ctx, existing, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to create existing object: %v", err)
+	}
+
+	registry.Storage.Storage = persistedCreateErrorStorage{Interface: registry.Storage.Storage}
+	var finishedSuccessfully bool
+	var finishCalled bool
+	registry.BeginCreate = func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error) {
+		return func(_ context.Context, success bool) {
+			finishCalled = true
+			finishedSuccessfully = success
+		}, nil
+	}
+
+	duplicate := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	if _, err := registry.Create(ctx, duplicate, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err == nil {
+		t.Fatal("expected create to fail")
+	}
+	if !finishCalled {
+		t.Fatal("expected BeginCreate finalizer to be called")
+	}
+	if finishedSuccessfully {
+		t.Fatal("expected BeginCreate resources to be reverted when another object already exists")
+	}
+}
+
 func isQualifiedResource(err error, kind, group string) bool {
 	if err.(errors.APIStatus).Status().Details.Kind != kind || err.(errors.APIStatus).Status().Details.Group != group {
 		return false
