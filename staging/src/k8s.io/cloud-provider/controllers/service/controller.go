@@ -383,7 +383,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 		if exists {
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
 			c.eventRecorder.Event(service, v1.EventTypeNormal, events.DeletingLoadBalancer, "Deleting load balancer")
-			if err := c.balancer.EnsureLoadBalancerDeleted(ctx, c.clusterName, service); err != nil {
+			if err := c.ensureLoadBalancerDeleted(ctx, service); err != nil {
 				if err == cloudprovider.ImplementedElsewhere {
 					klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error on deletion", key, c.cloud.ProviderName())
 				} else {
@@ -458,6 +458,11 @@ func (c *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service
 	return status, nil
 }
 
+func (c *Controller) ensureLoadBalancerDeleted(ctx context.Context, service *v1.Service) error {
+	c.removeLastSyncedNodes(service)
+	return c.balancer.EnsureLoadBalancerDeleted(ctx, c.clusterName, service)
+}
+
 func (c *Controller) storeLastSyncedNodes(svc *v1.Service, nodes []*v1.Node) {
 	c.lastSyncedNodesLock.Lock()
 	defer c.lastSyncedNodesLock.Unlock()
@@ -470,6 +475,13 @@ func (c *Controller) getLastSyncedNodes(svc *v1.Service) []*v1.Node {
 	defer c.lastSyncedNodesLock.Unlock()
 	key, _ := cache.MetaNamespaceKeyFunc(svc)
 	return c.lastSyncedNodes[key]
+}
+
+func (c *Controller) removeLastSyncedNodes(svc *v1.Service) {
+	c.lastSyncedNodesLock.Lock()
+	defer c.lastSyncedNodesLock.Unlock()
+	key, _ := cache.MetaNamespaceKeyFunc(svc)
+	delete(c.lastSyncedNodes, key)
 }
 
 // ListKeys implements the interface required by DeltaFIFO to list the keys we
@@ -924,7 +936,7 @@ func (c *Controller) processLoadBalancerDelete(ctx context.Context, service *v1.
 		return nil
 	}
 	c.eventRecorder.Event(service, v1.EventTypeNormal, events.DeletingLoadBalancer, "Deleting load balancer")
-	if err := c.balancer.EnsureLoadBalancerDeleted(ctx, c.clusterName, service); err != nil {
+	if err := c.ensureLoadBalancerDeleted(ctx, service); err != nil {
 		c.eventRecorder.Eventf(service, v1.EventTypeWarning, events.DeleteLoadBalancerFailed, "Error deleting load balancer: %v", err)
 		return err
 	}
