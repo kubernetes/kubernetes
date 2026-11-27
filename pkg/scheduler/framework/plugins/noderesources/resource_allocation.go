@@ -17,12 +17,15 @@ limitations under the License.
 package noderesources
 
 import (
+	"container/list"
 	"context"
-	"strings"
+	"fmt"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
+	"k8s.io/client-go/tools/cache"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
@@ -40,14 +43,136 @@ import (
 // scorer is decorator for resourceAllocationScorer
 type scorer func(strategy *config.ScoringStrategy) *resourceAllocationScorer
 
-// DRACaches holds various caches used for DRA-related computations
+// DRACaches belongs to one scoring plugin instance and is shared by scheduling
+// cycles and parallel Score workers. It must not be copied after first use.
 type DRACaches struct {
 	// celCache is a cache for compiled CEL expressions used in device class selectors.
 	celCache *cel.Cache
-	// Cache for DeviceMatches results to avoid expensive repeated evaluations
-	deviceMatchCache sync.Map // map[deviceMatchCacheKey]bool
-	// Cache for NodeMatches results to avoid expensive repeated node selector evaluations
-	nodeMatchCache sync.Map // map[nodeMatchCacheKey]bool
+	// Cache for DeviceMatches results to avoid expensive repeated evaluations.
+	// Both this cache and sliceMatchResults.results use sync.Map because parallel
+	// Score workers share them, and reads are typically more common than writes.
+	deviceMatchCache   deviceMatchCache
+	resourceSliceStore cache.Store
+	gcDone             chan struct{}
+}
+
+// sliceMatchResults belongs to one immutable ResourceSlice spec. In-flight readers
+// retain their entry even if a newer ResourceSlice generation replaces it in the outer cache.
+type sliceMatchResults struct {
+	generation int64
+	name       string
+	element    *list.Element // Protected by deviceMatchCache.mu.
+	results    sync.Map      // map[deviceMatchKey]bool
+}
+
+func (c *DRACaches) matchResultsForSlice(slice *draapi.ResourceSlice) *sliceMatchResults {
+	if slice.UID == "" {
+		return nil
+	}
+	if c.resourceSliceStore != nil {
+		obj, exists, err := c.resourceSliceStore.GetByKey(slice.Name)
+		current, _ := obj.(*resourceapi.ResourceSlice)
+		if err != nil || !exists || current == nil || current.UID != slice.UID || current.Generation != slice.Generation {
+			if value, ok := c.deviceMatchCache.Load(slice.UID); ok {
+				entry := value.(*sliceMatchResults)
+				// An old snapshot must not invalidate a newer, currently eligible entry.
+				if err != nil || !exists || current == nil || current.UID != slice.UID || current.Generation != entry.generation {
+					c.deviceMatchCache.CompareAndDelete(slice.UID, entry)
+				}
+			}
+			return &sliceMatchResults{generation: slice.Generation, name: slice.Name}
+		}
+	}
+	match, published := c.loadMatchResultsForSlice(slice)
+	if published && c.resourceSliceStore != nil {
+		// A deletion may occur between the eligibility check and publication.
+		obj, exists, err := c.resourceSliceStore.GetByKey(slice.Name)
+		current, _ := obj.(*resourceapi.ResourceSlice)
+		if err != nil || !exists || current == nil || current.UID != slice.UID || current.Generation != slice.Generation {
+			c.deviceMatchCache.CompareAndDelete(slice.UID, match)
+		}
+	}
+	return match
+}
+
+func (c *DRACaches) loadMatchResultsForSlice(slice *draapi.ResourceSlice) (*sliceMatchResults, bool) {
+	// Test slices may lack UIDs and must not share a cache entry.
+	if slice.UID == "" {
+		return nil, false
+	}
+	var fresh *sliceMatchResults
+	for {
+		value, ok := c.deviceMatchCache.Load(slice.UID)
+		if ok && value.(*sliceMatchResults).generation == slice.Generation {
+			return value.(*sliceMatchResults), false
+		}
+		if fresh == nil {
+			fresh = &sliceMatchResults{generation: slice.Generation, name: slice.Name}
+		}
+		if !ok {
+			if _, loaded := c.deviceMatchCache.LoadOrStore(slice.UID, fresh); !loaded {
+				return fresh, true
+			}
+		} else {
+			// An older snapshot may still be scored, but must not replace newer results.
+			if value.(*sliceMatchResults).generation > slice.Generation {
+				return fresh, false
+			}
+			if c.deviceMatchCache.CompareAndSwap(slice.UID, value, fresh) {
+				return fresh, true
+			}
+		}
+	}
+}
+
+// invalidateDeviceMatchCache preserves results published for a newer generation
+// while an older informer notification was still queued.
+func (c *DRACaches) invalidateDeviceMatchCache(slice *resourceapi.ResourceSlice) {
+	if value, ok := c.deviceMatchCache.Load(slice.UID); ok && value.(*sliceMatchResults).generation <= slice.Generation {
+		c.deviceMatchCache.CompareAndDelete(slice.UID, value)
+	}
+}
+
+// Objectless deletions provide only a name, so only this exceptional path scans
+// the cache. Check current state after capturing each candidate to retain entries
+// published for a same-name replacement while the notification was pending.
+func (c *DRACaches) invalidateDeviceMatchCacheByName(name string) {
+	c.deviceMatchCache.values.Range(func(key, value any) bool {
+		entry := value.(*sliceMatchResults)
+		if entry.name != name {
+			return true
+		}
+		obj, exists, err := c.resourceSliceStore.GetByKey(name)
+		current, _ := obj.(*resourceapi.ResourceSlice)
+		if err == nil && (!exists || current == nil || current.UID != key || current.Generation != entry.generation) {
+			c.deviceMatchCache.CompareAndDelete(key, entry)
+		}
+		return true
+	})
+}
+
+func (c *DRACaches) watchResourceSlices(ctx context.Context, informer cache.SharedIndexInformer) error {
+	c.resourceSliceStore = informer.GetStore()
+	c.gcDone = make(chan struct{})
+	registration, err := resourceinformers.ToResourceSliceIndexInformer(informer).AddTypedEventHandler(resourceinformers.ResourceSliceHandlerFuncs{
+		UpdateFunc: func(oldSlice, newSlice *resourceapi.ResourceSlice) {
+			if oldSlice.UID != newSlice.UID || oldSlice.Generation != newSlice.Generation {
+				c.invalidateDeviceMatchCache(oldSlice)
+			}
+		},
+		DeleteFunc: func(deleted resourceinformers.DeletedResourceSlice) {
+			if deleted.OptionalObj != nil {
+				c.invalidateDeviceMatchCache(deleted.OptionalObj)
+			} else {
+				c.invalidateDeviceMatchCacheByName(deleted.GetName())
+			}
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("register ResourceSlice match cache invalidation handler: %w", err)
+	}
+	go c.runDeviceMatchGC(ctx, func() { _ = informer.RemoveEventHandler(registration) })
+	return nil
 }
 
 // resourceAllocationScorer contains information to calculate resource allocation score.
@@ -64,76 +189,20 @@ type resourceAllocationScorer struct {
 	resources    []config.ResourceSpec
 	draFeatures  structured.Features
 	draManager   fwk.SharedDRAManager
-	// Caches for DRA-related computations
 	DRACaches
 }
 
-// buildNodeMatchCacheKey creates a string cache key for node matching results
-// Using a string key is significantly faster than struct keys with sync.Map
-func buildNodeMatchCacheKey(nodeName string, nodeNameToMatch string, allNodesMatch bool, nodeSelectorHash string) string {
-	// Pre-allocate sufficient capacity to avoid reallocation
-	var b strings.Builder
-	b.Grow(len(nodeName) + len(nodeNameToMatch) + len(nodeSelectorHash) + 4)
-
-	b.WriteString(nodeName)
-	b.WriteByte('|')
-	b.WriteString(nodeNameToMatch)
-	b.WriteByte('|')
-	if allNodesMatch {
-		b.WriteByte('1')
-	} else {
-		b.WriteByte('0')
-	}
-	b.WriteByte('|')
-	b.WriteString(nodeSelectorHash)
-
-	return b.String()
+// Driver and pool are fixed within the ResourceSlice owning these results.
+type deviceMatchKey struct {
+	expression string
+	device     draapi.UniqueString
 }
 
-// buildDeviceMatchCacheKey creates a string cache key for device matching results
-// Using a string key is significantly faster than struct keys with sync.Map
-// This concatenates expression|driver|poolName|deviceName with pipe separators
-func buildDeviceMatchCacheKey(expression string, driver string, poolName string, deviceName string) string {
-	// Pre-allocate sufficient capacity to avoid reallocation
-	var b strings.Builder
-	b.Grow(len(expression) + len(driver) + len(poolName) + len(deviceName) + 3)
-
-	b.WriteString(expression)
-	b.WriteByte('|')
-	b.WriteString(driver)
-	b.WriteByte('|')
-	b.WriteString(poolName)
-	b.WriteByte('|')
-	b.WriteString(deviceName)
-
-	return b.String()
-}
-
-// nodeMatches is a cached wrapper around structured.NodeMatches
+// nodeMatches is not cached: node labels change without any event that could
+// invalidate cached selector results (#144106), and evaluating a selector is
+// cheap compared to CEL device matching.
 func (r *resourceAllocationScorer) nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
-
-	var nodeName string
-	if node != nil {
-		nodeName = node.Name
-	}
-
-	nodeSelectorStr := nodeSelector.String()
-	key := buildNodeMatchCacheKey(nodeName, nodeNameToMatch, allNodesMatch, nodeSelectorStr)
-
-	// Check cache first
-	if matches, ok := r.nodeMatchCache.Load(key); ok {
-		return matches.(bool), nil
-	}
-
-	// Call the original function
-	matches, err := structured.NodeMatches(r.draFeatures, node, nodeNameToMatch, allNodesMatch, nodeSelector)
-
-	// Cache the result (even if there was an error, to avoid repeated failures)
-	if err == nil {
-		r.nodeMatchCache.Store(key, matches)
-	}
-
-	return matches, err
+	return structured.NodeMatches(r.draFeatures, node, nodeNameToMatch, allNodesMatch, nodeSelector)
 }
 
 // score will use `scorer` function to calculate the score.
@@ -482,6 +551,8 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, slice
 		return true, nil
 	}
 
+	match := r.matchResultsForSlice(slice)
+
 	// Lazily create the CEL device only when needed (first CEL selector that's not cached)
 	var celDevice cel.Device
 	celDeviceCreated := false
@@ -492,15 +563,16 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, slice
 			continue
 		}
 
-		// TODO (?): use UniqueString
-		key := buildDeviceMatchCacheKey(selector.CEL.Expression, slice.Spec.Driver.String(), slice.Spec.Pool.Name.String(), device.Name.String())
-
 		// Check if result is already cached
-		if matches, ok := r.deviceMatchCache.Load(key); ok {
-			if !matches.(bool) {
-				return false, nil
+		var key deviceMatchKey
+		if match != nil {
+			key = deviceMatchKey{expression: selector.CEL.Expression, device: device.Name}
+			if matches, ok := match.results.Load(key); ok {
+				if !matches.(bool) {
+					return false, nil
+				}
+				continue // This selector matches, check the next one
 			}
-			continue // This selector matches, check the next one
 		}
 
 		// Cache miss - need to evaluate CEL expression
@@ -522,12 +594,17 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, slice
 		}
 
 		matches, _, err := result.DeviceMatches(ctx, celDevice)
-		if err != nil || !matches {
+		if err != nil {
 			return false, err
 		}
 
 		// Cache the result for future use
-		r.deviceMatchCache.Store(key, matches)
+		if match != nil {
+			match.results.Store(key, matches)
+		}
+		if !matches {
+			return false, nil
+		}
 	}
 
 	return true, nil
