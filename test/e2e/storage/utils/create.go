@@ -313,13 +313,7 @@ func patchItemRecursively(tCtx ktesting.TContext, item interface{}) error {
 	case *rbacv1.Subject:
 		patchNamespace(tCtx, &item.Namespace)
 	case *rbacv1.RoleRef:
-		// TODO: avoid hard-coding this special name. Perhaps add a Framework.PredefinedRoles
-		// which contains all role names that are defined cluster-wide before the test starts?
-		// All those names are exempt from renaming. That list could be populated by querying
-		// and get extended by tests.
-		if item.Name != "e2e-test-privileged-psp" {
-			patchName(uniqueName, &item.Name)
-		}
+		patchName(uniqueName, &item.Name)
 	case *rbacv1.ClusterRole:
 		patchName(uniqueName, &item.Name)
 	case *rbacv1.Role:
