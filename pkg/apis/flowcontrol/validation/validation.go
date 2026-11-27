@@ -139,7 +139,7 @@ func ValidateFlowSchemaPolicyRulesWithSubjects(rule *flowcontrol.PolicyRulesWith
 			allErrs = append(allErrs, ValidateFlowSchemaSubject(&subject, fldPath.Child("subjects").Index(i))...)
 		}
 	} else {
-		allErrs = append(allErrs, field.Required(fldPath.Child("subjects"), "subjects must contain at least one value"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("subjects"), "subjects must contain at least one value").MarkCoveredByDeclarative())
 	}
 
 	if len(rule.ResourceRules) == 0 && len(rule.NonResourceRules) == 0 {
@@ -161,27 +161,29 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 	case flowcontrol.SubjectKindServiceAccount:
 		allErrs = append(allErrs, ValidateServiceAccountSubject(subject.ServiceAccount, fldPath.Child("serviceAccount"))...)
 		if subject.User != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'").MarkCoveredByDeclarative())
 		}
 		if subject.Group != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'").MarkCoveredByDeclarative())
 		}
 	case flowcontrol.SubjectKindUser:
 		allErrs = append(allErrs, ValidateUserSubject(subject.User, fldPath.Child("user"))...)
 		if subject.ServiceAccount != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'").MarkCoveredByDeclarative())
 		}
 		if subject.Group != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'").MarkCoveredByDeclarative())
 		}
 	case flowcontrol.SubjectKindGroup:
 		allErrs = append(allErrs, ValidateGroupSubject(subject.Group, fldPath.Child("group"))...)
 		if subject.ServiceAccount != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'").MarkCoveredByDeclarative())
 		}
 		if subject.User != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'").MarkCoveredByDeclarative())
 		}
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), subject.Kind, supportedSubjectKinds.List()))
 	}
@@ -192,7 +194,7 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "serviceAccount is required when subject kind is 'ServiceAccount'"))
+		return append(allErrs, field.Required(fldPath, "serviceAccount is required when subject kind is 'ServiceAccount'").MarkCoveredByDeclarative())
 	}
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
@@ -217,7 +219,7 @@ func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, f
 func ValidateUserSubject(subject *flowcontrol.UserSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "user is required when subject kind is 'User'"))
+		return append(allErrs, field.Required(fldPath, "user is required when subject kind is 'User'").MarkCoveredByDeclarative())
 	}
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
@@ -229,10 +231,10 @@ func ValidateUserSubject(subject *flowcontrol.UserSubject, fldPath *field.Path) 
 func ValidateGroupSubject(subject *flowcontrol.GroupSubject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if subject == nil {
-		return append(allErrs, field.Required(fldPath, "group is required when subject kind is 'Group'"))
+		return append(allErrs, field.Required(fldPath, "group is required when subject kind is 'Group'").MarkCoveredByDeclarative())
 	}
 	if len(subject.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	}
 	return allErrs
 }

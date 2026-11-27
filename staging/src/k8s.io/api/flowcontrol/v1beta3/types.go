@@ -180,6 +180,7 @@ type FlowSchemaSpec struct {
 	// if it is an empty slice, there will be no requests matching the FlowSchema.
 	// +listType=atomic
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	Rules []PolicyRulesWithSubjects `json:"rules,omitempty" protobuf:"bytes,4,rep,name=rules"`
 }
 
@@ -228,6 +229,7 @@ type PolicyRulesWithSubjects struct {
 	// +listType=atomic
 	// Required.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Subjects []Subject `json:"subjects" protobuf:"bytes,1,rep,name=subjects"`
 	// resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
 	// target resource.
@@ -250,15 +252,23 @@ type Subject struct {
 	// Required
 	// +required
 	// +unionDiscriminator
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:modeDiscriminator
 	Kind SubjectKind `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// user matches based on username.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:ifMode("User")=+k8s:required
 	User *UserSubject `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
 	// group matches based on user group name.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:ifMode("Group")=+k8s:required
 	Group *GroupSubject `json:"group,omitempty" protobuf:"bytes,3,opt,name=group"`
 	// serviceAccount matches ServiceAccounts.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:ifMode("ServiceAccount")=+k8s:required
 	ServiceAccount *ServiceAccountSubject `json:"serviceAccount,omitempty" protobuf:"bytes,4,opt,name=serviceAccount"`
 }
 
@@ -277,6 +287,7 @@ type UserSubject struct {
 	// name is the username that matches, or "*" to match all usernames.
 	// Required.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -287,6 +298,7 @@ type GroupSubject struct {
 	// well-known group names.
 	// Required.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -295,10 +307,12 @@ type ServiceAccountSubject struct {
 	// namespace is the namespace of matching ServiceAccount objects.
 	// Required.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
 	// name is the name of matching ServiceAccount objects, or "*" to match regardless of name.
 	// Required.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 }
 
