@@ -40,6 +40,9 @@ const (
 	noneMissed missedSchedulesType = iota
 	fewMissed
 	manyMissed
+
+	// Set by kubectl create job --from-cronjob.
+	cronJobInstantiateAnnotation = "cronjob.kubernetes.io/instantiate"
 )
 
 func (e missedSchedulesType) String() string {
@@ -89,6 +92,25 @@ func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 		}
 	}
 	cj.Status.Active = newActive
+}
+
+// adoptJobIntoActive adds job to cj.Status.Active when the CronJob controls it
+// and it is not a manual kubectl --from-cronjob instantiate. Returns true if
+// Active was updated.
+func adoptJobIntoActive(logger klog.Logger, cj *batchv1.CronJob, job *batchv1.Job) (bool, error) {
+	if !metav1.IsControlledBy(job, cj) {
+		return false, nil
+	}
+	if job.Annotations[cronJobInstantiateAnnotation] == "manual" {
+		return false, nil
+	}
+	jobRef, err := getRef(job)
+	if err != nil {
+		return false, err
+	}
+	cj.Status.Active = append(cj.Status.Active, *jobRef)
+	logger.Info("Adopted job into active list", "cronjob", klog.KObj(cj), "job", klog.KObj(job))
+	return true, nil
 }
 
 // mostRecentScheduleTime returns:
