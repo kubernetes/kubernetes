@@ -27,6 +27,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -97,7 +98,7 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 	}
 
 	// pvs are global, so we need to wait for the exact ones bound to the statefulset pvcs.
-	pvNames := sets.NewString()
+	pvNames := sets.New[string]()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
 	pvcPollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
@@ -105,15 +106,40 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
 		}
-		for _, pvc := range pvcList.Items {
-			pvNames.Insert(pvc.Spec.VolumeName)
-			// TODO: Double check that there are no pods referencing the pvc
-			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
-			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
-				return false, nil
+		if len(pvcList.Items) == 0 {
+			return true, nil
+		}
+		podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			framework.Logf("WARNING: Failed to list pods, retrying %v", err)
+			return false, nil
+		}
+		inUsePVCs := sets.New[string]()
+		for _, pod := range podList.Items {
+			for _, vol := range pod.Spec.Volumes {
+				if vol.PersistentVolumeClaim != nil {
+					inUsePVCs.Insert(vol.PersistentVolumeClaim.ClaimName)
+				}
 			}
 		}
-		return true, nil
+		for _, pvc := range pvcList.Items {
+			if pvc.Spec.VolumeName != "" {
+				pvNames.Insert(pvc.Spec.VolumeName)
+			}
+			if inUsePVCs.Has(pvc.Name) {
+				framework.Logf("Skipping deletion of pvc %v as it is still in use", pvc.Name)
+				continue
+			}
+			if pvc.DeletionTimestamp == nil {
+				framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
+				policy := metav1.DeletePropagationForeground
+				if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvc.Name, metav1.DeleteOptions{PropagationPolicy: &policy}); err != nil && !apierrors.IsNotFound(err) {
+					framework.Logf("WARNING: Failed to delete pvc %v, retrying: %v", pvc.Name, err)
+					return false, nil
+				}
+			}
+		}
+		return false, nil
 	})
 	if pvcPollErr != nil {
 		errList = append(errList, "Timeout waiting for pvc deletion.")
