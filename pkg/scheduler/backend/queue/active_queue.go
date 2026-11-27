@@ -100,10 +100,10 @@ type unlockedActiveQueue struct {
 	queue           *heap.Heap[framework.QueuedEntityInfo]
 	inFlightPods    map[types.UID]*list.Element
 	inFlightEvents  *list.List
-	metricsRecorder *metrics.MetricAsyncRecorder
+	metricsRecorder MetricAsyncRecorder
 }
 
-func newUnlockedActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], inFlightPods map[types.UID]*list.Element, inFlightEvents *list.List, metricsRecorder *metrics.MetricAsyncRecorder) *unlockedActiveQueue {
+func newUnlockedActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], inFlightPods map[types.UID]*list.Element, inFlightEvents *list.List, metricsRecorder MetricAsyncRecorder) *unlockedActiveQueue {
 	return &unlockedActiveQueue{
 		queue:           queue,
 		inFlightPods:    inFlightPods,
@@ -224,7 +224,7 @@ type activeQueue struct {
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
 	closed bool
 
-	metricsRecorder *metrics.MetricAsyncRecorder
+	metricsRecorder MetricAsyncRecorder
 
 	// backoffQPopper is used to pop from backoffQ when activeQ is empty.
 	// It is non-nil only when SchedulerPopFromBackoffQ feature is enabled.
@@ -236,7 +236,7 @@ type activeQueue struct {
 	lastPoppedEntityKey string
 }
 
-func newActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], metricRecorder *metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
+func newActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], metricRecorder MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
 	aq := &activeQueue{
 		queue:           queue,
 		inFlightPods:    make(map[types.UID]*list.Element),
