@@ -562,6 +562,36 @@ func Test_NestedPendingOperations_Positive_WaitWithExpBackoff(t *testing.T) {
 	}
 }
 
+func Test_NestedPendingOperations_Positive_WaitWithExpBackoffError(t *testing.T) {
+	// Test that Wait() unblocks when the last operation completes with an error
+	// and exponentialBackOffOnError is enabled.
+	// Arrange
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := v1.UniqueVolumeName("volume-name")
+	operation1DoneCh := make(chan interface{})
+	operation1 := generateWaitWithErrorFunc(operation1DoneCh)
+	err := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
+	if err != nil {
+		t.Fatalf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	waitDoneCh := make(chan interface{}, 1)
+	go func() {
+		grm.Wait()
+		waitDoneCh <- true
+	}()
+
+	// Finish the operation with error
+	operation1DoneCh <- true
+
+	// Assert
+	err = waitChannelWithTimeout(waitDoneCh, testTimeout)
+	if err != nil {
+		t.Fatalf("Error waiting for GoRoutineMap.Wait: %v", err)
+	}
+}
+
 /* Concurrent operations tests */
 
 // "None" means volume, pod, and node names are all empty
