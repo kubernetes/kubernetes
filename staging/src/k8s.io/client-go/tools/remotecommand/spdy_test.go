@@ -198,6 +198,10 @@ func TestSPDYExecutorNonZeroExitCode(t *testing.T) {
 		}
 		defer ctx.conn.Close()
 
+		if _, err := io.Copy(io.Discard, ctx.stdinStream); err != nil {
+			t.Errorf("unexpected stdin read error: %v", err)
+			return
+		}
 		if _, err := io.WriteString(ctx.stdoutStream, "stdout-before-exit"); err != nil {
 			t.Errorf("unexpected stdout write error: %v", err)
 			return

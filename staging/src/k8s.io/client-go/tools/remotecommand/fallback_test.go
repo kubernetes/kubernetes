@@ -254,6 +254,9 @@ func TestFallbackClient_SPDYSecondaryNonZeroExitCode(t *testing.T) {
 		}
 		defer ctx.conn.Close()
 
+		if _, err := io.Copy(io.Discard, ctx.stdinStream); err != nil {
+			t.Fatalf("error reading stdin stream: %v", err)
+		}
 		if _, err := io.WriteString(ctx.stdoutStream, expectedStdout); err != nil {
 			t.Fatalf("error writing stdout stream: %v", err)
 		}
