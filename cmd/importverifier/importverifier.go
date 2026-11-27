@@ -214,12 +214,12 @@ func main() {
 func loadImportRestrictions(configFile string) ([]ImportRestriction, error) {
 	config, err := os.ReadFile(configFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration from %s: %v", configFile, err)
+		return nil, fmt.Errorf("failed to load configuration from %s: %w", configFile, err)
 	}
 
 	var importRestrictions []ImportRestriction
 	if err := yaml.Unmarshal(config, &importRestrictions); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal from %s: %v", configFile, err)
+		return nil, fmt.Errorf("failed to unmarshal from %s: %w", configFile, err)
 	}
 
 	return importRestrictions, nil
@@ -242,7 +242,7 @@ func resolvePackageTree(treeBase string) ([]Package, error) {
 
 	packages, err := decodePackages(bytes.NewReader(stdout))
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode packages: %v", err)
+		return nil, fmt.Errorf("failed to decode packages: %w", err)
 	}
 
 	return packages, nil
@@ -259,7 +259,7 @@ func decodePackages(r io.Reader) ([]Package, error) {
 	for decoder.More() {
 		var pkg Package
 		if err := decoder.Decode(&pkg); err != nil {
-			return nil, fmt.Errorf("invalid package: %v", err)
+			return nil, fmt.Errorf("invalid package: %w", err)
 		}
 		packages = append(packages, pkg)
 	}
