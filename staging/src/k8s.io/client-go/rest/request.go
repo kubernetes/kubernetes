@@ -850,9 +850,15 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
 
+	if resp != nil {
+		if auditID := resp.Header.Get("Audit-ID"); auditID != "" {
+			ctx = klog.NewContext(ctx, klog.FromContext(ctx).WithValues("auditID", auditID))
+		}
+	}
+
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		r.newWatchEventDecoder(watchEventDecoder, objectDecoder),
+		r.newWatchEventDecoderWithContext(ctx, watchEventDecoder, objectDecoder),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
@@ -860,10 +866,16 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 }
 
 func (r *Request) newWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) watch.Decoder {
+	return r.newWatchEventDecoderWithContext(context.Background(), streamDecoder, objectDecoder)
+}
+
+func (r *Request) newWatchEventDecoderWithContext(ctx context.Context, streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) watch.Decoder {
 	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClientConcurrentDecoding) && r.params.Get("sendInitialEvents") == "true" {
-		return restclientwatch.NewConcurrentWatchEventDecoder(streamDecoder, objectDecoder)
+		logger := klog.FromContext(ctx)
+		return restclientwatch.NewConcurrentWatchEventDecoderWithLogger(streamDecoder, objectDecoder, &logger)
 	}
-	return restclientwatch.NewDecoder(streamDecoder, objectDecoder)
+	logger := klog.FromContext(ctx)
+	return restclientwatch.NewDecoderWithLogger(streamDecoder, objectDecoder, &logger)
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,

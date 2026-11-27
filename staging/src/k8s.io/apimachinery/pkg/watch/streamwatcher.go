@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
@@ -57,6 +58,8 @@ type StreamWatcher struct {
 	reporter Reporter
 	result   chan Event
 	done     chan struct{}
+
+	dispatchLogger *BlockLogger
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given decoder.
@@ -81,6 +84,15 @@ func NewStreamWatcherWithLogger(logger klog.Logger, d Decoder, r Reporter) *Stre
 		// error reporting might block forever.
 		// Therefore a dedicated stop channel is used to resolve this blocking.
 		done: make(chan struct{}),
+
+		dispatchLogger: NewBlockLoggerWithOptions(
+			"Fast watcher, slow consumer processing. Probably caused by slow Reflector/Informer DeltaFIFO processing or blocked event handlers",
+			BlockLoggerOptions{
+				SingleThreshold: DefaultBlockLoggerSingleThreshold,
+				Logger:          &logger,
+				Clock:           clock.RealClock{},
+			},
+		),
 	}
 	go sw.receive()
 	return sw
@@ -89,6 +101,11 @@ func NewStreamWatcherWithLogger(logger klog.Logger, d Decoder, r Reporter) *Stre
 // ResultChan implements Interface.
 func (sw *StreamWatcher) ResultChan() <-chan Event {
 	return sw.result
+}
+
+// DispatchLogger returns the BlockLogger tracking consumer dispatch wait time.
+func (sw *StreamWatcher) DispatchLogger() *BlockLogger {
+	return sw.dispatchLogger
 }
 
 // Stop implements Interface.
@@ -110,6 +127,7 @@ func (sw *StreamWatcher) receive() {
 	defer utilruntime.HandleCrashWithLogger(sw.logger)
 	defer close(sw.result)
 	defer sw.Stop()
+	defer sw.dispatchLogger.Flush()
 	for {
 		action, obj, err := sw.source.Decode()
 		if err != nil {
@@ -122,24 +140,30 @@ func (sw *StreamWatcher) receive() {
 				if net.IsProbableEOF(err) || net.IsTimeout(err) {
 					sw.logger.V(5).Info("Unable to decode an event from the watch stream", "err", err)
 				} else {
-					select {
-					case <-sw.done:
-					case sw.result <- Event{
+					sw.sendResult(Event{
 						Type:   Error,
 						Object: sw.reporter.AsObject(fmt.Errorf("unable to decode an event from the watch stream: %v", err)),
-					}:
-					}
+					})
 				}
 			}
 			return
 		}
-		select {
-		case <-sw.done:
-			return
-		case sw.result <- Event{
-			Type:   action,
-			Object: obj,
-		}:
+		if action != Error {
+			sw.dispatchLogger.EnsureResourceType(obj)
 		}
+		if !sw.sendResult(Event{Type: action, Object: obj}) {
+			return
+		}
+	}
+}
+
+func (sw *StreamWatcher) sendResult(ev Event) bool {
+	defer sw.dispatchLogger.RecordSince(sw.dispatchLogger.Now())
+
+	select {
+	case <-sw.done:
+		return false
+	case sw.result <- ev:
+		return true
 	}
 }
