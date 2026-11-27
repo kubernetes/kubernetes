@@ -19,6 +19,7 @@ package wsstream
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net/http"
 	"sync"
@@ -115,11 +116,28 @@ func (r *Reader) handshake(config *websocket.Config, req *http.Request) error {
 // Copy the reader to the response. The created WebSocket is closed after this
 // method completes.
 func (r *Reader) Copy(w http.ResponseWriter, req *http.Request) error {
+	// serveHTTPComplete is closed when "websocket#ServeHTTP" returns. If the
+	// handshake is rejected, it returns without calling r.handle, and nothing
+	// would ever send on or close r.err.
+	serveHTTPComplete := make(chan struct{})
 	go func() {
 		defer r.handleCrash(req.Context())
+		defer close(serveHTTPComplete)
 		websocket.Server{Handshake: r.handshake, Handler: r.handle}.ServeHTTP(w, req)
 	}()
-	return <-r.err
+	select {
+	case err := <-r.err:
+		return err
+	case <-serveHTTPComplete:
+		// If r.handle ran, it closed r.err (also when it panicked) before
+		// serveHTTPComplete was closed, so its result is already available.
+		select {
+		case err := <-r.err:
+			return err
+		default:
+			return errors.New("websocket server finished before becoming ready")
+		}
+	}
 }
 
 // handle implements a WebSocket handler.
