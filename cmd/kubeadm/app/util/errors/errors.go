@@ -40,7 +40,6 @@ const (
 // and stack traces.
 type errorWithStack struct {
 	msg   error
-	cause error
 	stack string
 }
 
@@ -49,7 +48,16 @@ func (e errorWithStack) Error() string {
 }
 
 func (e errorWithStack) Unwrap() error {
-	return e.cause
+	if u := errors.Unwrap(e.msg); u != nil {
+		return u
+	}
+	// A message built with more than one %w unwraps to a slice, which
+	// errors.Unwrap does not follow. Return the message itself so that Is and
+	// As can walk into it.
+	if _, ok := e.msg.(interface{ Unwrap() []error }); ok {
+		return e.msg
+	}
+	return nil
 }
 
 // Wrap wraps an error and includes stack.
@@ -59,7 +67,6 @@ func Wrap(err error, message string) error {
 	}
 	return &errorWithStack{
 		msg:   fmt.Errorf("%s: %w", message, err),
-		cause: err,
 		stack: callStack(),
 	}
 }
@@ -71,7 +78,6 @@ func Wrapf(err error, format string, args ...any) error {
 	}
 	return &errorWithStack{
 		msg:   fmt.Errorf("%s: %w", fmt.Sprintf(format, args...), err),
-		cause: err,
 		stack: callStack(),
 	}
 }
@@ -82,12 +88,13 @@ func Unwrap(err error) error {
 }
 
 // WithMessage includes formats an error with a message and includes stack trace.
+// The wrapped error is kept, so that Unwrap, Is and As can find it.
 func WithMessage(err error, message string) error {
 	if err == nil {
 		return nil
 	}
 	return &errorWithStack{
-		msg:   fmt.Errorf("%s: %s", message, err.Error()),
+		msg:   fmt.Errorf("%s: %w", message, err),
 		stack: callStack(),
 	}
 }
@@ -98,7 +105,7 @@ func WithMessagef(err error, format string, args ...any) error {
 		return nil
 	}
 	return &errorWithStack{
-		msg:   fmt.Errorf("%s: %s", fmt.Sprintf(format, args...), err.Error()),
+		msg:   fmt.Errorf("%s: %w", fmt.Sprintf(format, args...), err),
 		stack: callStack(),
 	}
 }
@@ -112,6 +119,8 @@ func New(message string) error {
 }
 
 // Errorf is calls the stdlib errors.Errorf and includes a stack trace.
+// An error passed with the %w verb is kept, so that Unwrap, Is and As can
+// find it.
 func Errorf(format string, args ...any) error {
 	return &errorWithStack{
 		msg:   fmt.Errorf(format, args...),

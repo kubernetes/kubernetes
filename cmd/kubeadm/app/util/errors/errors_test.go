@@ -17,6 +17,7 @@ limitations under the License.
 package errors
 
 import (
+	"errors"
 	"flag"
 	"strings"
 	"testing"
@@ -77,5 +78,50 @@ func TestHandleError(t *testing.T) {
 
 			handleError(err, handleFunc)
 		})
+	}
+}
+
+func TestUnwrap(t *testing.T) {
+	cause := errors.New("cause")
+
+	tests := []struct {
+		name          string
+		err           error
+		expectedMsg   string
+		expectedCause error
+	}{
+		{"Wrap", Wrap(cause, "ctx"), "ctx: cause", cause},
+		{"Wrapf", Wrapf(cause, "ctx %d", 1), "ctx 1: cause", cause},
+		{"WithMessage", WithMessage(cause, "ctx"), "ctx: cause", cause},
+		{"WithMessagef", WithMessagef(cause, "ctx %d", 1), "ctx 1: cause", cause},
+		{"Errorf with %w", Errorf("ctx: %w", cause), "ctx: cause", cause},
+		{"Errorf without %w", Errorf("ctx: %v", cause), "ctx: cause", nil},
+		{"New", New("ctx"), "ctx", nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.err.Error() != tc.expectedMsg {
+				t.Errorf("expected message %q, got %q", tc.expectedMsg, tc.err.Error())
+			}
+			if got := Unwrap(tc.err); got != tc.expectedCause {
+				t.Errorf("expected Unwrap to return %v, got %v", tc.expectedCause, got)
+			}
+			if got := Is(tc.err, cause); got != (tc.expectedCause != nil) {
+				t.Errorf("expected Is to return %v, got %v", tc.expectedCause != nil, got)
+			}
+		})
+	}
+}
+
+func TestUnwrapMultiple(t *testing.T) {
+	first, second := errors.New("first"), errors.New("second")
+	err := Errorf("ctx: %w, %w", first, second)
+
+	if err.Error() != "ctx: first, second" {
+		t.Errorf("expected message %q, got %q", "ctx: first, second", err.Error())
+	}
+	if !Is(err, first) || !Is(err, second) {
+		t.Errorf("expected Is to find both wrapped errors")
 	}
 }
