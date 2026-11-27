@@ -273,6 +273,7 @@ func (o *CloudControllerManagerOptions) Validate(allControllers []string, disabl
 		}
 	}
 	errors = append(errors, o.KubeCloudShared.Validate()...)
+	errors = append(errors, o.NodeController.Validate()...)
 	errors = append(errors, o.NodeLifecycleController.Validate()...)
 	errors = append(errors, o.ServiceController.Validate()...)
 	errors = append(errors, o.SecureServing.Validate()...)
