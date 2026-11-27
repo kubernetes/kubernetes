@@ -32,17 +32,18 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/utils/clock"
 	testclock "k8s.io/utils/clock/testing"
-
-	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type fakeAuthorizer struct {
@@ -55,8 +56,21 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 	return f.decision, f.reason, f.err
 }
 
-func newStorage(t *testing.T, authz authorizer.UnconditionalAuthorizer, clock clock.PassiveClock) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, certificates.SchemeGroupVersion.WithResource("podcertificaterequests").GroupResource())
+// newStorage creates the REST storages. Unless usePKCS10 is set, the storage
+// version is v1beta1: v1 has no PKIXPublicKey/ProofOfPossession, so those can
+// only be stored with v1beta1 (v1 was introduced in 1.37).
+func newStorage(t *testing.T, authz authorizer.UnconditionalAuthorizer, clock clock.PassiveClock, usePKCS10 bool) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
+	resource := certificates.SchemeGroupVersion.WithResource("podcertificaterequests").GroupResource()
+	var etcdStorage *storagebackend.ConfigForResource
+	var server *etcd3testing.EtcdTestServer
+	if usePKCS10 {
+		etcdStorage, server = registrytest.NewEtcdStorageForResource(t, resource)
+	} else {
+		effectiveVersion := basecompatibility.NewEffectiveVersionFromString("1.39", "", "")
+		effectiveVersion.SetEmulationVersion(version.MajorMinor(1, 36))
+		effectiveVersion.SetMinCompatibilityVersion(version.MajorMinor(1, 36))
+		etcdStorage, server = registrytest.NewEtcdStorageForResourceEffectiveVersion(t, resource, &certificates.PodCertificateRequest{}, effectiveVersion)
+	}
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
@@ -70,11 +84,29 @@ func newStorage(t *testing.T, authz authorizer.UnconditionalAuthorizer, clock cl
 	return storage, statusStorage, server
 }
 
+// forEachSpecVariant runs fn once for a PCR with StubPKCS10Request (stored as
+// v1) and once for a PCR with the deprecated PKIXPublicKey and
+// ProofOfPossession fields (stored as v1beta1).
+func forEachSpecVariant(t *testing.T, fn func(t *testing.T, usePKCS10 bool)) {
+	for name, usePKCS10 := range map[string]bool{
+		"pkcs10":                 true,
+		"pkix-and-proof-v1beta1": false,
+	} {
+		t.Run(name, func(t *testing.T) {
+			fn(t, usePKCS10)
+		})
+	}
+}
+
 func TestCreate(t *testing.T) {
+	forEachSpecVariant(t, testCreate)
+}
+
+func testCreate(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
@@ -85,26 +117,27 @@ func TestCreate(t *testing.T) {
 
 	podUID1 := types.UID("pod-uid-1")
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	_, _, ed25519PubPKIX2, ed25519Proof2 := mustMakeEd25519KeyAndProof(t, []byte("other-value"))
-	invalidPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	invalidPCRwithPKIX.Spec.PKIXPublicKey = ed25519PubPKIX2   //nolint:staticcheck // Deprecated fields must be tested
-	invalidPCRwithPKIX.Spec.ProofOfPossession = ed25519Proof2 //nolint:staticcheck // Deprecated fields must be tested
-	test.TestCreate(validPCRwithPKIX, invalidPCRwithPKIX)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
-	invalidPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
-	invalidPCRwithPKCS10.Spec.StubPKCS10Request = []byte("invalid-csr-bytes")
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
+	invalidPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
+	if usePKCS10 {
+		invalidPCRwithPKCS10.Spec.StubPKCS10Request = []byte("invalid-csr-bytes")
+	} else {
+		_, _, otherPKIX, otherProof := mustMakeEd25519KeyAndProof(t, []byte("other-value"))
+		invalidPCRwithPKCS10.Spec.PKIXPublicKey = otherPKIX      //nolint:staticcheck // Deprecated fields must be tested
+		invalidPCRwithPKCS10.Spec.ProofOfPossession = otherProof //nolint:staticcheck // Deprecated fields must be tested
+	}
 	test.TestCreate(validPCRwithPKCS10, invalidPCRwithPKCS10)
 }
 
 func TestUpdate(t *testing.T) {
+	forEachSpecVariant(t, testUpdate)
+}
+
+func testUpdate(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
@@ -130,22 +163,19 @@ func TestUpdate(t *testing.T) {
 		return pcr
 	}
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	test.TestUpdate(validPCRwithPKIX, validUpdate, invalidUpdate)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	test.TestUpdate(validPCRwithPKCS10, validUpdate, invalidUpdate)
 }
 
 func TestUpdateStompsStatus(t *testing.T) {
+	forEachSpecVariant(t, testUpdateStompsStatus)
+}
+
+func testUpdateStompsStatus(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
@@ -163,22 +193,19 @@ func TestUpdateStompsStatus(t *testing.T) {
 		return pcr
 	}
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	test.TestUpdate(validPCRwithPKIX, stompStatus)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	test.TestUpdate(validPCRwithPKCS10, stompStatus)
 }
 
 func TestUpdateStatus(t *testing.T) {
+	forEachSpecVariant(t, testUpdateStatus)
+}
+
+func testUpdateStatus(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
@@ -196,19 +223,7 @@ func TestUpdateStatus(t *testing.T) {
 		return pcr
 	}
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, pubKeyPKIX := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	pod1CertPKIX := mustSignCertForPublicKey(t, 24*time.Hour, pubKeyPKIX, caCertDER, caPrivKey)
-	test.TestUpdate(
-		validPCRwithPKIX,
-		makeStatusUpdate(t, pod1CertPKIX),
-		invalidUpdate,
-	)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, pubKeyPKCS10 := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, pubKeyPKCS10 := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	pod1CertPKCS10 := mustSignCertForPublicKey(t, 24*time.Hour, pubKeyPKCS10, caCertDER, caPrivKey)
 	test.TestUpdate(
 		validPCRwithPKCS10,
@@ -218,10 +233,14 @@ func TestUpdateStatus(t *testing.T) {
 }
 
 func TestUpdateStatusStompsSpec(t *testing.T) {
+	forEachSpecVariant(t, testUpdateStatusStompsSpec)
+}
+
+func testUpdateStatusStompsSpec(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
@@ -239,22 +258,19 @@ func TestUpdateStatusStompsSpec(t *testing.T) {
 		return pcr
 	}
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	test.TestUpdate(validPCRwithPKIX, stompSpec)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	test.TestUpdate(validPCRwithPKCS10, stompSpec)
 }
 
 func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
+	forEachSpecVariant(t, testUpdateStatusFailsWhenAuthorizerDenies)
+}
+
+func testUpdateStatusFailsWhenAuthorizerDenies(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionNoOpinion,
 	}
-	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	_, statusStorage, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
@@ -270,19 +286,7 @@ func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
 		return object
 	}
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, pubKeyPKIX := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	pod1CertPKIX := mustSignCertForPublicKey(t, 24*time.Hour, pubKeyPKIX, caCertDER, caPrivKey)
-	test.TestUpdate(
-		validPCRwithPKIX,
-		noopUpdate,
-		makeStatusUpdate(t, pod1CertPKIX),
-	)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, pubKeyPKCS10 := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, pubKeyPKCS10 := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	pod1CertPKCS10 := mustSignCertForPublicKey(t, 24*time.Hour, pubKeyPKCS10, caCertDER, caPrivKey)
 	test.TestUpdate(
 		validPCRwithPKCS10,
@@ -292,10 +296,14 @@ func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	forEachSpecVariant(t, testDelete)
+}
+
+func testDelete(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
@@ -306,22 +314,19 @@ func TestDelete(t *testing.T) {
 
 	podUID1 := types.UID("pod-uid-1")
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	test.TestDelete(validPCRwithPKIX)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	test.TestDelete(validPCRwithPKCS10)
 }
 
 func TestGet(t *testing.T) {
+	forEachSpecVariant(t, testGet)
+}
+
+func testGet(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
@@ -332,22 +337,19 @@ func TestGet(t *testing.T) {
 
 	podUID1 := types.UID("pod-uid-1")
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	test.TestGet(validPCRwithPKIX)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	test.TestGet(validPCRwithPKCS10)
 }
 
 func TestList(t *testing.T) {
+	forEachSpecVariant(t, testList)
+}
+
+func testList(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
@@ -358,22 +360,19 @@ func TestList(t *testing.T) {
 
 	podUID1 := types.UID("pod-uid-1")
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	test.TestList(validPCRwithPKIX)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	test.TestList(validPCRwithPKCS10)
 }
 
 func TestWatch(t *testing.T) {
+	forEachSpecVariant(t, testWatch)
+}
+
+func testWatch(t *testing.T, usePKCS10 bool) {
 	authz := &fakeAuthorizer{
 		decision: authorizer.DecisionAllow,
 	}
-	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")))
+	storage, _, server := newStorage(t, authz, testclock.NewFakePassiveClock(mustParseTime(t, "1970-01-01T00:00:00Z")), usePKCS10)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
@@ -384,40 +383,7 @@ func TestWatch(t *testing.T) {
 
 	podUID1 := types.UID("pod-uid-1")
 
-	// Test PCR with PKIXPublicKey and ProofOfPossession fields
-	validPCRwithPKIX, _ := makeValidPCR(t, "foo1", test.TestNamespace(), podUID1, false)
-	test.TestWatch(
-		validPCRwithPKIX,
-		// matching labels
-		[]labels.Set{},
-		// not matching labels
-		[]labels.Set{
-			{"foo": "bar"},
-		},
-		// matching fields
-		[]fields.Set{
-			{
-				"metadata.namespace": test.TestNamespace(),
-				"metadata.name":      "foo1",
-				"spec.signerName":    "k8s.io/foo",
-				"spec.nodeName":      "node-1",
-			},
-		},
-		// not matching fields
-		[]fields.Set{
-			{
-				"metadata.namespace": test.TestNamespace(),
-				"metadata.name":      "foo1",
-				"spec.signerName":    "k8s.io/othersigner",
-				"spec.nodeName":      "node-1",
-			},
-		},
-	)
-
-	clearStorage(t, server)
-
-	// Test PRC with StubPKCS10Request field
-	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, true)
+	validPCRwithPKCS10, _ := makeValidPCR(t, "foo2", test.TestNamespace(), podUID1, usePKCS10)
 	test.TestWatch(
 		validPCRwithPKCS10,
 		// matching labels
@@ -566,16 +532,6 @@ func makeValidPCR(t *testing.T, name string, namespace string, podUID types.UID,
 		pubKey = pubKeyPKIX
 	}
 	return pcr, pubKey
-}
-
-func clearStorage(t *testing.T, server *etcd3testing.EtcdTestServer) {
-	// The resttest.Tester internally uses multiple namespaces ("test", "bar1", "bar2", etc.)
-	// to test namespace isolation. To prevent "already exists" conflicts between subtests
-	// within the same etcd instance, we wipe all podcertificaterequest keys across all
-	// namespaces directly from etcd using their resource prefix.
-	if _, err := server.V3Client.Delete(context.TODO(), "/registry/podcertificaterequests", clientv3.WithPrefix()); err != nil {
-		t.Fatalf("unable to clear etcd database: %v", err)
-	}
 }
 
 func makeStatusUpdate(t *testing.T, certChain string) func(runtime.Object) runtime.Object {

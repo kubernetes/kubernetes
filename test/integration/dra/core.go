@@ -33,7 +33,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,20 +66,6 @@ func testPod(tCtx ktesting.TContext) {
 	assert.NotEmpty(tCtx, pod.Spec.ResourceClaims, "should store resource claims in pod spec")
 }
 
-// testConvert creates a claim using a one API version and reads it with another.
-func testConvert(tCtx ktesting.TContext) {
-	tCtx.Parallel()
-	namespace := createTestNamespace(tCtx, nil)
-	claim := claim.DeepCopy()
-	claim.Namespace = namespace
-	claim, err := tCtx.Client().ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{FieldValidation: "Strict"})
-	tCtx.ExpectNoError(err, "create claim")
-	claimBeta2, err := tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
-	tCtx.ExpectNoError(err, "get claim")
-	// We could check more fields, but there are unit tests which cover this better.
-	assert.Equal(tCtx, claim.Name, claimBeta2.Name, "claim name")
-}
-
 // testResourceSliceFieldSelectors verifies that all supported ResourceSlice
 // field selectors return the same objects through all served API versions.
 func testResourceSliceFieldSelectors(tCtx ktesting.TContext) {
@@ -99,14 +84,6 @@ func testResourceSliceFieldSelectors(tCtx ktesting.TContext) {
 			poolNameField: resourceapi.ResourceSliceSelectorPoolName,
 			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
 				return tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, options)
-			},
-		},
-		"v1beta2": {
-			driverField:   resourcev1beta2.ResourceSliceSelectorDriver,
-			nodeNameField: resourcev1beta2.ResourceSliceSelectorNodeName,
-			poolNameField: resourcev1beta2.ResourceSliceSelectorPoolName,
-			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
-				return tCtx.Client().ResourceV1beta2().ResourceSlices().List(tCtx, options)
 			},
 		},
 	}
