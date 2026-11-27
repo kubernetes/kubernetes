@@ -21,11 +21,12 @@ package subpath
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"unsafe"
 
+	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 )
@@ -35,6 +36,21 @@ import (
 const MaxPathLength = 32767
 
 type subpath struct{}
+
+type windowsLinkType uint8
+
+const (
+	windowsNotLink windowsLinkType = iota
+	windowsSymbolicLink
+	windowsJunction
+	windowsHardLink
+)
+
+var (
+	linkKernel32       = windows.NewLazySystemDLL("kernel32.dll")
+	findFirstFileNameW = linkKernel32.NewProc("FindFirstFileNameW")
+	findNextFileNameW  = linkKernel32.NewProc("FindNextFileNameW")
+)
 
 // New returns a subpath.Interface for the current system
 func New(mount.Interface) Interface {
@@ -75,25 +91,65 @@ func getUpperPath(path string) string {
 	return filepath.Dir(upperpath)
 }
 
+// Reparse points include objects other than the two link types PowerShell
+// follows. Inspect the tag rather than relying on Lstat's Go-version-dependent
+// classification of junctions.
+func nativeLinkType(path string) (windowsLinkType, error) {
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return windowsNotLink, &os.PathError{Op: "linktype", Path: path, Err: err}
+	}
+	attributes, err := windows.GetFileAttributes(p)
+	if err != nil {
+		return windowsNotLink, &os.PathError{Op: "linktype", Path: path, Err: err}
+	}
+	if attributes&windows.FILE_ATTRIBUTE_REPARSE_POINT == 0 && attributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0 {
+		return windowsNotLink, nil
+	}
+	handle, err := windows.CreateFile(p, 0, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if err != nil {
+		return windowsNotLink, &os.PathError{Op: "linktype", Path: path, Err: err}
+	}
+	defer windows.CloseHandle(handle)
+	if attributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		var info struct{ attributes, tag uint32 }
+		err = windows.GetFileInformationByHandleEx(handle, windows.FileAttributeTagInfo, (*byte)(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)))
+		if err != nil {
+			return windowsNotLink, &os.PathError{Op: "linktype", Path: path, Err: err}
+		}
+		switch info.tag {
+		case windows.IO_REPARSE_TAG_SYMLINK:
+			return windowsSymbolicLink, nil
+		case windows.IO_REPARSE_TAG_MOUNT_POINT:
+			return windowsJunction, nil
+		}
+		return windowsNotLink, nil
+	}
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return windowsNotLink, &os.PathError{Op: "linktype", Path: path, Err: err}
+	}
+	if info.NumberOfLinks > 1 {
+		return windowsHardLink, nil
+	}
+	return windowsNotLink, nil
+}
+
 // Check whether a directory/file is a link type or not
 // LinkType could be SymbolicLink, Junction, or HardLink
 func isLinkPath(path string) (bool, error) {
-	cmd := exec.Command("powershell", "/c", "$ErrorActionPreference = 'Stop'; (Get-Item -Force -LiteralPath $env:linkpath).LinkType")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("linkpath=%s", path))
-	klog.V(8).Infof("Executing command: %q", cmd.String())
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return false, err
-	}
-	if strings.TrimSpace(string(output)) != "" {
-		return true, nil
-	}
-	return false, nil
+	kind, err := nativeLinkType(path)
+	return kind != windowsNotLink, err
 }
 
 // evalSymlink returns the path name after the evaluation of any symbolic links.
 // If the path after evaluation is a device path or network connection, the original path is returned
 func evalSymlink(path string) (string, error) {
+	// Check before normalization, which adds a drive prefix to paths starting
+	// with a backslash. Special paths must not cause filesystem/network access.
+	if isDeviceOrUncPath(path) {
+		return mount.NormalizeWindowsPath(path), nil
+	}
 	path = mount.NormalizeWindowsPath(path)
 	if isDeviceOrUncPath(path) || isDriveLetterorEmptyPath(path) {
 		klog.V(4).Infof("Path '%s' is not a symlink, return its original form.", path)
@@ -102,13 +158,16 @@ func evalSymlink(path string) (string, error) {
 	upperpath := path
 	base := ""
 	for i := 0; i < MaxPathLength; i++ {
-		isLink, err := isLinkPath(upperpath)
+		kind, err := nativeLinkType(upperpath)
 		if err != nil {
 			return "", err
 		}
-		if isLink {
+		if kind == windowsSymbolicLink || kind == windowsJunction {
 			break
 		}
+		// Hardlinks alias a file; following PowerShell's other names would cycle.
+		// Keep this name and resolve its parents. Containment is checked under
+		// the file's lock below, including every other hardlink name.
 		// continue to check next layer
 		base = filepath.Join(filepath.Base(upperpath), base)
 		upperpath = getUpperPath(upperpath)
@@ -117,17 +176,13 @@ func evalSymlink(path string) (string, error) {
 			return path, nil
 		}
 	}
-	// This command will give the target path of a given symlink
-	// The -Force parameter will allow Get-Item to also evaluate hidden folders, like AppData.
-	cmd := exec.Command("powershell", "/c", "$ErrorActionPreference = 'Stop'; (Get-Item -Force -LiteralPath $env:linkpath).Target")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("linkpath=%s", upperpath))
-	klog.V(8).Infof("Executing command: %q", cmd.String())
-	output, err := cmd.CombinedOutput()
+	// Readlink handles both symlink and mount-point reparse tags, including
+	// junctions whose Lstat mode changed in Go 1.23.
+	linkedPath, err := os.Readlink(upperpath)
 	if err != nil {
 		return "", err
 	}
-	klog.V(4).Infof("evaluate path %s: symlink from %s to %s", path, upperpath, string(output))
-	linkedPath := strings.TrimSpace(string(output))
+	klog.V(4).Infof("evaluate path %s: symlink from %s to %s", path, upperpath, linkedPath)
 	if linkedPath == "" || isDeviceOrUncPath(linkedPath) {
 		klog.V(4).Infof("Path '%s' has a target %s. Return its original form.", path, linkedPath)
 		return path, nil
@@ -141,6 +196,96 @@ func evalSymlink(path string) (string, error) {
 		return path, err
 	}
 	return filepath.Join(nextLink, base), nil
+}
+
+// Hardlinks are names of the same file, not redirects. PowerShell's Target
+// lists the other names, which may point back to the input and cause resolver
+// recursion. Enumerate the names for containment checks without following them.
+func hardLinkTargets(path string) ([]string, error) {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	// Enumeration returns long names even when the input uses an 8.3 alias.
+	// Compare names in the same form so the input is not its own target.
+	absolute, err = longPathName(absolute)
+	if err != nil {
+		return nil, err
+	}
+	p, err := windows.UTF16PtrFromString(absolute)
+	if err != nil {
+		return nil, err
+	}
+	volume := make([]uint16, MaxPathLength+1)
+	if err := windows.GetVolumePathName(p, &volume[0], uint32(len(volume))); err != nil {
+		return nil, &os.PathError{Op: "hardlink targets", Path: path, Err: err}
+	}
+	volumePath := windows.UTF16ToString(volume)
+	buffer := make([]uint16, MaxPathLength+1)
+	length := uint32(len(buffer))
+	handle, _, err := findFirstFileNameW.Call(uintptr(unsafe.Pointer(p)), 0, uintptr(unsafe.Pointer(&length)), uintptr(unsafe.Pointer(&buffer[0])))
+	if handle == uintptr(windows.InvalidHandle) {
+		return nil, &os.PathError{Op: "hardlink targets", Path: path, Err: err}
+	}
+	defer windows.FindClose(windows.Handle(handle))
+	var targets []string
+	for {
+		target := filepath.Join(volumePath, strings.TrimPrefix(windows.UTF16ToString(buffer), `\`))
+		if !strings.EqualFold(filepath.Clean(target), filepath.Clean(absolute)) {
+			targets = append(targets, target)
+		}
+		length = uint32(len(buffer))
+		ok, _, err := findNextFileNameW.Call(handle, uintptr(unsafe.Pointer(&length)), uintptr(unsafe.Pointer(&buffer[0])))
+		if ok == 0 {
+			if err != windows.ERROR_HANDLE_EOF {
+				return nil, &os.PathError{Op: "hardlink targets", Path: path, Err: err}
+			}
+			break
+		}
+	}
+	return targets, nil
+}
+
+func longPathName(path string) (string, error) {
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return "", err
+	}
+	buffer := make([]uint16, MaxPathLength+1)
+	n, err := windows.GetLongPathName(p, &buffer[0], uint32(len(buffer)))
+	if err == nil && n >= uint32(len(buffer)) {
+		err = windows.ERROR_INSUFFICIENT_BUFFER
+	}
+	if err != nil {
+		return "", &os.PathError{Op: "long path name", Path: path, Err: err}
+	}
+	return windows.UTF16ToString(buffer[:n]), nil
+}
+
+// Called while the caller retains the file's lockPath handle. A hardlink with
+// a name outside the volume must not turn native resolution into a bypass of
+// the subPath containment check.
+func checkHardLinkTargets(path, volumePath string) error {
+	// Otherwise a valid long-name alias appears outside an 8.3 volume path.
+	volumePath, err := longPathName(volumePath)
+	if err != nil {
+		return err
+	}
+	targets, err := hardLinkTargets(path)
+	if err != nil {
+		return err
+	}
+	for _, target := range targets {
+		resolved, err := evalSymlink(target)
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(volumePath, resolved)
+		if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("hardlink %q has a target %q outside volume %q", path, target, volumePath)
+		}
+	}
+	return nil
 }
 
 // check whether hostPath is within volume path
@@ -214,6 +359,19 @@ func lockAndCheckSubPathWithoutSymlink(volumePath, subPath string) ([]uintptr, e
 		if stat.Mode()&os.ModeIrregular != 0 {
 			errorResult = fmt.Errorf("subpath %q is an unexpected irregular file after EvalSymlinks", currentFullPath)
 			break
+		}
+		if !stat.IsDir() {
+			kind, err := nativeLinkType(currentFullPath)
+			if err != nil {
+				errorResult = err
+				break
+			}
+			if kind == windowsHardLink {
+				if err := checkHardLinkTargets(currentFullPath, volumePath); err != nil {
+					errorResult = err
+					break
+				}
+			}
 		}
 
 		if !mount.PathWithinBase(currentFullPath, volumePath) {

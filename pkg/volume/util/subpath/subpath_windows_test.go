@@ -19,17 +19,25 @@ limitations under the License.
 package subpath
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
+	"k8s.io/mount-utils"
 )
 
-func makeLink(link, target string) error {
-	if output, err := exec.Command("cmd", "/c", "mklink", "/D", link, target).CombinedOutput(); err != nil {
+func makeLink(link, target, linkType string) error {
+	if linkType == "" {
+		linkType = "/D"
+	}
+	if output, err := exec.Command("cmd", "/c", "mklink", linkType, link, target).CombinedOutput(); err != nil {
 		return fmt.Errorf("mklink failed: %v, link(%q) target(%q) output: %q", err, link, target, string(output))
 	}
 	return nil
@@ -113,7 +121,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 			// make last element as symlink
 			linkPath := test.subPath
 			if _, err := os.Stat(linkPath); err != nil && os.IsNotExist(err) {
-				if err := makeLink(linkPath, test.symlinkTarget); err != nil {
+				if err := makeLink(linkPath, test.symlinkTarget, "/D"); err != nil {
 					t.Fatalf("unexpected error: %v", fmt.Errorf("mklink link(%q) target(%q) error: %q", linkPath, test.symlinkTarget, err))
 				}
 			}
@@ -147,6 +155,7 @@ func TestLockAndCheckSubPath(t *testing.T) {
 		expectedHandleCount int
 		expectError         bool
 		symlinkTarget       string
+		linkType            string
 	}{
 		{
 			volumePath:          `c:\`,
@@ -197,6 +206,21 @@ func TestLockAndCheckSubPath(t *testing.T) {
 			expectError:         false,
 			symlinkTarget:       filepath.Join(testingVolumePath, `a\b`),
 		},
+		{
+			volumePath:          testingVolumePath,
+			subPath:             filepath.Join(testingVolumePath, `junction-outside`),
+			expectedHandleCount: 0,
+			expectError:         true,
+			symlinkTarget:       base,
+			linkType:            "/J",
+		},
+		{
+			volumePath:          testingVolumePath,
+			subPath:             filepath.Join(testingVolumePath, `junction-inside`),
+			expectedHandleCount: 2,
+			symlinkTarget:       filepath.Join(testingVolumePath, `a\b`),
+			linkType:            "/J",
+		},
 	}
 
 	for _, test := range tests {
@@ -214,7 +238,7 @@ func TestLockAndCheckSubPath(t *testing.T) {
 				// make last element as symlink
 				linkPath := test.subPath
 				if _, err := os.Stat(linkPath); err != nil && os.IsNotExist(err) {
-					if err := makeLink(linkPath, test.symlinkTarget); err != nil {
+					if err := makeLink(linkPath, test.symlinkTarget, test.linkType); err != nil {
 						t.Fatalf("unexpected error: %v", fmt.Errorf("mklink link(%q) target(%q) error: %q", linkPath, test.symlinkTarget, err))
 					}
 				}
@@ -318,7 +342,7 @@ func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
 				// make last element as symlink
 				linkPath := test.subPath
 				if _, err := os.Stat(linkPath); err != nil && os.IsNotExist(err) {
-					if err := makeLink(linkPath, test.symlinkTarget); err != nil {
+					if err := makeLink(linkPath, test.symlinkTarget, "/D"); err != nil {
 						t.Fatalf("unexpected error: %v", fmt.Errorf("mklink link(%q) target(%q) error: %q", linkPath, test.symlinkTarget, err))
 					}
 				}
@@ -540,5 +564,241 @@ func TestIsDeviceOrUncPath(t *testing.T) {
 		result := isDeviceOrUncPath(test.path)
 		assert.Equal(t, test.expectedResult, result, "Expect result not equal with isDeviceOrUncPath(%s) return: %t, expected: %t",
 			test.path, result, test.expectedResult)
+	}
+}
+
+func makeTestSymlink(t *testing.T, target, link string) {
+	t.Helper()
+	err := os.Symlink(target, link)
+	if errors.Is(err, windows.ERROR_PRIVILEGE_NOT_HELD) {
+		t.Skipf("symbolic link creation requires SeCreateSymbolicLinkPrivilege: %v", err)
+	}
+	require.NoError(t, err)
+}
+
+func TestNativeLinkType(t *testing.T) {
+	root := t.TempDir()
+	file, dir := filepath.Join(root, "file.cfg"), filepath.Join(root, "dir")
+	require.NoError(t, os.WriteFile(file, []byte("fixture"), 0600))
+	require.NoError(t, os.Mkdir(dir, 0700))
+	tests := []struct {
+		name, path, target string
+		linkType           windowsLinkType
+	}{
+		{name: "file", path: file},
+		{name: "directory", path: dir},
+		{name: "file symlink", target: file, linkType: windowsSymbolicLink},
+		{name: "directory symlink", target: dir, linkType: windowsSymbolicLink},
+		{name: "junction", target: dir, linkType: windowsJunction},
+		{name: "hardlink", target: file, linkType: windowsHardLink},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := test.path
+			if path == "" {
+				path = filepath.Join(root, test.name)
+			}
+			switch test.linkType {
+			case windowsSymbolicLink:
+				makeTestSymlink(t, test.target, path)
+			case windowsJunction:
+				require.NoError(t, makeLink(path, test.target, "/J"))
+			case windowsHardLink:
+				require.NoError(t, os.Link(test.target, path))
+			}
+			paths := []string{path}
+			if test.linkType == windowsHardLink {
+				paths = append(paths, test.target)
+			}
+			for _, path := range paths {
+				kind, err := nativeLinkType(path)
+				assert.NoError(t, err)
+				assert.Equal(t, test.linkType, kind)
+				isLink, err := isLinkPath(path)
+				assert.NoError(t, err)
+				assert.Equal(t, test.linkType != windowsNotLink, isLink)
+			}
+		})
+	}
+	_, err := nativeLinkType(filepath.Join(root, "missing"))
+	assert.True(t, os.IsNotExist(err), "expected a not-exist error, got %v", err)
+}
+
+func TestEvalSymlink(t *testing.T) {
+	root := t.TempDir()
+	dir, file := filepath.Join(root, "target"), filepath.Join(root, "target", "file.cfg")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "leaf"), 0700))
+	require.NoError(t, os.WriteFile(file, []byte("fixture"), 0600))
+	tests := []struct {
+		name, target, suffix, expected string
+		junction                       bool
+	}{
+		{name: "absolute file", target: file, expected: file},
+		{name: "relative file", target: filepath.Join("target", "file.cfg"), expected: file},
+		{name: "absolute directory parent", target: dir, suffix: "leaf", expected: filepath.Join(dir, "leaf")},
+		{name: "relative directory parent", target: "target", suffix: "leaf", expected: filepath.Join(dir, "leaf")},
+		{name: "junction parent", target: dir, suffix: "leaf", expected: filepath.Join(dir, "leaf"), junction: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			link := filepath.Join(root, test.name)
+			if test.junction {
+				require.NoError(t, makeLink(link, test.target, "/J"))
+			} else {
+				makeTestSymlink(t, test.target, link)
+			}
+			// Resolution must work without a PowerShell executable in PATH.
+			t.Setenv("PATH", filepath.Join(root, "no-executables"))
+			actual, err := evalSymlink(filepath.Join(link, test.suffix))
+			assert.NoError(t, err)
+			assert.Equal(t, strings.ToLower(test.expected), strings.ToLower(actual))
+		})
+	}
+	actual, err := evalSymlink(file)
+	assert.NoError(t, err)
+	assert.Equal(t, file, actual)
+	_, err = evalSymlink(filepath.Join(root, "missing"))
+	assert.True(t, os.IsNotExist(err), "expected a not-exist error, got %v", err)
+}
+
+func TestHardLinkTargets(t *testing.T) {
+	// TempDir may inherit a short-name TEMP path from the Windows account.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	file := filepath.Join(root, "file.cfg")
+	require.NoError(t, os.WriteFile(file, []byte("fixture"), 0600))
+	names := []string{"file.cfg", "alias1.cfg", "alias2.cfg"}
+	for _, name := range names[1:] {
+		require.NoError(t, os.Link(file, filepath.Join(root, name)))
+	}
+	for _, name := range names {
+		path := filepath.Join(root, name)
+		targets, err := hardLinkTargets(path)
+		require.NoError(t, err)
+		for i := range targets {
+			targets[i] = strings.ToLower(targets[i])
+		}
+		var expected []string
+		for _, other := range names {
+			if other != name {
+				expected = append(expected, strings.ToLower(filepath.Join(root, other)))
+			}
+		}
+		assert.ElementsMatch(t, expected, targets, "hardlink %q", path)
+		resolved, err := evalSymlink(path)
+		assert.NoError(t, err)
+		assert.Equal(t, strings.ToLower(path), strings.ToLower(resolved))
+	}
+}
+
+func TestHardLinkShortPaths(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	volume := filepath.Join(root, "long-volume-directory")
+	require.NoError(t, os.Mkdir(volume, 0700))
+	file, alias := filepath.Join(volume, "file.cfg"), filepath.Join(volume, "alias.cfg")
+	require.NoError(t, os.WriteFile(file, []byte("fixture"), 0600))
+	require.NoError(t, os.Link(file, alias))
+	shortName := func(path string) string {
+		t.Helper()
+		p, err := windows.UTF16PtrFromString(path)
+		require.NoError(t, err)
+		buffer := make([]uint16, MaxPathLength+1)
+		n, err := windows.GetShortPathName(p, &buffer[0], uint32(len(buffer)))
+		require.NoError(t, err)
+		require.Less(t, n, uint32(len(buffer)))
+		return windows.UTF16ToString(buffer[:n])
+	}
+	shortVolume, shortFile := shortName(volume), shortName(file)
+	if strings.EqualFold(shortVolume, volume) {
+		t.Skip("test filesystem does not provide 8.3 names")
+	}
+	targets, err := hardLinkTargets(shortFile)
+	require.NoError(t, err)
+	require.Len(t, targets, 1)
+	assert.Equal(t, strings.ToLower(alias), strings.ToLower(targets[0]))
+	handles, err := lockAndCheckSubPath(shortVolume, shortFile)
+	unlockPath(handles)
+	assert.NoError(t, err)
+	require.NoError(t, os.Link(file, filepath.Join(root, "outside.cfg")))
+	handles, err = lockAndCheckSubPath(shortVolume, shortFile)
+	unlockPath(handles)
+	assert.Error(t, err, "expected rejection of a hardlink outside the volume")
+}
+
+func TestLockAndCheckSubPathHardLinks(t *testing.T) {
+	root := t.TempDir()
+	volume := filepath.Join(root, "volume")
+	require.NoError(t, os.Mkdir(volume, 0700))
+	file, alias := filepath.Join(volume, "file.cfg"), filepath.Join(volume, "alias.cfg")
+	require.NoError(t, os.WriteFile(file, []byte("fixture"), 0600))
+	require.NoError(t, os.Link(file, alias))
+	handles, err := lockAndCheckSubPath(volume, alias)
+	assert.NoError(t, err)
+	assert.Len(t, handles, 1)
+	assert.Error(t, os.Rename(alias, alias+".renamed"), "hardlink name changed while locked")
+	unlockPath(handles)
+	assert.NoError(t, os.Rename(alias, alias+".renamed"), "cleanup did not release the handle")
+	require.NoError(t, os.Link(file, filepath.Join(root, "outside.cfg")))
+	handles, err = lockAndCheckSubPath(volume, file)
+	unlockPath(handles)
+	assert.Error(t, err, "expected rejection of a hardlink outside the volume")
+}
+
+func TestEvalSymlinkSpecialPaths(t *testing.T) {
+	for _, path := range []string{`\\127.0.0.1\not-a-share`, `//127.0.0.1/not-a-share`, `\\?\C:\not-a-path`, `\\.\PhysicalDrive999`, `UNC\127.0.0.1\not-a-share`, `Volume{00000000-0000-0000-0000-000000000000}\`, `C:`, `C:\`, ""} {
+		actual, err := evalSymlink(path)
+		assert.NoError(t, err, "path %q", path)
+		assert.Equal(t, mount.NormalizeWindowsPath(path), actual)
+	}
+	link := filepath.Join(t.TempDir(), "unc-target")
+	p, err := windows.UTF16PtrFromString(link)
+	require.NoError(t, err)
+	target, err := windows.UTF16PtrFromString(`\\127.0.0.1\not-a-share`)
+	require.NoError(t, err)
+	// Create the directory link without probing its remote target.
+	err = windows.CreateSymbolicLink(p, target, windows.SYMBOLIC_LINK_FLAG_DIRECTORY)
+	if errors.Is(err, windows.ERROR_PRIVILEGE_NOT_HELD) {
+		t.Skipf("symbolic link creation requires SeCreateSymbolicLinkPrivilege: %v", err)
+	}
+	require.NoError(t, err)
+	actual, err := evalSymlink(link)
+	assert.NoError(t, err)
+	assert.Equal(t, link, actual, "UNC target must not be followed")
+}
+
+func TestLockAndCheckSubPathAccessDenied(t *testing.T) {
+	volume := t.TempDir()
+	path := filepath.Join(volume, "denied.cfg")
+	require.NoError(t, os.WriteFile(path, []byte("fixture"), 0600))
+	original, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	require.NoError(t, err)
+	originalDACL, _, err := original.DACL()
+	require.NoError(t, err)
+	denied, err := windows.SecurityDescriptorFromString("D:(D;;GR;;;WD)(A;;GA;;;BA)(A;;GA;;;SY)")
+	require.NoError(t, err)
+	deniedDACL, _, err := denied.DACL()
+	require.NoError(t, err)
+	require.NoError(t, windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, deniedDACL, nil))
+	t.Cleanup(func() {
+		assert.NoError(t, windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.UNPROTECTED_DACL_SECURITY_INFORMATION, nil, nil, originalDACL, nil))
+	})
+	handles, err := lockAndCheckSubPath(volume, path)
+	unlockPath(handles)
+	if err == nil {
+		t.Skip("account bypasses the fixture's deny-read DACL")
+	}
+	assert.ErrorContains(t, err, "Access is denied")
+}
+
+func BenchmarkLockAndCheckSubPath(b *testing.B) {
+	volume := b.TempDir()
+	path := filepath.Join(volume, "a", "b", "c", "d")
+	require.NoError(b, os.MkdirAll(path, 0700))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		handles, err := lockAndCheckSubPath(volume, path)
+		unlockPath(handles)
+		require.NoError(b, err)
 	}
 }
