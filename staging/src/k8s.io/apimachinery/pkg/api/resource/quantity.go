@@ -696,7 +696,9 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		return zeroBytes, nil
 	}
 
-	var rounded CanonicalValue
+	// rounded is the value rounded to scale 0 for BinarySI. It is held as a
+	// concrete type, so that out does not escape through an interface call.
+	var rounded binarySIRounded
 	format := q.Format
 	switch format {
 	case DecimalExponent, DecimalSI:
@@ -709,7 +711,7 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 			format = DecimalExponent
 		} else {
 			var exact bool
-			if rounded, exact = q.AsScale(0); !exact {
+			if rounded, exact = q.asScaleZero(); !exact {
 				// Don't lose precision-- show as DecimalSI
 				format = DecimalSI
 			}
@@ -752,6 +754,38 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		}
 		return number, suffix
 	}
+}
+
+// binarySIRounded is a Quantity value rounded to scale 0, as either an int64Amount
+// or an infDecAmount.
+type binarySIRounded struct {
+	i     int64Amount
+	d     infDecAmount
+	isDec bool
+}
+
+// asScaleZero is AsScale(0) that returns a concrete type instead of a CanonicalValue.
+func (q *Quantity) asScaleZero() (binarySIRounded, bool) {
+	if q.d.Dec != nil {
+		d, exact := q.d.AsScale(0)
+		return binarySIRounded{d: d, isDec: true}, exact
+	}
+	i, exact := q.i.AsScale(0)
+	return binarySIRounded{i: i}, exact
+}
+
+func (r binarySIRounded) AsCanonicalBytes(out []byte) ([]byte, int32) {
+	if r.isDec {
+		return r.d.AsCanonicalBytes(out)
+	}
+	return r.i.AsCanonicalBytes(out)
+}
+
+func (r binarySIRounded) AsCanonicalBase1024Bytes(out []byte) ([]byte, int32) {
+	if r.isDec {
+		return r.d.AsCanonicalBase1024Bytes(out)
+	}
+	return r.i.AsCanonicalBase1024Bytes(out)
 }
 
 // AsApproximateFloat64 returns a float64 representation of the quantity which
@@ -1070,8 +1104,8 @@ func (q *Quantity) String() string {
 		return "<nil>"
 	}
 	if !q.s.validFor(q.Format) {
-		result := make([]byte, 0, int64QuantityExpectedBytes)
-		number, suffix := q.CanonicalizeBytes(result)
+		var result [int64QuantityExpectedBytes]byte
+		number, suffix := q.CanonicalizeBytes(result[:0])
 		return string(append(number, suffix...))
 	}
 	return q.s.str
