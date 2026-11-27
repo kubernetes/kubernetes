@@ -3180,7 +3180,7 @@ func sortPodsForAdmission(pods []*v1.Pod, hasAllocatedResources func(types.UID) 
 func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
-	sortPodsForAdmission(pods, kl.allocationManager.HasPodAllocatedResources)
+	kl.sortPodAdditions(ctx, pods)
 	// Backfill the resize conditions before any pod worker syncs the pods and updates them.
 	kl.statusManager.BackfillPodResizeConditions(pods)
 	var pendingAllocations []types.UID
