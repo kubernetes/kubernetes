@@ -245,22 +245,22 @@ func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	if err != nil {
 		notMnt, mntErr := mount.IsNotMountPoint(nfsMounter.mounter, dir)
 		if mntErr != nil {
-			klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+			klog.ErrorS(mntErr, "IsNotMountPoint check failed", "path", dir)
 			return err
 		}
 		if !notMnt {
 			if mntErr = nfsMounter.mounter.Unmount(dir); mntErr != nil {
-				klog.Errorf("Failed to unmount: %v", mntErr)
+				klog.ErrorS(mntErr, "Failed to unmount", "path", dir)
 				return err
 			}
 			notMnt, mntErr := mount.IsNotMountPoint(nfsMounter.mounter, dir)
 			if mntErr != nil {
-				klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+				klog.ErrorS(mntErr, "IsNotMountPoint check failed", "path", dir)
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.ErrorS(nil, "Directory is still mounted, despite call to unmount(); will try again next sync loop", "path", dir)
 				return err
 			}
 		}
