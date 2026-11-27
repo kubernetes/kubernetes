@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -521,4 +522,85 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 	}
 
 	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+}
+
+type fakeCertKeyContentProvider struct{}
+
+func (fakeCertKeyContentProvider) AddListener(dynamiccertificates.Listener) {}
+
+func (fakeCertKeyContentProvider) Name() string { return "fake" }
+
+func (fakeCertKeyContentProvider) CurrentCertKeyContent() ([]byte, []byte) { return nil, nil }
+
+func TestSecureServingOptionsValidateCertKeyPair(t *testing.T) {
+	tests := []struct {
+		name            string
+		certFile        string
+		keyFile         string
+		generated       bool
+		wantPairErr     bool
+		wantConflictErr bool
+	}{
+		{
+			name: "neither set",
+		},
+		{
+			name:     "both set",
+			certFile: "cert.pem",
+			keyFile:  "key.pem",
+		},
+		{
+			name:        "cert without key",
+			certFile:    "cert.pem",
+			wantPairErr: true,
+		},
+		{
+			name:        "key without cert",
+			keyFile:     "key.pem",
+			wantPairErr: true,
+		},
+		{
+			name:            "both set with generated certificate",
+			certFile:        "cert.pem",
+			keyFile:         "key.pem",
+			generated:       true,
+			wantConflictErr: true,
+		},
+		{
+			name:            "cert without key and generated certificate",
+			certFile:        "cert.pem",
+			generated:       true,
+			wantPairErr:     true,
+			wantConflictErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := &SecureServingOptions{BindPort: 443}
+			options.ServerCert.CertKey.CertFile = test.certFile
+			options.ServerCert.CertKey.KeyFile = test.keyFile
+			if test.generated {
+				options.ServerCert.GeneratedCert = fakeCertKeyContentProvider{}
+			}
+
+			var pairErr, conflictErr bool
+			for _, err := range options.Validate() {
+				switch {
+				case strings.Contains(err.Error(), "must be specified together"):
+					pairErr = true
+				case strings.Contains(err.Error(), "cannot both be set"):
+					conflictErr = true
+				default:
+					t.Errorf("unexpected validation error: %v", err)
+				}
+			}
+			if pairErr != test.wantPairErr {
+				t.Errorf("pair error = %v, want %v", pairErr, test.wantPairErr)
+			}
+			if conflictErr != test.wantConflictErr {
+				t.Errorf("conflict error = %v, want %v", conflictErr, test.wantConflictErr)
+			}
+		})
+	}
 }
