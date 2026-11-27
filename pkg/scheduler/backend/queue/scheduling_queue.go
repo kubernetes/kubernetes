@@ -1294,7 +1294,7 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pIn
 		return nil
 	}
 
-	p.activeQ.clearPoppedEntity()
+	p.activeQ.clearPoppedEntityIfMatches(pInfo)
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	if !pInfo.IsResize() {
 		for plugin := range rejectorPlugins {
