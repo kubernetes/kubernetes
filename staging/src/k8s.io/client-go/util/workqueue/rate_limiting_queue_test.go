@@ -24,7 +24,8 @@ import (
 )
 
 func TestRateLimitingQueue(t *testing.T) {
-	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second)
+	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second).(*ItemExponentialFailureRateLimiter)
+	limiter.int64N = randMax
 	queue := NewRateLimitingQueue(limiter).(*pausableRateLimitingType[any]) //nolint:logcheck // Intentionally testing old API here.
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	delayingQueue := &delayingType[any]{
@@ -39,12 +40,12 @@ func TestRateLimitingQueue(t *testing.T) {
 
 	queue.AddRateLimited("one")
 	waitEntry := <-delayingQueue.waitingForAddCh
-	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 1*time.Millisecond-1, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	queue.AddRateLimited("one")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 2*time.Millisecond-1, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := 2, queue.NumRequeues("one"); e != a {
@@ -53,12 +54,12 @@ func TestRateLimitingQueue(t *testing.T) {
 
 	queue.AddRateLimited("two")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 1*time.Millisecond-1, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	queue.AddRateLimited("two")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 2*time.Millisecond-1, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -68,7 +69,7 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 	queue.AddRateLimited("one")
 	waitEntry = <-delayingQueue.waitingForAddCh
-	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
+	if e, a := 1*time.Millisecond-1, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 

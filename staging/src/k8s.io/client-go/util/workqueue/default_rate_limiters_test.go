@@ -17,39 +17,37 @@ limitations under the License.
 package workqueue
 
 import (
+	"math"
+	"strconv"
 	"testing"
 	"time"
 )
 
+var (
+	randMin = func(int64) int64 { return 0 }
+	randMax = func(n int64) int64 { return n - 1 }
+)
+
 func TestItemExponentialFailureRateLimiter(t *testing.T) {
-	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second)
+	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 10*time.Millisecond).(*ItemExponentialFailureRateLimiter)
+	limiter.int64N = randMax
 
-	if e, a := 1*time.Millisecond, limiter.When("one"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+	// The largest possible delay follows baseDelay*2^n, capped at maxDelay.
+	for i, e := range []time.Duration{1, 2, 4, 8, 10, 10} {
+		if e, a := e*time.Millisecond-1, limiter.When("one"); e != a {
+			t.Errorf("attempt %d: expected %v, got %v", i, e, a)
+		}
 	}
-	if e, a := 2*time.Millisecond, limiter.When("one"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := 4*time.Millisecond, limiter.When("one"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := 8*time.Millisecond, limiter.When("one"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := 16*time.Millisecond, limiter.When("one"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := 5, limiter.NumRequeues("one"); e != a {
+	if e, a := 6, limiter.NumRequeues("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	if e, a := 1*time.Millisecond, limiter.When("two"); e != a {
+	// The smallest possible delay is zero.
+	limiter.int64N = randMin
+	if e, a := time.Duration(0), limiter.When("two"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 2*time.Millisecond, limiter.When("two"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := 2, limiter.NumRequeues("two"); e != a {
+	if e, a := 1, limiter.NumRequeues("two"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -57,43 +55,69 @@ func TestItemExponentialFailureRateLimiter(t *testing.T) {
 	if e, a := 0, limiter.NumRequeues("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := 1*time.Millisecond, limiter.When("one"); e != a {
+	limiter.int64N = randMax
+	if e, a := 1*time.Millisecond-1, limiter.When("one"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-
 }
 
 func TestItemExponentialFailureRateLimiterOverFlow(t *testing.T) {
-	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1000*time.Second)
-	for i := 0; i < 5; i++ {
-		limiter.When("one")
-	}
-	if e, a := 32*time.Millisecond, limiter.When("one"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-
+	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1000*time.Second).(*ItemExponentialFailureRateLimiter)
+	limiter.int64N = randMax
 	for i := 0; i < 1000; i++ {
 		limiter.When("overflow1")
 	}
-	if e, a := 1000*time.Second, limiter.When("overflow1"); e != a {
+	if e, a := 1000*time.Second-1, limiter.When("overflow1"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	limiter = NewItemExponentialFailureRateLimiter(1*time.Minute, 1000*time.Hour)
-	for i := 0; i < 2; i++ {
-		limiter.When("two")
+	limiter = NewItemExponentialFailureRateLimiter(1*time.Minute, math.MaxInt64).(*ItemExponentialFailureRateLimiter)
+	limiter.int64N = randMax
+	for i := range 100 {
+		if a := limiter.When("overflow2"); a < 0 {
+			t.Fatalf("attempt %d: negative delay %v, overflowed", i, a)
+		}
 	}
-	if e, a := 4*time.Minute, limiter.When("two"); e != a {
+	if e, a := time.Duration(math.MaxInt64-1), limiter.When("overflow2"); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+}
 
-	for i := 0; i < 1000; i++ {
-		limiter.When("overflow2")
+func TestItemExponentialFailureRateLimiterNonPositiveDelays(t *testing.T) {
+	for name, limiter := range map[string]RateLimiter{
+		"zero base": NewItemExponentialFailureRateLimiter(0, time.Second),
+		"zero max":  NewItemExponentialFailureRateLimiter(time.Millisecond, 0),
+	} {
+		for i := range 5 {
+			if e, a := time.Duration(0), limiter.When("one"); e != a {
+				t.Errorf("%s attempt %d: expected %v, got %v", name, i, e, a)
+			}
+		}
 	}
-	if e, a := 1000*time.Hour, limiter.When("overflow2"); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
+}
 
+// TestItemExponentialFailureRateLimiterSpreadsRetries checks that items failing
+// at the same time get different delays within the backoff window, which is
+// the point of jitter.
+func TestItemExponentialFailureRateLimiterSpreadsRetries(t *testing.T) {
+	const items = 1000
+	base, maxDelay := 5*time.Millisecond, 1000*time.Second
+	limiter := NewTypedItemExponentialFailureRateLimiter[string](base, maxDelay)
+	for attempt := range 10 {
+		ceiling := min(maxDelay, base<<attempt)
+		distinct := map[time.Duration]struct{}{}
+		for i := range items {
+			d := limiter.When(strconv.Itoa(i))
+			if d < 0 || d >= ceiling {
+				t.Fatalf("attempt %d: delay %v outside [0, %v)", attempt, d, ceiling)
+			}
+			distinct[d] = struct{}{}
+		}
+		// Collisions are possible but should be rare at nanosecond resolution.
+		if len(distinct) < items*9/10 {
+			t.Errorf("attempt %d: only %d distinct delays for %d items", attempt, len(distinct), items)
+		}
+	}
 }
 
 func TestItemFastSlowRateLimiter(t *testing.T) {
@@ -139,9 +163,11 @@ func TestItemFastSlowRateLimiter(t *testing.T) {
 }
 
 func TestMaxOfRateLimiter(t *testing.T) {
+	exponential := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second).(*ItemExponentialFailureRateLimiter)
+	exponential.int64N = randMin
 	limiter := NewMaxOfRateLimiter(
 		NewItemFastSlowRateLimiter(5*time.Millisecond, 3*time.Second, 3),
-		NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second),
+		exponential,
 	)
 
 	if e, a := 5*time.Millisecond, limiter.When("one"); e != a {
