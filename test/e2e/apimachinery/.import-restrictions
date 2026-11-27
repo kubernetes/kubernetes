@@ -1,0 +1,6 @@
+rules:
+  # Temporary exception for health_handlers.go checking WatchCacheInitializationPostStartHook.
+  # Will be removed in 1.40 when the feature gate and check are dropped.
+  - selectorRegexp: ^k8s[.]io/apiserver/pkg/util/feature$
+    allowedPrefixes:
+      - k8s.io/apiserver/pkg/util/feature
