@@ -52,7 +52,7 @@ const (
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
 	PLEGRelistDurationKey              = "pleg_relist_duration_seconds"
 	PLEGDiscardEventsKey               = "pleg_discard_events"
-	PLEGRelistRequestsDroppedKey        = "pleg_relist_requests_dropped_total"
+	PLEGRelistRequestsDroppedKey       = "pleg_relist_requests_dropped_total"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
 	PLEGPodRelistDurationKey           = "pleg_pod_relist_duration_seconds"

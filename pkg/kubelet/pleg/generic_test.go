@@ -883,10 +883,13 @@ func TestRequestRelistQueueFullIncrementsDroppedMetric(t *testing.T) {
 		pleg.relistRequests <- relistRequest{}
 	}
 
-	before := testutil.ToFloat64(metrics.PLEGRelistRequestsDropped)
-	pleg.RequestRelist(tCtx.Logger(), types.UID("test-pod"))
-	after := testutil.ToFloat64(metrics.PLEGRelistRequestsDropped)
+	before, err := testutil.GetCounterMetricValue(metrics.PLEGRelistRequestsDropped)
+	require.NoError(t, err)
 
+	pleg.RequestRelist(tCtx.Logger(), types.UID("test-pod"))
+
+	after, err := testutil.GetCounterMetricValue(metrics.PLEGRelistRequestsDropped)
+	require.NoError(t, err)
 	assert.Equal(t, before+1, after)
 }
 
