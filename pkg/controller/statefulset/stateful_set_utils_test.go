@@ -150,6 +150,74 @@ func TestOwnerRefsChanged(t *testing.T) {
 	}
 }
 
+func TestNewVersionedStatefulSetPod(t *testing.T) {
+	testCases := []struct {
+		name          string
+		policy        apps.PodManagementPolicyType
+		partition     *int32
+		wantRevisions []string
+	}{
+		{
+			name:          "Parallel without rollingUpdate uses update revision",
+			policy:        apps.ParallelPodManagement,
+			wantRevisions: []string{"update", "update", "update"},
+		},
+		{
+			name:          "OrderedReady without rollingUpdate keeps pods below CurrentReplicas on current revision",
+			policy:        apps.OrderedReadyPodManagement,
+			wantRevisions: []string{"current", "current", "update"},
+		},
+		{
+			name:          "partition 0 uses update revision",
+			policy:        apps.OrderedReadyPodManagement,
+			partition:     ptr.To[int32](0),
+			wantRevisions: []string{"update", "update", "update"},
+		},
+		{
+			name:          "partition below CurrentReplicas takes precedence",
+			policy:        apps.OrderedReadyPodManagement,
+			partition:     ptr.To[int32](1),
+			wantRevisions: []string{"current", "update", "update"},
+		},
+		{
+			name:          "Parallel honors an explicit partition",
+			policy:        apps.ParallelPodManagement,
+			partition:     ptr.To[int32](1),
+			wantRevisions: []string{"current", "update", "update"},
+		},
+		{
+			name:          "partition above CurrentReplicas takes precedence",
+			policy:        apps.OrderedReadyPodManagement,
+			partition:     ptr.To[int32](3),
+			wantRevisions: []string{"current", "current", "current"},
+		},
+	}
+
+	const start = 10
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			currentSet := newStatefulSet(3)
+			currentSet.Spec.PodManagementPolicy = tc.policy
+			currentSet.Spec.Ordinals = &apps.StatefulSetOrdinals{Start: start}
+			currentSet.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType}
+			if tc.partition != nil {
+				currentSet.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{Partition: tc.partition}
+			}
+			currentSet.Status.CurrentReplicas = 2
+			updateSet := currentSet.DeepCopy()
+			updateSet.Spec.Template.Spec.Containers[0].Image = "new-image"
+
+			for offset, wantRevision := range tc.wantRevisions {
+				ordinal := start + offset
+				pod := newVersionedStatefulSetPod(currentSet, updateSet, "current", "update", ordinal)
+				if got := getPodRevision(pod); got != wantRevision {
+					t.Errorf("pod ordinal %d: expected revision %q, got %q", ordinal, wantRevision, got)
+				}
+			}
+		})
+	}
+}
+
 func TestGetParentNameAndOrdinal(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
