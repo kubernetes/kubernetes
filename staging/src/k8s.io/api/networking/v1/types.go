@@ -691,8 +691,8 @@ type IPAddressSpec struct {
 	// parentRef references the resource that an IPAddress is attached to.
 	// An IPAddress must reference a parent object.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
-	// +k8s:beta(since: "1.37")=+k8s:immutable
+	// +k8s:required
+	// +k8s:immutable
 	ParentRef *ParentReference `json:"parentRef,omitempty" protobuf:"bytes,1,opt,name=parentRef"`
 }
 
@@ -703,14 +703,14 @@ type ParentReference struct {
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// resource is the resource of the object being referenced.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	Resource string `json:"resource,omitempty" protobuf:"bytes,2,opt,name=resource"`
 	// namespace is the namespace of the object being referenced.
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 	// name is the name of the object being referenced.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	Name string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
 }
 
