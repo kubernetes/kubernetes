@@ -750,6 +750,8 @@ func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 	case qs.qCfg.DesiredNumQueues < 0:
 		// This is code for exemption from limitation
 		return true
+	case qs.dCfg.ConcurrencyLimit == 0:
+		return false
 	case seats > qs.dCfg.ConcurrencyLimit:
 		// we have picked the queue with the minimum virtual finish time, but
 		// the number of seats this request asks for exceeds the concurrency limit.
