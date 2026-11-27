@@ -37,9 +37,8 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-// ProxyOptions have the data required to perform the proxy operation
-type ProxyOptions struct {
-	// Common user flags
+// ProxyFlags directly reflect the information that CLI is gathering via flags.
+type ProxyFlags struct {
 	staticDir     string
 	staticPrefix  string
 	apiPrefix     string
@@ -52,6 +51,37 @@ type ProxyOptions struct {
 	disableFilter bool
 	unixSocket    string
 	keepalive     time.Duration
+
+	appendServerPath bool
+
+	genericiooptions.IOStreams
+}
+
+// NewProxyFlags returns a default ProxyFlags
+func NewProxyFlags(streams genericiooptions.IOStreams) *ProxyFlags {
+	return &ProxyFlags{
+		staticPrefix:  defaultStaticPrefix,
+		apiPrefix:     defaultAPIPrefix,
+		acceptPaths:   proxy.DefaultPathAcceptRE,
+		rejectPaths:   proxy.DefaultPathRejectRE,
+		acceptHosts:   proxy.DefaultHostAcceptRE,
+		rejectMethods: proxy.DefaultMethodRejectRE,
+		port:          defaultPort,
+		address:       defaultAddress,
+
+		IOStreams: streams,
+	}
+}
+
+// ProxyOptions have the data required to perform the proxy operation
+type ProxyOptions struct {
+	staticDir    string
+	staticPrefix string
+	apiPrefix    string
+	port         int
+	address      string
+	unixSocket   string
+	keepalive    time.Duration
 
 	appendServerPath bool
 
@@ -99,24 +129,26 @@ var (
 		kubectl proxy --api-prefix=/k8s-api`))
 )
 
-// NewProxyOptions creates the options for proxy
-func NewProxyOptions(ioStreams genericiooptions.IOStreams) *ProxyOptions {
-	return &ProxyOptions{
-		IOStreams:     ioStreams,
-		staticPrefix:  defaultStaticPrefix,
-		apiPrefix:     defaultAPIPrefix,
-		acceptPaths:   proxy.DefaultPathAcceptRE,
-		rejectPaths:   proxy.DefaultPathRejectRE,
-		acceptHosts:   proxy.DefaultHostAcceptRE,
-		rejectMethods: proxy.DefaultMethodRejectRE,
-		port:          defaultPort,
-		address:       defaultAddress,
-	}
+// AddFlags registers flags for the proxy command.
+func (flags *ProxyFlags) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVarP(&flags.staticDir, "www", "w", flags.staticDir, "Also serve static files from the given directory under the specified prefix.")
+	cmd.Flags().StringVarP(&flags.staticPrefix, "www-prefix", "P", flags.staticPrefix, "Prefix to serve static files under, if static file directory is specified.")
+	cmd.Flags().StringVar(&flags.apiPrefix, "api-prefix", flags.apiPrefix, "Prefix to serve the proxied API under.")
+	cmd.Flags().StringVar(&flags.acceptPaths, "accept-paths", flags.acceptPaths, "Regular expression for paths that the proxy should accept.")
+	cmd.Flags().StringVar(&flags.rejectPaths, "reject-paths", flags.rejectPaths, "Regular expression for paths that the proxy should reject. Paths specified here will be rejected even accepted by --accept-paths.")
+	cmd.Flags().StringVar(&flags.acceptHosts, "accept-hosts", flags.acceptHosts, "Regular expression for hosts that the proxy should accept.")
+	cmd.Flags().StringVar(&flags.rejectMethods, "reject-methods", flags.rejectMethods, "Regular expression for HTTP methods that the proxy should reject (example --reject-methods='POST,PUT,PATCH'). ")
+	cmd.Flags().IntVarP(&flags.port, "port", "p", flags.port, "The port on which to run the proxy. Set to 0 to pick a random port.")
+	cmd.Flags().StringVar(&flags.address, "address", flags.address, "The IP address on which to serve on.")
+	cmd.Flags().BoolVar(&flags.disableFilter, "disable-filter", flags.disableFilter, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
+	cmd.Flags().StringVarP(&flags.unixSocket, "unix-socket", "u", flags.unixSocket, "Unix socket on which to run the proxy.")
+	cmd.Flags().DurationVar(&flags.keepalive, "keepalive", flags.keepalive, "keepalive specifies the keep-alive period for an active network connection. Set to 0 to disable keepalive.")
+	cmd.Flags().BoolVar(&flags.appendServerPath, "append-server-path", flags.appendServerPath, "If true, enables automatic path appending of the kube context server path to each request.")
 }
 
 // NewCmdProxy returns the proxy Cobra command
 func NewCmdProxy(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
-	o := NewProxyOptions(ioStreams)
+	flags := NewProxyFlags(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
@@ -125,70 +157,79 @@ func NewCmdProxy(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 		Long:                  proxyLong,
 		Example:               proxyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f))
+			o, err := flags.ToOptions(f)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunProxy())
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.staticDir, "www", "w", o.staticDir, "Also serve static files from the given directory under the specified prefix.")
-	cmd.Flags().StringVarP(&o.staticPrefix, "www-prefix", "P", o.staticPrefix, "Prefix to serve static files under, if static file directory is specified.")
-	cmd.Flags().StringVar(&o.apiPrefix, "api-prefix", o.apiPrefix, "Prefix to serve the proxied API under.")
-	cmd.Flags().StringVar(&o.acceptPaths, "accept-paths", o.acceptPaths, "Regular expression for paths that the proxy should accept.")
-	cmd.Flags().StringVar(&o.rejectPaths, "reject-paths", o.rejectPaths, "Regular expression for paths that the proxy should reject. Paths specified here will be rejected even accepted by --accept-paths.")
-	cmd.Flags().StringVar(&o.acceptHosts, "accept-hosts", o.acceptHosts, "Regular expression for hosts that the proxy should accept.")
-	cmd.Flags().StringVar(&o.rejectMethods, "reject-methods", o.rejectMethods, "Regular expression for HTTP methods that the proxy should reject (example --reject-methods='POST,PUT,PATCH'). ")
-	cmd.Flags().IntVarP(&o.port, "port", "p", o.port, "The port on which to run the proxy. Set to 0 to pick a random port.")
-	cmd.Flags().StringVar(&o.address, "address", o.address, "The IP address on which to serve on.")
-	cmd.Flags().BoolVar(&o.disableFilter, "disable-filter", o.disableFilter, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
-	cmd.Flags().StringVarP(&o.unixSocket, "unix-socket", "u", o.unixSocket, "Unix socket on which to run the proxy.")
-	cmd.Flags().DurationVar(&o.keepalive, "keepalive", o.keepalive, "keepalive specifies the keep-alive period for an active network connection. Set to 0 to disable keepalive.")
-	cmd.Flags().BoolVar(&o.appendServerPath, "append-server-path", o.appendServerPath, "If true, enables automatic path appending of the kube context server path to each request.")
+	flags.AddFlags(cmd)
+
 	return cmd
 }
 
-// Complete adapts from the command line args and factory to the data required.
-func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
+// ToOptions converts from CLI inputs to runtime inputs.
+func (flags *ProxyFlags) ToOptions(f cmdutil.Factory) (*ProxyOptions, error) {
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
-		return err
-	}
-	o.clientConfig = clientConfig
-
-	if !strings.HasSuffix(o.staticPrefix, "/") {
-		o.staticPrefix += "/"
+		return nil, err
 	}
 
-	if !strings.HasSuffix(o.apiPrefix, "/") {
-		o.apiPrefix += "/"
+	staticPrefix := flags.staticPrefix
+	if !strings.HasSuffix(staticPrefix, "/") {
+		staticPrefix += "/"
 	}
 
-	if o.appendServerPath == false {
+	apiPrefix := flags.apiPrefix
+	if !strings.HasSuffix(apiPrefix, "/") {
+		apiPrefix += "/"
+	}
+
+	if !flags.appendServerPath {
 		target, err := url.Parse(clientConfig.Host)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if target.Path != "" && target.Path != "/" {
 			klog.Warning("Your kube context contains a server path " + target.Path + ", use --append-server-path to automatically append the path to each request")
 		}
 	}
-	if o.disableFilter {
-		if o.unixSocket == "" {
+
+	var filter *proxy.FilterServer
+	if flags.disableFilter {
+		if flags.unixSocket == "" {
 			klog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
 		}
-		o.filter = nil
 	} else {
-		if o.rejectPaths == "" || o.rejectMethods == "" {
+		if flags.rejectPaths == "" || flags.rejectMethods == "" {
 			klog.Warning("Request filter has been relaxed, your proxy may be vulnerable to attacks, please be cautious")
 		}
-		o.filter = &proxy.FilterServer{
-			AcceptPaths:   proxy.MakeRegexpArrayOrDie(o.acceptPaths),
-			RejectPaths:   proxy.MakeRegexpArrayOrDie(o.rejectPaths),
-			AcceptHosts:   proxy.MakeRegexpArrayOrDie(o.acceptHosts),
-			RejectMethods: proxy.MakeRegexpArrayOrDie(o.rejectMethods),
+		filter = &proxy.FilterServer{
+			AcceptPaths:   proxy.MakeRegexpArrayOrDie(flags.acceptPaths),
+			RejectPaths:   proxy.MakeRegexpArrayOrDie(flags.rejectPaths),
+			AcceptHosts:   proxy.MakeRegexpArrayOrDie(flags.acceptHosts),
+			RejectMethods: proxy.MakeRegexpArrayOrDie(flags.rejectMethods),
 		}
 	}
-	return nil
+
+	o := &ProxyOptions{
+		staticDir:    flags.staticDir,
+		staticPrefix: staticPrefix,
+		apiPrefix:    apiPrefix,
+		port:         flags.port,
+		address:      flags.address,
+		unixSocket:   flags.unixSocket,
+		keepalive:    flags.keepalive,
+
+		appendServerPath: flags.appendServerPath,
+
+		clientConfig: clientConfig,
+		filter:       filter,
+
+		IOStreams: flags.IOStreams,
+	}
+	return o, nil
 }
 
 // Validate checks to the ProxyOptions to see if there is sufficient information to run the command.
