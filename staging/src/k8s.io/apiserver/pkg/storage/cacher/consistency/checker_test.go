@@ -20,6 +20,7 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -311,5 +312,17 @@ func TestConsistencyCheckerListOpts(t *testing.T) {
 	}
 	if diff := cmp.Diff(etcdOpts, wantEtcdOpts); diff != "" {
 		t.Errorf("unexpected list opts (-want +got):\n%s", diff)
+	}
+}
+
+func TestCheckerPeriod(t *testing.T) {
+	checker := &Checker{}
+	if got := checker.period(); got != CheckPeriod {
+		t.Errorf("default period = %v, want %v", got, CheckPeriod)
+	}
+
+	checker.CheckPeriod = 15 * time.Minute
+	if got := checker.period(); got != 15*time.Minute {
+		t.Errorf("configured period = %v, want %v", got, 15*time.Minute)
 	}
 }

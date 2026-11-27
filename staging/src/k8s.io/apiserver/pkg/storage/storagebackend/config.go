@@ -87,6 +87,9 @@ type Config struct {
 	// WatchCacheMaxEvents, if positive, overrides the upper bound of the watch
 	// cache event history capacity. Zero keeps the value derived from EventsHistoryWindow.
 	WatchCacheMaxEvents int
+	// WatchCacheConsistencyCheckPeriod is the period between checks that the
+	// watch cache is consistent with etcd. Zero means the default.
+	WatchCacheConsistencyCheckPeriod time.Duration
 	// HealthcheckTimeout specifies the timeout used when checking health
 	HealthcheckTimeout time.Duration
 	// ReadycheckTimeout specifies the timeout used when checking readiness
