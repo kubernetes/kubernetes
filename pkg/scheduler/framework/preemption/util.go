@@ -118,40 +118,45 @@ func compareVictimStructuralImportance(vi1, vi2 Victim) int {
 	return cmp.Compare(len(vi1.Pods()), len(vi2.Pods()))
 }
 
+func podMatchesPDB(pod *v1.Pod, pdb *policy.PodDisruptionBudget) bool {
+	if pdb.Namespace != pod.Namespace {
+		return false
+	}
+	selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
+	if err != nil || !selector.Matches(labels.Set(pod.Labels)) {
+		// Either the PDB had invalid selector or it did not match the pod label.
+		return false
+	}
+	// Existing in DisruptedPods means it has been processed in API server,
+	// we don't treat it as a violating case.
+	if _, exist := pdb.Status.DisruptedPods[pod.Name]; exist {
+		return false
+	}
+	return true
+}
+
 // FilterVictimsWithPDBViolation groups "victims" into "violatingVictims"
 // and "nonViolatingVictims" based on whether their PDBs will be violated if they are
 // preempted.
 func FilterVictimsWithPDBViolation[T Victim](victims []T, pdbs []*policy.PodDisruptionBudget) (violatingVictims []ViolatingVictim[T], nonViolatingVictims []T) {
+	// pdbsAllowed holds the disruptions each PDB still allows; it decreases as victims are evaluated in order.
 	pdbsAllowed := make([]int32, len(pdbs))
 	podIsViolating := func(pod *v1.Pod) bool {
+		violating := false
 		for i, pdb := range pdbs {
-			if pdb.Namespace != pod.Namespace {
-				continue
-			}
-			selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
-			if err != nil {
-				// This object has an invalid selector, it does not match the pod
-				continue
-			}
-			if !selector.Matches(labels.Set(pod.Labels)) {
-				continue
-			}
-
-			// Existing in DisruptedPods means it has been processed in API server,
-			// we don't treat it as a violating case.
-			if _, exist := pdb.Status.DisruptedPods[pod.Name]; exist {
+			if !podMatchesPDB(pod, pdb) {
 				continue
 			}
 			// Only decrement the matched pdb when it's not in its <DisruptedPods>;
 			// otherwise we may over-decrement the budget number.
 			pdbsAllowed[i]--
-			// We have found a matching PDB.
+			// Check the pod against every PDB even after one of them is violated, because
+			// subsequent pods protected by the same PDBs are evaluated against the leftover budget.
 			if pdbsAllowed[i] < 0 {
-				return true
+				violating = true
 			}
 		}
-
-		return false
+		return violating
 	}
 
 	for i, pdb := range pdbs {
@@ -181,6 +186,57 @@ func FilterVictimsWithPDBViolation[T Victim](victims []T, pdbs []*policy.PodDisr
 	}
 
 	return violatingVictims, nonViolatingVictims
+}
+
+// initPDBDisruptionsAllowed sets pdbDisruptionsAllowed for every PDB protecting any pod of the given victim.
+func initPDBDisruptionsAllowed(pdbDisruptionsAllowed map[*policy.PodDisruptionBudget]int32, vw *victimWithPDBViolations) {
+	for _, podPDBs := range vw.pdbsPerPod {
+		for _, pdb := range podPDBs {
+			pdbDisruptionsAllowed[pdb] = pdb.Status.DisruptionsAllowed
+		}
+	}
+}
+
+// countVictimPDBViolations returns how many pods of the given victim would violate a PDB if it were
+// evicted. Each pod consumes one disruption in remainingDisruptionsAllowed from every PDB that protects
+// it. Once a PDB has no disruptions left, the further pods it protects are violations (a pod counts once
+// even if it violates several PDBs).
+func countVictimPDBViolations(vw *victimWithPDBViolations, remainingDisruptionsAllowed map[*policy.PodDisruptionBudget]int32) int {
+	violatingPods := 0
+	for _, podPDBs := range vw.pdbsPerPod {
+		podViolates := false
+		for _, pdb := range podPDBs {
+			remainingDisruptionsAllowed[pdb]--
+			if remainingDisruptionsAllowed[pdb] < 0 {
+				podViolates = true
+			}
+		}
+		if podViolates {
+			violatingPods++
+		}
+	}
+	return violatingPods
+}
+
+// getPDBsPerPod returns matching PDBs for each pod in victim.Pods() that is protected by at least one PDB (ignoring already disrupted pods).
+func getPDBsPerPod(victim Victim, pdbs []*policy.PodDisruptionBudget) [][]*policy.PodDisruptionBudget {
+	if len(pdbs) == 0 {
+		return nil
+	}
+	var pdbsPerPod [][]*policy.PodDisruptionBudget
+	for _, pi := range victim.Pods() {
+		pod := pi.GetPod()
+		var podPDBs []*policy.PodDisruptionBudget
+		for _, pdb := range pdbs {
+			if podMatchesPDB(pod, pdb) {
+				podPDBs = append(podPDBs, pdb)
+			}
+		}
+		if len(podPDBs) > 0 {
+			pdbsPerPod = append(pdbsPerPod, podPDBs)
+		}
+	}
+	return pdbsPerPod
 }
 
 // getPodDisruptionBudgets returns all pod disruption budgets from the provided lister.
