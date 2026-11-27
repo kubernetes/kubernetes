@@ -2468,8 +2468,11 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			}
 		}
 	}
-	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(ctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff, restartingAllContainers)
+	// Restart decisions must use the generated status, since the pod watch may still
+	// report terminated containers after RestartAllContainers has reset them to Waiting.
+	podForRuntime := pod.DeepCopy()
+	podForRuntime.Status = apiPodStatus
+	result := kl.containerRuntime.SyncPod(ctx, podForRuntime, podStatus, pullSecrets, kl.crashLoopBackOff, restartingAllContainers)
 	// Cancelling the context for SyncPod is a known and deliberate action, for
 	// example when the pod starts terminating or its grace period is shortened.
 	// Such an interruption is not a generic error, so it must neither be cached

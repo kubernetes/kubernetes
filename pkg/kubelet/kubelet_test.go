@@ -7436,6 +7436,72 @@ func TestSyncPodPrunedContainersRequeue(t *testing.T) {
 	}
 }
 
+type recordingSyncPodRuntime struct {
+	kubecontainer.Runtime
+	pod *v1.Pod
+}
+
+func (r *recordingSyncPodRuntime) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) kubecontainer.PodSyncResult {
+	r.pod = pod
+	return r.Runtime.SyncPod(ctx, pod, podStatus, pullSecrets, backOff, restartAllContainers)
+}
+
+func TestSyncPodRestartRemovedContainer(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.NodeDeclaredFeatures:                 true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
+	for _, policy := range []v1.ContainerRestartPolicy{v1.ContainerRestartPolicyNever, v1.ContainerRestartPolicyOnFailure} {
+		for _, restarting := range []bool{false, true} {
+			t.Run(fmt.Sprintf("policy=%s/restarting=%t", policy, restarting), func(t *testing.T) {
+				logger, tCtx := ktesting.NewTestContext(t)
+				testKubelet := newTestKubelet(t, false)
+				defer testKubelet.Cleanup()
+				kubelet := testKubelet.kubelet
+				runtime := &recordingSyncPodRuntime{Runtime: kubelet.containerRuntime}
+				kubelet.containerRuntime = runtime
+				pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyAlways,
+					Containers: []v1.Container{
+						{Name: "c1", RestartPolicy: &policy},
+						{Name: "c2"},
+					},
+				})
+				pod.Status = v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						{Name: "c1", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}}},
+						{Name: "c2", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
+					},
+				}
+				originalPod := pod.DeepCopy()
+				kubelet.podManager.SetPods([]*v1.Pod{pod})
+				oldStatus := pod.Status.DeepCopy()
+				podStatus := &kubecontainer.PodStatus{}
+				if restarting {
+					// Cleanup has completed, but the pod watch still reports the previous execution.
+					oldStatus.Conditions = []v1.PodCondition{{Type: v1.AllContainersRestarting, Status: v1.ConditionTrue}}
+				} else {
+					// Ordinary GC removed c1 while c2 continues running.
+					podStatus.ContainerStatuses = []*kubecontainer.Status{{Name: "c2", State: kubecontainer.ContainerStateRunning}}
+				}
+				kubelet.statusManager.SetPodStatus(logger, pod, *oldStatus)
+
+				isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus, 0)
+				require.NoError(t, err)
+				require.False(t, isTerminal)
+				require.NotNil(t, runtime.pod)
+				for i := range runtime.pod.Spec.Containers {
+					container := &runtime.pod.Spec.Containers[i]
+					require.Equal(t, restarting, kubecontainer.ShouldContainerBeRestarted(logger, container, runtime.pod, podStatus), "%s restart decision in the first sync after removal", container.Name)
+				}
+				require.Equal(t, originalPod, pod, "SyncPod must not mutate the pod from the watch")
+			})
+		}
+	}
+}
+
 func cleanUpTempDir(t *testing.T, tempDir, originalLogsDir string) {
 	t.Helper()
 	ContainerLogsDir = originalLogsDir
