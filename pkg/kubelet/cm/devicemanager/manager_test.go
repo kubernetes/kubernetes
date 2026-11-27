@@ -3357,3 +3357,200 @@ func TestPluginConnectedDuplicateRejectionIsDetectable(t *testing.T) {
 	require.Contains(t, logs, "incumbentStopped=false",
 		"a live incumbent (the stuck-takeover shape) must be reported as not stopped")
 }
+
+func TestUpdateAllocatedDevicesPersistsCheckpoint(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	res1 := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+		topology:         true,
+	}
+	testResources := []TestResource{res1}
+
+	podsStub := &activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	as := require.New(t)
+
+	tmpDir, err := os.MkdirTemp("", "checkpoint-persist-test")
+	as.NoError(err)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
+
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
+	as.NoError(err)
+
+	pod1 := makePod(v1.ResourceList{
+		v1.ResourceName(res1.resourceName): res1.resourceQuantity,
+	})
+	podsStub.updateActivePods([]*v1.Pod{pod1})
+
+	err = testManager.Allocate(tCtx, pod1, &pod1.Spec.Containers[0], lifecycle.AddOperation)
+	as.NoError(err)
+
+	// Verify pod1 is recorded in checkpoint on disk
+	cp, err := testManager.getCheckpoint()
+	as.NoError(err)
+	podEntries, _ := cp.GetData()
+	as.Len(podEntries, 1)
+	as.Equal(string(pod1.UID), podEntries[0].PodUID)
+
+	// Now pod1 terminates or fails admission and is removed from activePods
+	podsStub.updateActivePods([]*v1.Pod{})
+	testManager.UpdateAllocatedDevices(logger)
+
+	// Verify that UpdateAllocatedDevices persisted the removal to disk checkpoint
+	cp, err = testManager.getCheckpoint()
+	as.NoError(err)
+	podEntries, _ = cp.GetData()
+	as.Empty(podEntries, "expected checkpoint file on disk to have 0 pod entries after UpdateAllocatedDevices")
+}
+
+func TestReadCheckpointReconcilesActivePods(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	as := require.New(t)
+
+	tmpDir, err := os.MkdirTemp("", "checkpoint-reconcile-test")
+	as.NoError(err)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
+
+	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	as.NoError(err)
+
+	resourceName := "domain1.com/resource1"
+	stalePodUID := "stale-pod-uid"
+	activePodUID := "active-pod-uid"
+
+	// Create and populate initial manager that writes checkpoint with stalePod and activePod
+	writer := &ManagerImpl{
+		endpoints:         make(map[string]endpointInfo),
+		healthyDevices:    make(map[string]sets.Set[string]),
+		unhealthyDevices:  make(map[string]sets.Set[string]),
+		allocatedDevices:  make(map[string]sets.Set[string]),
+		podDevices:        newPodDevices(),
+		checkpointManager: ckm,
+	}
+	writer.podDevices.insert(stalePodUID, "cont1", resourceName,
+		constructDevices([]string{"dev1"}),
+		newContainerAllocateResponse(),
+	)
+	writer.podDevices.insert(activePodUID, "cont2", resourceName,
+		constructDevices([]string{"dev2"}),
+		newContainerAllocateResponse(),
+	)
+	writer.healthyDevices[resourceName] = sets.New[string]("dev1", "dev2")
+	err = writer.writeCheckpoint(logger)
+	as.NoError(err)
+
+	// Now initialize manager where only activePodUID is in activePods
+	activePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID(activePodUID),
+		},
+	}
+	testManager := &ManagerImpl{
+		healthyDevices:    make(map[string]sets.Set[string]),
+		unhealthyDevices:  make(map[string]sets.Set[string]),
+		allocatedDevices:  make(map[string]sets.Set[string]),
+		endpoints:         make(map[string]endpointInfo),
+		podDevices:        newPodDevices(),
+		checkpointManager: ckm,
+		activePods:        func() []*v1.Pod { return []*v1.Pod{activePod} },
+		sourcesReady:      &sourcesReadyStub{},
+	}
+
+	err = testManager.readCheckpoint(logger)
+	as.NoError(err)
+
+	// Check in-memory state: stalePod should be purged, activePod retained
+	as.True(testManager.podDevices.hasPod(activePodUID))
+	as.False(testManager.podDevices.hasPod(stalePodUID))
+
+	// Check allocatedDevices: dev1 (allocated to stalePod) should be freed, only dev2 allocated
+	allocated := testManager.allocatedDevices[resourceName]
+	as.True(allocated.Equal(sets.New[string]("dev2")), "expected allocated devices to only contain dev2, got %v", allocated)
+
+	// Check checkpoint on disk: should be rewritten without stalePod
+	cp, err := testManager.getCheckpoint()
+	as.NoError(err)
+	recoveredEntries, _ := cp.GetData()
+	as.Len(recoveredEntries, 1)
+	as.Equal(activePodUID, recoveredEntries[0].PodUID)
+}
+
+func TestCheckpointDesynchronizationRecoveryOnKubeletRestart(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	as := require.New(t)
+
+	resourceName := "domain1.com/resource1"
+	res1 := TestResource{
+		resourceName:     resourceName,
+		resourceQuantity: *resource.NewQuantity(int64(1), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1"}},
+		topology:         true,
+	}
+	testResources := []TestResource{res1}
+
+	tmpDir, err := os.MkdirTemp("", "checkpoint-restart-recovery-test")
+	as.NoError(err)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(tmpDir), "unable to remove dir %s", tmpDir)
+	})
+
+	failedPod := makePod(v1.ResourceList{
+		v1.ResourceName(resourceName): res1.resourceQuantity,
+	})
+	podsStub := &activePodsStub{
+		activePods: []*v1.Pod{failedPod},
+	}
+
+	// 1. Initial manager allocates device to failedPod during admission
+	mgr1, err := getTestManager(logger, tmpDir, podsStub.getActivePods, testResources)
+	as.NoError(err)
+	err = mgr1.Allocate(tCtx, failedPod, &failedPod.Spec.Containers[0], lifecycle.AddOperation)
+	as.NoError(err)
+
+	// Verify dev1 is allocated in mgr1
+	as.Equal(sets.New[string]("dev1"), mgr1.allocatedDevices[resourceName])
+
+	// 2. Container admission subsequently fails (e.g., webhook or runtime error).
+	// Kubelet terminates / restarts before RemovePod can run.
+	// On kubelet restart, failedPod is NOT in activePods.
+	ckm2, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	as.NoError(err)
+
+	sourcesReady := &sourcesReadyStub{}
+	mgr2 := &ManagerImpl{
+		healthyDevices:        make(map[string]sets.Set[string]),
+		unhealthyDevices:      make(map[string]sets.Set[string]),
+		allocatedDevices:      make(map[string]sets.Set[string]),
+		endpoints:             make(map[string]endpointInfo),
+		podDevices:            newPodDevices(),
+		devicesToReuse:        make(PodReusableDevices),
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+		activePods:            func() []*v1.Pod { return []*v1.Pod{} }, // pod is gone
+		sourcesReady:          sourcesReady,
+		checkpointManager:     ckm2,
+		allDevices:            NewResourceDeviceInstances(),
+	}
+	mgr2.healthyDevices[resourceName] = sets.New[string]("dev1")
+	mgr2.allDevices[resourceName] = makeDevice(res1.devs, res1.topology)
+
+	// Read checkpoint: restores stale pod initially, but reconciles because sources are ready
+	err = mgr2.readCheckpoint(logger)
+	as.NoError(err)
+
+	// Allocated devices must be empty because failedPod was pruned
+	as.Empty(mgr2.allocatedDevices[resourceName])
+	as.False(mgr2.podDevices.hasPod(string(failedPod.UID)))
+
+	// Checkpoint on disk must be clean
+	cp, err := mgr2.getCheckpoint()
+	as.NoError(err)
+	entries, _ := cp.GetData()
+	as.Empty(entries)
+}
