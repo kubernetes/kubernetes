@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
@@ -1299,6 +1300,78 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 // TestCascadingDeleteOnCRDConversionFailure tests that a bad conversion webhook cannot block the entire GC controller.
 // Historically, a cache sync failure from a single resource prevented GC controller from running. This test creates
 // a CRD, updates the storage version with a bad conversion webhook and then runs a simple cascading delete test.
+func TestCascadingDeleteAfterCRDServedVersionChange(t *testing.T) {
+	ctx := setup(t, 5)
+	gc, apiExtensionClient, dynamicClient, clientSet := ctx.gc, ctx.apiExtensionClient, ctx.dynamicClient, ctx.clientSet
+
+	ns := createNamespaceOrDie("crd-served-version-change", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+
+	// The CRD starts out serving only v1beta1, so the GC observes the dependent via v1beta1.
+	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
+	owner, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), newConfigMap(ns.Name, "owner"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create owner: %v", err)
+	}
+	dependent := newCRDInstance(definition, ns.Name, "dependent")
+	dependent.SetOwnerReferences([]metav1.OwnerReference{{APIVersion: "v1", Kind: "ConfigMap", Name: owner.Name, UID: owner.UID}})
+	dependent, err = resourceClient.Create(context.TODO(), dependent, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create dependent: %v", err)
+	}
+	if err := wait.PollUntilContextTimeout(context.TODO(), time.Second, 30*time.Second, true, func(context.Context) (bool, error) {
+		return gc.GraphHasUID(dependent.GetUID()), nil
+	}); err != nil {
+		t.Fatalf("dependent was not observed by the garbage collector: %v", err)
+	}
+
+	setVersions := func(v1beta1Served bool) {
+		t.Helper()
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			crd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), definition.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+				{Name: "v1", Served: true, Storage: true, Schema: apiextensionstestserver.AllowAllSchema()},
+				{Name: "v1beta1", Served: v1beta1Served, Schema: apiextensionstestserver.AllowAllSchema()},
+			}
+			_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
+			return err
+		})
+		if err != nil {
+			t.Fatalf("failed to update CRD versions: %v", err)
+		}
+	}
+	waitForDiscovery := func(version string, served bool) {
+		t.Helper()
+		if err := wait.PollUntilContextTimeout(context.TODO(), time.Second, 30*time.Second, true, func(context.Context) (bool, error) {
+			_, err := clientSet.Discovery().ServerResourcesForGroupVersion(definition.Spec.Group + "/" + version)
+			return (err == nil) == served, nil
+		}); err != nil {
+			t.Fatalf("discovery did not observe %s served=%v: %v", version, served, err)
+		}
+		// let gc.Sync pick up the new preferred version and reset its RESTMapper
+		time.Sleep(ctx.syncPeriod + time.Second)
+	}
+
+	setVersions(true)
+	waitForDiscovery("v1", true)
+	setVersions(false)
+	waitForDiscovery("v1beta1", false)
+
+	if err := clientSet.CoreV1().ConfigMaps(ns.Name).Delete(context.TODO(), owner.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("failed to delete owner: %v", err)
+	}
+	v1Client := dynamicClient.Resource(schema.GroupVersionResource{Group: definition.Spec.Group, Version: "v1", Resource: definition.Spec.Names.Plural}).Namespace(ns.Name)
+	if err := wait.PollUntilContextTimeout(context.TODO(), time.Second, 60*time.Second, true, func(context.Context) (bool, error) {
+		_, err := v1Client.Get(context.TODO(), dependent.GetName(), metav1.GetOptions{})
+		return apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("dependent was not garbage collected after its owner was deleted: %v", err)
+	}
+}
+
 func TestCascadingDeleteOnCRDConversionFailure(t *testing.T) {
 	ctx := setup(t, 0)
 	gc, apiExtensionClient, dynamicClient, clientSet := ctx.gc, ctx.apiExtensionClient, ctx.dynamicClient, ctx.clientSet
