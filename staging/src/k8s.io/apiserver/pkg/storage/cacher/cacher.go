@@ -1339,7 +1339,7 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 			updateResourceVersion(object, versioner, event.ResourceVersion)
 			event.PrevObject = object
 		} else {
-			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
+			klog.Errorf("couldn't create cachingObject from previous object of type %T", event.PrevObject)
 		}
 	}
 }
