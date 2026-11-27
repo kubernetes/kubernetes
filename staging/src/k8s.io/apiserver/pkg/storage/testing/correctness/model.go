@@ -511,11 +511,43 @@ func (s *Model) readItems(key, continueKey string, opts storage.ListOptions) (li
 				res.hasMoreMatches = true
 				continue
 			}
-			res.items = append(res.items, obj.DeepCopyObject())
+			var item runtime.Object
+			if opts.KeysOnly {
+				item, err = s.keysOnlyItem(k, obj)
+				if err != nil {
+					return listResponse{}, err
+				}
+			} else {
+				item = obj.DeepCopyObject()
+			}
+			res.items = append(res.items, item)
 			res.lastKey = k
 		}
 	}
 	return res, nil
+}
+
+func (s *Model) keysOnlyItem(key string, obj runtime.Object) (runtime.Object, error) {
+	objAccessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, storage.NewInternalError(err)
+	}
+	name, namespace := objAccessor.GetName(), objAccessor.GetNamespace()
+	if s.ReverseKeyFunc != nil {
+		name, namespace, err = s.ReverseKeyFunc(key)
+		if err != nil {
+			return nil, storage.NewInternalError(err)
+		}
+	}
+	out := s.NewFunc()
+	outAccessor, err := meta.Accessor(out)
+	if err != nil {
+		return nil, storage.NewInternalError(err)
+	}
+	outAccessor.SetName(name)
+	outAccessor.SetNamespace(namespace)
+	outAccessor.SetResourceVersion(objAccessor.GetResourceVersion())
+	return out, nil
 }
 
 func compactedContinueError(continueKey, keyPrefix string) error {

@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -361,6 +362,11 @@ type ListOptions struct {
 	// cache); external clients cannot set it. The watch cache strips the wrapper
 	// before storing or serializing the object, so it never reaches other watchers.
 	RecordTimestamps bool
+	// KeysOnly is an option for internal list callers that requests returned
+	// list items populate only name, namespace, and resource version.
+	// Requires Predicate.Empty() to be true. Etcd storage also requires a
+	// reverse key function. Not supported for Watch.
+	KeysOnly bool
 }
 
 // WatchEventWithRecordTime wraps a runtime.Object with the timestamp at which the
@@ -387,6 +393,9 @@ type DeleteOptions struct {
 }
 
 func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions) (withRev int64, continueKey string, err error) {
+	if opts.KeysOnly && !opts.Predicate.Empty() {
+		return 0, "", apierrors.NewInternalError(errors.New("keysOnly requires an empty predicate"))
+	}
 	if opts.Recursive && len(opts.Predicate.Continue) > 0 {
 		continueKey, continueRV, err := DecodeContinue(opts.Predicate.Continue, keyPrefix)
 		if err != nil {
@@ -424,6 +433,19 @@ func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions
 		return withRev, "", fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
 	}
 	return withRev, "", nil
+}
+
+func ValidateWatchOptions(opts ListOptions) error {
+	if opts.WatchWithoutPrevKV && !opts.Predicate.Empty() {
+		return apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
+	}
+	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
+		return apierrors.NewInternalError(errors.New("limit and continue are not supported for watch"))
+	}
+	if opts.KeysOnly {
+		return apierrors.NewInternalError(errors.New("keysOnly is not supported for watch"))
+	}
+	return nil
 }
 
 // Stats provides statistics information about storage.
