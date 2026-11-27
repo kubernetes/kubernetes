@@ -190,8 +190,11 @@ func (fk *fakeKubelet) SyncLoopHealthCheck(req *http.Request) error {
 		duration = minDuration
 	}
 	enterLoopTime := fk.LatestLoopEntryTime()
-	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
-		return fmt.Errorf("sync Loop took longer than expected")
+	if enterLoopTime.IsZero() {
+		return fmt.Errorf("sync loop has not started yet")
+	}
+	if time.Now().After(enterLoopTime.Add(duration)) {
+		return fmt.Errorf("sync loop took longer than expected")
 	}
 	return nil
 }
@@ -385,6 +388,7 @@ func newServerTestWithDebuggingHandlers(ctx context.Context, kubeCfg *kubeletcon
 
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
+		loopEntryTime: time.Now(),
 		podByNameFunc: func(namespace, name string) (*v1.Pod, bool) {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -995,9 +999,11 @@ func TestSyncLoopCheck(t *testing.T) {
 	defer fw.testHTTPServer.Close()
 
 	fw.fakeKubelet.resyncInterval = time.Minute
-	fw.fakeKubelet.loopEntryTime = time.Now()
 
-	// Test with correct hostname, Docker version
+	fw.fakeKubelet.loopEntryTime = time.Time{}
+	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
+
+	fw.fakeKubelet.loopEntryTime = time.Now()
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
 
 	fw.fakeKubelet.loopEntryTime = time.Now().Add(time.Minute * -10)
