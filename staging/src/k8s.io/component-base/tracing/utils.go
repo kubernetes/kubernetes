@@ -98,10 +98,15 @@ func WithTracing(handler http.Handler, tp oteltrace.TracerProvider, spanName str
 		otelhttp.WithTracerProvider(tp),
 	}
 	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		span := oteltrace.SpanFromContext(ctx)
 		// Add the http.target attribute to the otelhttp span
 		// Workaround for https://github.com/open-telemetry/opentelemetry-go-contrib/issues/3743
 		if r.URL != nil {
-			oteltrace.SpanFromContext(r.Context()).SetAttributes(attribute.Key("http.target").String(r.URL.RequestURI()))
+			span.SetAttributes(attribute.Key("http.target").String(r.URL.RequestURI()))
+		}
+		if newCtx := ContextWithSpanLogger(ctx, span); newCtx != ctx {
+			r = r.WithContext(newCtx)
 		}
 		handler.ServeHTTP(w, r)
 	})
