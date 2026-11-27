@@ -155,7 +155,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				config.SyncPeriod = metav1.Duration{Duration: -5 * time.Second}
 			},
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("iptables", "syncPeriod"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than 0"),
-				field.Invalid(field.NewPath("iptables", "syncPeriod"), metav1.Duration{Duration: 2 * time.Second}, "must be greater than or equal to iptables.minSyncPeriod")},
+				field.Invalid(field.NewPath("iptables", "syncPeriod"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to iptables.minSyncPeriod")},
 		},
 		"MinSyncPeriod must be > 0": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
@@ -168,7 +168,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				config.SyncPeriod = metav1.Duration{Duration: 1 * time.Second}
 				config.MinSyncPeriod = metav1.Duration{Duration: 5 * time.Second}
 			},
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("iptables", "syncPeriod"), metav1.Duration{Duration: 5 * time.Second}, "must be greater than or equal to iptables.minSyncPeriod")},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("iptables", "syncPeriod"), metav1.Duration{Duration: 1 * time.Second}, "must be greater than or equal to iptables.minSyncPeriod")},
 		},
 		"invalid DetectLocalMode": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
@@ -1082,15 +1082,16 @@ func TestValidateV1Alpha1SyncPeriodPaths(t *testing.T) {
 				t.Skip("Proxy mode is not supported on this platform")
 			}
 			for _, tc := range []struct {
-				name           string
-				syncPeriod     time.Duration
-				minSyncPeriod  time.Duration
-				expectedField  string
-				expectedDetail string
+				name             string
+				syncPeriod       time.Duration
+				minSyncPeriod    time.Duration
+				expectedField    string
+				expectedDetail   string
+				expectedBadValue time.Duration
 			}{
-				{"nonpositive sync period", 0, 0, "syncPeriod", "must be greater than 0"},
-				{"negative minimum sync period", time.Second, -time.Second, "minSyncPeriod", "must be greater than or equal to 0"},
-				{"sync period below minimum", time.Second, 2 * time.Second, "syncPeriod", ""},
+				{"nonpositive sync period", 0, 0, "syncPeriod", "must be greater than 0", 0},
+				{"negative minimum sync period", time.Second, -time.Second, "minSyncPeriod", "must be greater than or equal to 0", -time.Second},
+				{"sync period below minimum", time.Second, 2 * time.Second, "syncPeriod", "", time.Second},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					config := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{Mode: mode}
@@ -1117,6 +1118,7 @@ func TestValidateV1Alpha1SyncPeriodPaths(t *testing.T) {
 						expectedDetail = "must be greater than or equal to " + prefix + ".minSyncPeriod"
 					}
 					assert.Equal(t, expectedDetail, errs[0].Detail)
+					assert.Equal(t, metav1.Duration{Duration: tc.expectedBadValue}, errs[0].BadValue)
 				})
 			}
 		})
