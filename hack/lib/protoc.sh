@@ -27,6 +27,29 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 PROTOC_VERSION=23.4
 
+# These checksums pin the release artifacts used by the code-generation tools.
+# Update them whenever PROTOC_VERSION changes.
+function kube::protoc::sha256() {
+  case "${1}/${2}" in
+    darwin/amd64)
+      echo "07e5fdcf1b0708d3367dc5e6eb8d135de7e407d75316c93155cfd8ab362eec80"
+      ;;
+    darwin/arm64)
+      echo "8c7afae8626b6811e7b5897d16d940c2dbf50b1e135ed958a01db6566bdda726"
+      ;;
+    linux/amd64)
+      echo "0502f286ac9ed860b629a7965a14527b1f2dd131e4283fa23c2d7f184672aa9a"
+      ;;
+    linux/arm64)
+      echo "1c7750b6e038305b5a7fc3d0cda1ebefdf106a4f30a787bf826ed2fc47c3967d"
+      ;;
+    *)
+      kube::log::error "No protoc checksum is configured for ${1}/${2}"
+      return 1
+      ;;
+  esac
+}
+
 # Generates $1/api.pb.go from the protobuf file $1/api.proto
 # and formats it correctly
 # $1: Full path to the directory where the api.proto file is
@@ -113,19 +136,36 @@ function kube::protoc::install() {
   (
     cd "${third_party_dir}" || return 1
     if [[ $(readlink protoc) != "${download_folder}" ]]; then
-      local url
-      if [[ ${os} == "darwin" ]]; then
-        # TODO: switch to universal binary when updating to 3.20+
-        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-osx-x86_64.zip"
-      elif [[ ${os} == "linux" && ${arch} == "amd64" ]]; then
-        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
-      elif [[ ${os} == "linux" && ${arch} == "arm64" ]]; then
-        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-aarch_64.zip"
-      else
-        kube::log::info "This install script does not support ${os}/${arch}"
+      local url asset_arch asset_os expected_sha256
+      case "${os}/${arch}" in
+        darwin/amd64)
+          asset_arch=x86_64
+          asset_os=osx
+          ;;
+        darwin/arm64)
+          asset_arch=aarch_64
+          asset_os=osx
+          ;;
+        linux/amd64)
+          asset_arch=x86_64
+          asset_os=linux
+          ;;
+        linux/arm64)
+          asset_arch=aarch_64
+          asset_os=linux
+          ;;
+        *)
+          kube::log::info "This install script does not support ${os}/${arch}"
+          return 1
+          ;;
+      esac
+      url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${asset_os}-${asset_arch}.zip"
+      expected_sha256=$(kube::protoc::sha256 "${os}" "${arch}")
+      kube::util::download_file "${url}" "${download_file}"
+      if ! kube::util::verify_sha256 "${download_file}" "${expected_sha256}"; then
+        rm -f "${download_file}"
         return 1
       fi
-      kube::util::download_file "${url}" "${download_file}"
       unzip -o "${download_file}" -d "${download_folder}"
       ln -fns "${download_folder}" protoc
       mv protoc/bin/protoc protoc/protoc
