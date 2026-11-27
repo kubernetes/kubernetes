@@ -18,6 +18,7 @@ package labels
 
 import (
 	"fmt"
+	"iter"
 	"slices"
 	"sort"
 	"strconv"
@@ -320,6 +321,11 @@ func (r *Requirement) ValuesUnsorted() []string {
 	ret := make([]string, 0, len(r.strValues))
 	ret = append(ret, r.strValues...)
 	return ret
+}
+
+// ValuesIter returns an iterator over the requirement values as passed to NewRequirement, without sorting or copying.
+func (r *Requirement) ValuesIter() iter.Seq[string] {
+	return slices.Values(r.strValues)
 }
 
 // Equal checks the equality of requirement.
