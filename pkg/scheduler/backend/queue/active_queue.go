@@ -62,6 +62,7 @@ type activeQueuer interface {
 
 	isLastPoppedEntity(entityLookup framework.QueuedEntityInfo) bool
 	clearPoppedEntity()
+	clearPoppedEntityIfMatches(entityLookup framework.QueuedEntityInfo)
 
 	schedulingCycle() int64
 	done(pod types.UID)
@@ -388,6 +389,15 @@ func (aq *activeQueue) clearPoppedEntity() {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 	aq.lastPoppedEntityKey = ""
+}
+
+func (aq *activeQueue) clearPoppedEntityIfMatches(entityLookup framework.QueuedEntityInfo) {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
+	// An asynchronous binding failure must not clear a newer entity's scheduling cycle marker.
+	if aq.lastPoppedEntityKey == queuedEntityKeyFunc(entityLookup) {
+		aq.lastPoppedEntityKey = ""
+	}
 }
 
 // list returns all pods that are in the queue.
