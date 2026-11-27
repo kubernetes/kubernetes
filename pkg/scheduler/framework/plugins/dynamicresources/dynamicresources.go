@@ -323,6 +323,11 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: claimPreQueueingHint},
+		// A deleted Pod may still have an in-flight allocation after its
+		// ResourceClaims are gone. When the binding cycle fails, Unreserve
+		// releases the allocation before an AssignedPodDelete event is emitted,
+		// giving waiting Pods another opportunity to be scheduled.
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeletion},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
@@ -558,6 +563,65 @@ func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 
 	logger.V(5).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
 	return fwk.Queue, nil
+}
+
+// isSchedulableAfterAssignedPodDeletion is invoked when an assigned pod gets
+// deleted. Besides real deletions observed through the API this also covers a
+// pod whose binding cycle was aborted, because the scheduler emits the same
+// event for it after Unreserve released its in-flight allocation. A pod that
+// was rejected while that allocation was held may become schedulable now.
+func (pl *DynamicResources) isSchedulableAfterAssignedPodDeletion(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	// The tombstone inside a DeletedFinalStateUnknown carries the last known
+	// revision of the deleted pod. That is good enough here because whether a
+	// pod uses ResourceClaims never changes (spec.resourceClaims is immutable)
+	// and which extended resources it requests is immutable, too.
+	deletedPod, _, err := schedutil.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		// Shouldn't happen.
+		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterAssignedPodDeletion: %w", err)
+	}
+	if deletedPod == nil {
+		// Shouldn't happen. We cannot tell whether the deleted pod had
+		// claims, so keep the wakeup decision conservative.
+		logger.V(6).Info("assigned pod deletion event without the deleted pod", "pod", klog.KObj(pod))
+		return fwk.Queue, nil
+	}
+	if len(deletedPod.Spec.ResourceClaims) == 0 && !pl.requestsPotentialDRAExtendedResources(deletedPod) {
+		// The deleted pod had no ResourceClaims or potential DRA extended resources.
+		logger.V(6).Info("assigned pod without resource claims got deleted", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+		return fwk.QueueSkip, nil
+	}
+	// Whether the devices held by the deleted pod are needed by this pod gets
+	// decided by the next scheduling attempt.
+	logger.V(6).Info("assigned pod with resource claims or potential DRA extended resources got deleted", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	return fwk.Queue, nil
+}
+
+// requestsPotentialDRAExtendedResources deliberately ignores DeviceClass mappings:
+// a mapping may have disappeared while the pod still held an in-flight allocation.
+func (pl *DynamicResources) requestsPotentialDRAExtendedResources(pod *v1.Pod) bool {
+	if !pl.fts.EnableDRAExtendedResource {
+		return false
+	}
+	hasRequests := func(requests v1.ResourceList) bool {
+		for name, quantity := range requests {
+			if !quantity.IsZero() && schedutil.IsDRAExtendedResourceName(name) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, container := range pod.Spec.InitContainers {
+		if hasRequests(container.Resources.Requests) {
+			return true
+		}
+	}
+	for _, container := range pod.Spec.Containers {
+		if hasRequests(container.Resources.Requests) {
+			return true
+		}
+	}
+	return false
 }
 
 // isSchedulableAfterTargetPodUpdate is invoked for update pod events reported by
@@ -2376,6 +2440,13 @@ func (pl *DynamicResources) isPodReadyForBinding(state *stateData) (bool, error)
 			return false, err
 		}
 		state.claims.set(claimIndex, claim)
+		if claim.Status.Allocation == nil {
+			// Claims must be allocated before waiting for binding conditions, so a nil
+			// allocation here means it was removed while this binding cycle was active.
+			// Waiting until the binding timeout expires could keep an in-flight
+			// allocation blocking the devices.
+			return false, fmt.Errorf("%w: claim=%s was deallocated while waiting for binding conditions", ErrDeviceBindingFailed, claim.Name)
+		}
 		ready, err := pl.isClaimReadyForBinding(claim)
 		if err != nil {
 			return false, err

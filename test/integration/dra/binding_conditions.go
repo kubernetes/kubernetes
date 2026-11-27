@@ -53,6 +53,18 @@ func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
 		tCtx.Run("FailureRemove", func(tCtx ktesting.TContext) { testDeviceBindingFailureConditionsReschedule(tCtx, false) })
 		tCtx.Run("TimeoutReached", func(tCtx ktesting.TContext) { testDeviceBindingConditionsTimeoutReached(tCtx) })
 		tCtx.Run("TimeoutRecover", func(tCtx ktesting.TContext) { testDeviceBindingConditionsTimeoutRecovery(tCtx) })
+		tCtx.Run("ClaimDeletedReschedule", func(tCtx ktesting.TContext) { testDeviceBindingConditionsClaimDeletedReschedule(tCtx) })
+		for _, tc := range []struct {
+			name, kind          string
+			createAfterDeletion bool
+		}{
+			{name: "TemplateClaimDeletedReschedule", kind: "template"},
+			{name: "StandaloneClaimDeallocatedReschedule", kind: "standalone-deallocated"},
+			{name: "SharedStandaloneClaimReschedule", kind: "shared", createAfterDeletion: true},
+			{name: "StandaloneClaimTimeoutReschedule", kind: "standalone-timeout"},
+		} {
+			tCtx.Run(tc.name, func(tCtx ktesting.TContext) { testBindingRelease(tCtx, tc.kind, tc.createAfterDeletion) })
+		}
 	}
 }
 
@@ -473,18 +485,24 @@ profiles:
 		gomega.BeNumerically("<=", maxTO),
 		"bindingTimeout should trigger roughly near %s (observed %v)", wantTO, elapsed,
 	)
-	// Verify that the pod remains unscheduled after the binding timeout.
-	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
+	// A transient unscheduled observation does not establish that binding stays blocked.
+	tCtx.Consistently(func(tCtx ktesting.TContext) (*v1.Pod, error) {
 		return tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	}).WithTimeout(wantTO).WithPolling(200 * time.Millisecond).Should(gomega.SatisfyAll(
 		gomega.HaveField("Spec.NodeName", gomega.BeEmpty()),
-
-		gomega.HaveField("Status.Conditions",
-			gomega.Not(gomega.ContainElement(v1.PodCondition{
-				Type:   v1.PodScheduled,
-				Status: v1.ConditionTrue,
-			}))),
+		gomega.HaveField("Status.Conditions", gomega.Not(gomega.ContainElement(
+			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Type":   gomega.Equal(v1.PodScheduled),
+				"Status": gomega.Equal(v1.ConditionTrue),
+			}),
+		))),
 	))
+}
+
+// testDeviceBindingConditionsClaimDeletedReschedule isolates the scheduler so
+// releases in parallel tests cannot hide a missing post-Unreserve notification.
+func testDeviceBindingConditionsClaimDeletedReschedule(tCtx ktesting.TContext) {
+	testBindingRelease(tCtx, "standalone-deleted", false)
 }
 
 // testDeviceBindingConditionsTimeoutRecovery verifies that when a device with BindingConditions

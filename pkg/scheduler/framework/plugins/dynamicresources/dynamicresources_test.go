@@ -5332,6 +5332,16 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 				tc.patchTestCase(&tc)
 			}
 
+			// Test cases share package-level pod variables, so give each run its own copy.
+			if tc.pod != nil {
+				tc.pod = tc.pod.DeepCopy()
+			}
+			for i := range tc.objs {
+				if pod, ok := tc.objs[i].(*v1.Pod); ok {
+					tc.objs[i] = pod.DeepCopy()
+				}
+			}
+
 			nodes := tc.nodes
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
@@ -6422,6 +6432,74 @@ func TestEventsToRegisterOptionalNodeOperations(t *testing.T) {
 			}
 			if registered != enabled {
 				tCtx.Errorf("UpdateNodeDeclaredFeature registered = %v, want %v", registered, enabled)
+			}
+		})
+	}
+}
+
+func TestIsSchedulableAfterAssignedPodDeletion(t *testing.T) {
+	testIsSchedulableAfterAssignedPodDeletion(ktesting.Init(t))
+}
+func testIsSchedulableAfterAssignedPodDeletion(tCtx ktesting.TContext) {
+	deletedPodWithClaims := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "deleted-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			ResourceClaims: []v1.PodResourceClaim{{Name: "resource-claim", ResourceClaimName: &claimName}},
+		},
+	}
+	deletedPodWithoutClaims := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "deleted-pod", Namespace: "default"},
+	}
+
+	testcases := map[string]struct {
+		oldObj   interface{}
+		wantHint fwk.QueueingHint
+		wantErr  bool
+	}{
+		"pod-with-claims": {
+			oldObj:   deletedPodWithClaims,
+			wantHint: fwk.Queue,
+		},
+		"pod-without-claims": {
+			oldObj:   deletedPodWithoutClaims,
+			wantHint: fwk.QueueSkip,
+		},
+		"tombstone-with-claims": {
+			// The tombstone carries the last known revision of the pod,
+			// which is good enough because spec.resourceClaims is immutable.
+			oldObj:   cache.DeletedFinalStateUnknown{Key: "default/deleted-pod", Obj: deletedPodWithClaims},
+			wantHint: fwk.Queue,
+		},
+		"tombstone-without-claims": {
+			oldObj:   cache.DeletedFinalStateUnknown{Key: "default/deleted-pod", Obj: deletedPodWithoutClaims},
+			wantHint: fwk.QueueSkip,
+		},
+		"nil-old-object": {
+			// As tolerates nil objects, so the hint may receive a nil
+			// deleted pod and must not dereference it.
+			oldObj:   nil,
+			wantHint: fwk.Queue,
+		},
+		"unexpected-object": {
+			oldObj:   "not-a-pod",
+			wantHint: fwk.Queue,
+			wantErr:  true,
+		},
+	}
+
+	for name, tc := range testcases {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			pl := &DynamicResources{}
+			gotHint, err := pl.isSchedulableAfterAssignedPodDeletion(tCtx.Logger(), podWithClaimTemplate, tc.oldObj, nil)
+			if tc.wantErr {
+				if err == nil {
+					tCtx.Fatalf("want error, got nil")
+				}
+			} else {
+				tCtx.ExpectNoError(err)
+			}
+			if tc.wantHint != gotHint {
+				tCtx.Fatalf("want %v, got %v", tc.wantHint.String(), gotHint.String())
 			}
 		})
 	}
