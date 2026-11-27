@@ -17,6 +17,8 @@ limitations under the License.
 package content
 
 import (
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -141,5 +143,80 @@ func TestIsPrefixedLabelKey(t *testing.T) {
 		if errs := IsPrefixedLabelKey(errorCases[i]); len(errs) == 0 {
 			t.Errorf("case[%d]: %q: expected failure", i, errorCases[i])
 		}
+	}
+}
+
+func FuzzIsLabelKey(f *testing.F) {
+	refKey := regexp.MustCompile("^" + labelKeyFmt + "$")
+	for _, seed := range []string{"", "simple", "topology.kubernetes.io/zone", "/name", "prefix/", "a/b/c", "Example.com/name", strings.Repeat("a", 64), strings.Repeat("a", 254) + "/b", "a/b\u00e9"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		var want []string
+		parts := strings.Split(value, "/")
+		var name string
+		switch len(parts) {
+		case 1:
+			name = parts[0]
+		case 2:
+			prefix := parts[0]
+			name = parts[1]
+			if len(prefix) == 0 {
+				want = append(want, "prefix part "+EmptyError())
+			} else if msgs := IsDNS1123Subdomain(prefix); len(msgs) != 0 {
+				want = append(want, prefixEach(msgs, "prefix part ")...)
+			}
+		default:
+			want = append(want, "a valid label key "+RegexError(labelKeyErrMsg, labelKeyFmt, "MyName", "my.name", "123-abc")+
+				" with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')")
+			if got := IsLabelKey(value); !slices.Equal(got, want) {
+				t.Fatalf("IsLabelKey(%q) = %v, want %v", value, got, want)
+			}
+			return
+		}
+		if len(name) == 0 {
+			want = append(want, "name part "+EmptyError())
+		} else if len(name) > labelKeyMaxLength {
+			want = append(want, "name part "+MaxLenError(labelKeyMaxLength))
+		}
+		if !refKey.MatchString(name) {
+			want = append(want, "name part "+RegexError(labelKeyErrMsg, labelKeyFmt, "MyName", "my.name", "123-abc"))
+		}
+		if got := IsLabelKey(value); !slices.Equal(got, want) {
+			t.Fatalf("IsLabelKey(%q) = %v, want %v", value, got, want)
+		}
+	})
+}
+
+func FuzzIsLabelValue(f *testing.F) {
+	refVal := regexp.MustCompile("^" + labelValueFmt + "$")
+	for _, seed := range []string{"", "us-central1-a", "My_Value.123", "-bad", "bad-", strings.Repeat("a", 63), strings.Repeat("a", 64), "a/b", "a\u00e9"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		var want []string
+		if len(value) > LabelValueMaxLength {
+			want = append(want, MaxLenError(LabelValueMaxLength))
+		}
+		if !refVal.MatchString(value) {
+			want = append(want, RegexError(labelValueErrMsg, labelValueFmt, "MyValue", "my_value", "12345"))
+		}
+		if got := IsLabelValue(value); !slices.Equal(got, want) {
+			t.Fatalf("IsLabelValue(%q) = %v, want %v", value, got, want)
+		}
+	})
+}
+
+func BenchmarkIsLabelKey(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = IsLabelKey("topology.kubernetes.io/zone")
+	}
+}
+
+func BenchmarkIsLabelValue(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = IsLabelValue("us-central1-a")
 	}
 }
