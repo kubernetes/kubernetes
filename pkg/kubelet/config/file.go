@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -58,23 +59,24 @@ type sourceFile struct {
 	watchEvents    chan *watchEvent
 }
 
-// NewSourceFile watches a config file for changes.
-func NewSourceFile(logger klog.Logger, path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) {
+// NewSourceFile watches a config file for changes. The watch stops when ctx
+// is canceled.
+func NewSourceFile(ctx context.Context, path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) {
 	// "github.com/sigma/go-inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
-	config := newSourceFile(path, nodeName, period, updates)
-	logger.V(1).Info("Watching path", "path", path)
-	config.run(logger)
+	config := newSourceFile(ctx, path, nodeName, period, updates)
+	klog.FromContext(ctx).V(1).Info("Watching path", "path", path)
+	config.run(ctx)
 }
 
-func newSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) *sourceFile {
+func newSourceFile(ctx context.Context, path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) *sourceFile {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
 			pods = append(pods, o.(*v1.Pod))
 		}
-		updates <- sourceUpdate{Pods: pods}
+		sendUpdate(ctx, updates, sourceUpdate{Pods: pods})
 	}
 	store := cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc)
 	return &sourceFile{
@@ -88,18 +90,31 @@ func newSourceFile(path string, nodeName types.NodeName, period time.Duration, u
 	}
 }
 
-func (s *sourceFile) run(logger klog.Logger) {
+// sendUpdate delivers update unless ctx is canceled first, so that a stopped
+// source never blocks forever on a channel nobody reads anymore.
+func sendUpdate(ctx context.Context, updates chan<- sourceUpdate, update sourceUpdate) {
+	select {
+	case updates <- update:
+	case <-ctx.Done():
+	}
+}
+
+func (s *sourceFile) run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	listTicker := time.NewTicker(s.period)
 
 	go func() {
+		defer listTicker.Stop()
 		// Read path immediately to speed up startup.
-		if err := s.listConfig(logger); err != nil {
+		if err := s.listConfig(ctx); err != nil {
 			logger.Error(err, "Unable to read config path", "path", s.path)
 		}
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-listTicker.C:
-				if err := s.listConfig(logger); err != nil {
+				if err := s.listConfig(ctx); err != nil {
 					logger.Error(err, "Unable to read config path", "path", s.path)
 				}
 			case e := <-s.watchEvents:
@@ -110,14 +125,15 @@ func (s *sourceFile) run(logger klog.Logger) {
 		}
 	}()
 
-	s.startWatch(logger)
+	s.startWatch(ctx)
 }
 
 func (s *sourceFile) applyDefaults(logger klog.Logger, pod *api.Pod, source string) error {
 	return applyDefaults(logger, pod, source, true, s.nodeName)
 }
 
-func (s *sourceFile) listConfig(logger klog.Logger) error {
+func (s *sourceFile) listConfig(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	path := s.path
 	statInfo, err := os.Stat(path)
 	if err != nil {
@@ -125,7 +141,7 @@ func (s *sourceFile) listConfig(logger klog.Logger) error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- sourceUpdate{Pods: []*v1.Pod{}}
+		sendUpdate(ctx, s.updates, sourceUpdate{Pods: []*v1.Pod{}})
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -137,7 +153,7 @@ func (s *sourceFile) listConfig(logger klog.Logger) error {
 		}
 		if len(pods) == 0 {
 			// Emit an update with an empty PodList to allow FileSource to be marked as seen
-			s.updates <- sourceUpdate{Pods: pods}
+			sendUpdate(ctx, s.updates, sourceUpdate{Pods: pods})
 			return nil
 		}
 		return s.replaceStore(pods...)
