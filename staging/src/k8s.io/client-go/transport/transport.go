@@ -74,6 +74,21 @@ func isValidHolders(config *Config) bool {
 
 	return true
 }
+func getTLSMinVersion() uint16 {
+	if v := os.Getenv("KUBERNETES_TLS_MIN_VERSION"); v != "" {
+		switch v {
+		case "VersionTLS10", "TLS1.0", "1.0":
+			return tls.VersionTLS10
+		case "VersionTLS11", "TLS1.1", "1.1":
+			return tls.VersionTLS11
+		case "VersionTLS12", "TLS1.2", "1.2":
+			return tls.VersionTLS12
+		case "VersionTLS13", "TLS1.3", "1.3":
+			return tls.VersionTLS13
+		}
+	}
+	return tls.VersionTLS12
+}
 
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
 // by the provided Config. Will return nil if no transport level security is requested.
@@ -92,7 +107,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		// Can't use SSLv3 because of POODLE and BEAST
 		// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 		// Can't use TLSv1.1 because of RC4 cipher usage
-		MinVersion:         tls.VersionTLS12,
+		MinVersion:         getTLSMinVersion(),
 		InsecureSkipVerify: c.TLS.Insecure,
 		ServerName:         c.TLS.ServerName,
 		NextProtos:         c.TLS.NextProtos,

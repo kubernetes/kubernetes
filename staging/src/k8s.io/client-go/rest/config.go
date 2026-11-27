@@ -271,6 +271,13 @@ type TLSClientConfig struct {
 	// To indicate to the server http/1.1 is preferred over http/2, set to ["http/1.1", "h2"] (though the server is free to ignore that preference).
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
+// MinVersion specifies the minimum TLS version acceptable for connections 
+	// (e.g., tls.VersionTLS13). If zero, defaults to the system/transport minimum.
+	MinVersion uint16
+
+	// MaxVersion specifies the maximum TLS version acceptable for connections.
+	// If zero, defaults to the system/transport maximum.
+	MaxVersion uint16
 }
 
 var _ fmt.Stringer = TLSClientConfig{}

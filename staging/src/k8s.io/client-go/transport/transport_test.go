@@ -621,3 +621,123 @@ func TestRootCertPoolEmptyData(t *testing.T) {
 		})
 	}
 }
+func TestGetTLSMinVersion(t *testing.T) {
+	tests := []struct {
+		name     string
+		envVal   string
+		hasEnv   bool
+		expected uint16
+	}{
+		{
+			name:     "Default when env is unset",
+			hasEnv:   false,
+			expected: tls.VersionTLS12,
+		},
+		{
+			name:     "Default when env is empty",
+			envVal:   "",
+			hasEnv:   true,
+			expected: tls.VersionTLS12,
+		},
+		// TLS 1.0 variants
+		{
+			name:     "TLS 1.0 via VersionTLS10",
+			envVal:   "VersionTLS10",
+			hasEnv:   true,
+			expected: tls.VersionTLS10,
+		},
+		{
+			name:     "TLS 1.0 via TLS1.0",
+			envVal:   "TLS1.0",
+			hasEnv:   true,
+			expected: tls.VersionTLS10,
+		},
+		{
+			name:     "TLS 1.0 via 1.0",
+			envVal:   "1.0",
+			hasEnv:   true,
+			expected: tls.VersionTLS10,
+		},
+		// TLS 1.1 variants
+		{
+			name:     "TLS 1.1 via VersionTLS11",
+			envVal:   "VersionTLS11",
+			hasEnv:   true,
+			expected: tls.VersionTLS11,
+		},
+		{
+			name:     "TLS 1.1 via TLS1.1",
+			envVal:   "TLS1.1",
+			hasEnv:   true,
+			expected: tls.VersionTLS11,
+		},
+		{
+			name:     "TLS 1.1 via 1.1",
+			envVal:   "1.1",
+			hasEnv:   true,
+			expected: tls.VersionTLS11,
+		},
+		// TLS 1.2 variants
+		{
+			name:     "TLS 1.2 via VersionTLS12",
+			envVal:   "VersionTLS12",
+			hasEnv:   true,
+			expected: tls.VersionTLS12,
+		},
+		{
+			name:     "TLS 1.2 via TLS1.2",
+			envVal:   "TLS1.2",
+			hasEnv:   true,
+			expected: tls.VersionTLS12,
+		},
+		{
+			name:     "TLS 1.2 via 1.2",
+			envVal:   "1.2",
+			hasEnv:   true,
+			expected: tls.VersionTLS12,
+		},
+		// TLS 1.3 variants
+		{
+			name:     "TLS 1.3 via VersionTLS13",
+			envVal:   "VersionTLS13",
+			hasEnv:   true,
+			expected: tls.VersionTLS13,
+		},
+		{
+			name:     "TLS 1.3 via TLS1.3",
+			envVal:   "TLS1.3",
+			hasEnv:   true,
+			expected: tls.VersionTLS13,
+		},
+		{
+			name:     "TLS 1.3 via 1.3",
+			envVal:   "1.3",
+			hasEnv:   true,
+			expected: tls.VersionTLS13,
+		},
+		// Invalid fallback case
+		{
+			name:     "Invalid version string falls back to TLS 1.2",
+			envVal:   "TLS2.0",
+			hasEnv:   true,
+			expected: tls.VersionTLS12,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.hasEnv {
+				t.Setenv("KUBERNETES_TLS_MIN_VERSION", tc.envVal)
+			} else {
+				// If we want to simulate an unset variable explicitly when t.Setenv isn't used
+				// (Though t.Setenv overrides, we can also ensure it's cleared if needed)
+				t.Setenv("KUBERNETES_TLS_MIN_VERSION", "")
+			}
+
+			actual := getTLSMinVersion()
+			if actual != tc.expected {
+				t.Errorf("getTLSMinVersion() with env %q = %v, expected %v", tc.envVal, actual, tc.expected)
+			}
+		})
+	}
+}
