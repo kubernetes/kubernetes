@@ -68,6 +68,9 @@ func init() {
 			"metadata.ownerReferences[*].uid": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"metadata.resourceVersion": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},

@@ -529,7 +529,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				new.SetResourceVersion("")
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").MarkFromImperative(),
+				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").WithOrigin("update").MarkAlpha(),
 			},
 		},
 		{
