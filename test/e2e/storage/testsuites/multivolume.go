@@ -19,7 +19,6 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -411,37 +410,35 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		TestConcurrentAccessToRelatedVolumes(ctx, l.config.Framework, l.cs, l.ns.Name, l.config.ClientNodeSelection, pvcs, expectedContent)
 	})
 
-	// This tests below configuration:
-	// [pod1] [pod2]
-	// [   node1   ]
-	//   \      /     <- same volume mode (read only)
-	//   [volume1]
-	ginkgo.It("should concurrently access the single read-only volume from pods on the same node", func(ctx context.Context) {
-		init(ctx)
-		ginkgo.DeferCleanup(cleanup)
+	if pattern.VolMode != v1.PersistentVolumeBlock || !dInfo.Capabilities[storageframework.CapReadOnlyBlockNotSupported] {
+		// This tests below configuration:
+		// [pod1] [pod2]
+		// [   node1   ]
+		//   \      /     <- same volume mode (read only)
+		//   [volume1]
+		ginkgo.It("should concurrently access the single read-only volume from pods on the same node", func(ctx context.Context) {
+			init(ctx)
+			ginkgo.DeferCleanup(cleanup)
 
-		numPods := 2
+			numPods := 2
 
-		if !l.driver.GetDriverInfo().Capabilities[storageframework.CapMultiPODs] {
-			e2eskipper.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
-		}
+			if !l.driver.GetDriverInfo().Capabilities[storageframework.CapMultiPODs] {
+				e2eskipper.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
+			}
 
-		if l.driver.GetDriverInfo().Name == "vsphere" && reflect.DeepEqual(pattern, storageframework.BlockVolModeDynamicPV) {
-			e2eskipper.Skipf("Driver %q does not support read only raw block volumes - skipping", dInfo.Name)
-		}
+			// Create volume
+			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			resource := storageframework.CreateVolumeResource(ctx, l.driver, l.config, pattern, testVolumeSizeRange)
+			l.resources = append(l.resources, resource)
 
-		// Create volume
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		resource := storageframework.CreateVolumeResource(ctx, l.driver, l.config, pattern, testVolumeSizeRange)
-		l.resources = append(l.resources, resource)
+			// Initialize the volume with a filesystem - it's going to be mounted as read-only below.
+			initializeVolume(ctx, l.cs, f.Timeouts, l.ns.Name, resource.Pvc, l.config.ClientNodeSelection)
 
-		// Initialize the volume with a filesystem - it's going to be mounted as read-only below.
-		initializeVolume(ctx, l.cs, f.Timeouts, l.ns.Name, resource.Pvc, l.config.ClientNodeSelection)
-
-		// Test access to the volume from pods on a single node
-		TestConcurrentAccessToSingleVolume(ctx, l.config.Framework, l.cs, l.ns.Name,
-			l.config.ClientNodeSelection, resource.Pvc, numPods, true /* sameNode */, true /* readOnly */)
-	})
+			// Test access to the volume from pods on a single node
+			TestConcurrentAccessToSingleVolume(ctx, l.config.Framework, l.cs, l.ns.Name,
+				l.config.ClientNodeSelection, resource.Pvc, numPods, true /* sameNode */, true /* readOnly */)
+		})
+	}
 
 	// This tests below configuration:
 	//        [pod1] [pod2]
