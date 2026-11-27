@@ -23,10 +23,14 @@ import (
 	"crypto/ecdsa"
 	"crypto/mldsa"
 	"crypto/rsa"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -38,6 +42,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-jose/go-jose/v4"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -5035,6 +5040,249 @@ func TestJWKSMetrics(t *testing.T) {
 	metricsAfterCancel := captureTimestampMetric(t, jwtIssuerHash, "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37")
 	if metricsAfterCancel != metricsBeforeCancel {
 		t.Errorf("metrics changed after context cancellation: before=%v, after=%v (should remain unchanged)", metricsBeforeCancel, metricsAfterCancel)
+	}
+}
+
+// newJWKSMetricsRoundTripper serves body as a JWKS response and returns a round
+// tripper for it. The server URL doubles as the JWKS URL and the issuer.
+func newJWKSMetricsRoundTripper(t *testing.T, body []byte) (http.RoundTripper, string) {
+	t.Helper()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+
+	return withMetricsRoundTripper(nil, srv.URL, srv.URL, "testAPIServerID", context.Background()), srv.URL
+}
+
+// unsupportedRSAKey returns a key go-jose rejects with ErrUnsupportedKeyType
+// because its modulus exceeds MaxRSAModulusBits.
+func unsupportedRSAKey() *jose.JSONWebKey {
+	return &jose.JSONWebKey{
+		Key: &rsa.PublicKey{
+			N: new(big.Int).Lsh(big.NewInt(1), uint(jose.MaxRSAModulusBits+1)),
+			E: 65537,
+		},
+		KeyID:     "unsupported",
+		Algorithm: string(jose.RS256),
+		Use:       "sig",
+	}
+}
+
+func TestJWKSMetricsUnsupportedKeyInSet(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationJWKSMetrics, true)
+	ResetMetrics()
+	RegisterMetrics()
+
+	body, err := json.Marshal(toKeySet([]*jose.JSONWebKey{
+		loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+		unsupportedRSAKey(),
+	}))
+	if err != nil {
+		t.Fatalf("marshal key set: %v", err)
+	}
+	rt, srvURL := newJWKSMetricsRoundTripper(t, body)
+
+	resp, err := rt.RoundTrip(httptest.NewRequest(http.MethodGet, srvURL, nil))
+	if err != nil {
+		t.Fatalf("round trip: %v", err)
+	}
+	defer resp.Body.Close()
+
+	got, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if !bytes.Equal(got, body) {
+		t.Fatalf("key set body was not passed through unchanged")
+	}
+
+	checkJWKSMetrics(t, getHash(srvURL), getHash(string(body)))
+}
+
+func TestJWKSMetricsAllKeysUnsupported(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfigurationJWKSMetrics, true)
+	ResetMetrics()
+	RegisterMetrics()
+
+	body, err := json.Marshal(toKeySet([]*jose.JSONWebKey{unsupportedRSAKey()}))
+	if err != nil {
+		t.Fatalf("marshal key set: %v", err)
+	}
+	rt, srvURL := newJWKSMetricsRoundTripper(t, body)
+
+	resp, err := rt.RoundTrip(httptest.NewRequest(http.MethodGet, srvURL, nil))
+	if err != nil {
+		t.Fatalf("round trip: %v", err)
+	}
+	defer resp.Body.Close()
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+	for _, family := range metricFamilies {
+		if family.GetName() != "apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds" {
+			continue
+		}
+		for _, metric := range family.Metric {
+			labelFilter := map[string]string{
+				"apiserver_id_hash": "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",
+				"jwt_issuer_hash":   getHash(srvURL),
+				"result":            "failure",
+			}
+			if testutil.LabelsMatch(metric, labelFilter) {
+				return
+			}
+		}
+		t.Fatalf("failure series not found in %v", family.Metric)
+	}
+	t.Fatalf("failure metric was not recorded")
+}
+
+func TestValidateKeySetMatchesGoOIDC(t *testing.T) {
+	validKey := loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256)
+	validJSON, err := json.Marshal(validKey)
+	if err != nil {
+		t.Fatalf("marshal valid key: %v", err)
+	}
+	signingKey := loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256)
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(signingKey.Algorithm),
+		Key:       signingKey,
+	}, nil)
+	if err != nil {
+		t.Fatalf("initialize signer: %v", err)
+	}
+	jws, err := signer.Sign([]byte(`{"sub":"jane"}`))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	token, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+
+	oversizedMember := map[string]any{
+		"kty": "RSA", "alg": "RS256", "kid": "big", "use": "sig",
+		"n": base64.RawURLEncoding.EncodeToString(new(big.Int).Lsh(big.NewInt(1), uint(jose.MaxRSAModulusBits+1)).Bytes()),
+		"e": "AQAB",
+	}
+
+	tests := []struct {
+		name string
+		// member is appended to a set that already holds validJSON, unless
+		// noValidKey is set.
+		member     map[string]any
+		noValidKey bool
+		// wantSentinel asserts that go-jose still rejects the member with
+		// ErrUnsupportedKeyType. Without it a dependency bump that starts
+		// accepting the member would leave the case passing but meaningless.
+		wantSentinel bool
+		// knownDivergence marks a member that go-oidc skips by alg before
+		// parsing it, which validateKeySet cannot do without a copy of the
+		// private algorithm allowlist. The metric reports a failure for a
+		// body that authenticates. A well-formed member carrying an
+		// unsupported alg goes the other way: it counts as parseable here
+		// while go-oidc skips it.
+		knownDivergence bool
+	}{
+		{
+			name:   "no extra member",
+			member: nil,
+		},
+		{
+			name:         "oversized RSA modulus",
+			member:       oversizedMember,
+			wantSentinel: true,
+		},
+		{
+			name:         "only an unsupported key",
+			member:       oversizedMember,
+			noValidKey:   true,
+			wantSentinel: true,
+		},
+		{
+			name: "unsupported curve",
+			member: map[string]any{
+				"kty": "EC", "kid": "secp256k1", "use": "sig",
+				"crv": "secp256k1",
+				"x":   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				"y":   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			},
+			wantSentinel: true,
+		},
+		{
+			name:         "unknown key type",
+			member:       map[string]any{"kty": "XYZ"},
+			wantSentinel: true,
+		},
+		{
+			name:         "unsupported OKP curve",
+			member:       map[string]any{"kty": "OKP", "crv": "Ed448", "x": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+			wantSentinel: true,
+		},
+		{
+			name:   "malformed key",
+			member: map[string]any{"kty": "RSA", "alg": "RS256", "n": "!!!", "e": "AQAB"},
+		},
+		{
+			name:            "malformed key with unsupported alg",
+			member:          map[string]any{"kty": "RSA", "alg": "ES256K", "n": "!!!", "e": "AQAB"},
+			knownDivergence: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			members := []any{}
+			if !tc.noValidKey {
+				members = append(members, json.RawMessage(validJSON))
+			}
+			if tc.member != nil {
+				members = append(members, tc.member)
+			}
+			body, err := json.Marshal(map[string]any{"keys": members})
+			if err != nil {
+				t.Fatalf("marshal key set: %v", err)
+			}
+			if tc.wantSentinel {
+				memberJSON, err := json.Marshal(tc.member)
+				if err != nil {
+					t.Fatalf("marshal member: %v", err)
+				}
+				var key jose.JSONWebKey
+				if err := json.Unmarshal(memberJSON, &key); !errors.Is(err, jose.ErrUnsupportedKeyType) {
+					t.Fatalf("corpus case no longer exercises the skip, go-jose returned %v", err)
+				}
+			}
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(body)
+			}))
+			defer srv.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_, verifyErr := oidc.NewRemoteKeySet(ctx, srv.URL).VerifySignature(ctx, token)
+
+			validateErr := validateKeySet(&http.Response{Header: http.Header{"Content-Type": []string{"application/json"}}}, body)
+
+			if tc.knownDivergence {
+				if verifyErr != nil {
+					t.Fatalf("expected go-oidc to skip the member, got error: %v", verifyErr)
+				}
+				if validateErr == nil {
+					t.Fatalf("expected validateKeySet to reject the malformed member")
+				}
+				return
+			}
+			if (verifyErr == nil) != (validateErr == nil) {
+				t.Fatalf("parsers disagree: go-oidc error = %v, validateKeySet error = %v", verifyErr, validateErr)
+			}
+		})
 	}
 }
 
