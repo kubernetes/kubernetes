@@ -2119,6 +2119,7 @@
   - group
   - resource
   - success
+  - verb
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

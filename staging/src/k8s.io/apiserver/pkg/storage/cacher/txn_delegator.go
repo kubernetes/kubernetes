@@ -105,7 +105,19 @@ func (d *txnDelegator) GetCurrentState(ctx context.Context, ignoreNotFound bool)
 	return d.getStateNotOlderThan(ctx, "", ignoreNotFound)
 }
 
-func (d *txnDelegator) getStateNotOlderThan(ctx context.Context, resourceVersion string, ignoreNotFound bool) (*storage.ObjState, error) {
+func (d *txnDelegator) getStateNotOlderThan(ctx context.Context, resourceVersion string, ignoreNotFound bool) (_ *storage.ObjState, err error) {
+	defer func() {
+		if storage.IsTooLargeResourceVersion(err) {
+			// Recorded by the caller after handling storage fallback.
+			return
+		}
+		success := "true"
+		if err != nil && !storage.IsNotFound(err) {
+			success = "false"
+		}
+		recordConsistentRead(ctx, d.cacher.groupResource, success, "false")
+	}()
+
 	obj, exists, err := d.cacher.get(ctx, d.key, resourceVersion, ignoreNotFound)
 	if err != nil {
 		return nil, err
@@ -114,7 +126,7 @@ func (d *txnDelegator) getStateNotOlderThan(ctx context.Context, resourceVersion
 		obj = obj.DeepCopyObject()
 	} else {
 		obj = d.cacher.newFunc()
-		if err := runtime.SetZeroValue(obj); err != nil {
+		if err = runtime.SetZeroValue(obj); err != nil {
 			return nil, fmt.Errorf("unable to zero object: %w", err)
 		}
 	}
