@@ -17,6 +17,8 @@ limitations under the License.
 package env
 
 import (
+	"bufio"
+	"errors"
 	"os"
 	"os/exec"
 	"runtime"
@@ -725,5 +727,17 @@ huHhWsWslkcntkKp0V1Jc8oGv86Dp5mPhpfpMOK+vCe2TrS/saes9fNVxjorSpLl4xTU/V
 				}
 			}
 		})
+	}
+}
+
+func TestParseEnvScannerErrorInMultilineValue(t *testing.T) {
+	path := t.TempDir() + "/settings.env"
+	content := "KEY='first line\n" + strings.Repeat("x", bufio.MaxScanTokenSize) + "'\n"
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := ParseEnv(path, "KEY")
+	if !errors.Is(err, bufio.ErrTooLong) {
+		t.Fatalf("expected scanner error, got %v", err)
 	}
 }
