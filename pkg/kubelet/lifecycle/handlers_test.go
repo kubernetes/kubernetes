@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	compversion "k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/ktesting"
@@ -47,6 +48,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
+
+var lifecycleUserAgent = fmt.Sprintf("kube-lifecycle/%s.%s", compversion.Get().Major, compversion.Get().Minor)
 
 type fakeContainerCommandRunner struct {
 	Cmd []string
@@ -384,7 +387,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "http://example.test:42/foo",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -402,7 +405,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "http://233.252.0.1:42/foo",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -420,7 +423,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "http://233.252.0.1:42/foo",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -438,7 +441,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "http://233.252.0.1:42/foo",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -456,7 +459,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "http://233.252.0.1:8080/foo",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -474,7 +477,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "https://233.252.0.1:4430/foo",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -492,7 +495,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "baz://233.252.0.1:80/foo",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -510,7 +513,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "http://233.252.0.1:80/foo?k=v",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -528,7 +531,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "http://233.252.0.1:80/foo#frag",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -552,7 +555,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
 					"Foo":        {"bar"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 				},
 			},
 		}, {
@@ -576,7 +579,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				NewURL:    "http://example.test:80/foo",
 				NewHeader: http.Header{
 					"Accept":     {"*/*"},
-					"User-Agent": {"kube-lifecycle/."},
+					"User-Agent": {lifecycleUserAgent},
 					"Host":       {"from.header"},
 				},
 			},

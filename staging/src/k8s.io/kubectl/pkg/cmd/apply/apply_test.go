@@ -2614,7 +2614,15 @@ func TestLoadObjects(t *testing.T) {
 	}
 }
 
+// pinApplySetToolVersion makes the expected tooling annotation independent of the build version.
+func pinApplySetToolVersion(t *testing.T) {
+	orig := ApplySetToolVersion
+	ApplySetToolVersion = "v1.2.3"
+	t.Cleanup(func() { ApplySetToolVersion = orig })
+}
+
 func TestApplySetParentManagement(t *testing.T) {
+	pinApplySetToolVersion(t)
 	nameParentSecret := "my-set"
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
@@ -2661,7 +2669,7 @@ metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-kinds: ReplicationController
-    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/tooling: kubectl/v1.2.3
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
@@ -2694,7 +2702,7 @@ metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-kinds: ReplicationController,Service
-    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/tooling: kubectl/v1.2.3
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
@@ -2728,7 +2736,7 @@ metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-kinds: ReplicationController,Service
-    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/tooling: kubectl/v1.2.3
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
@@ -2762,7 +2770,7 @@ metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-kinds: Service
-    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/tooling: kubectl/v1.2.3
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
@@ -2876,6 +2884,7 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 }
 
 func TestApplySet_ClusterScopedCustomResourceParent(t *testing.T) {
+	pinApplySetToolVersion(t)
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
@@ -2924,7 +2933,7 @@ metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: test
     applyset.kubernetes.io/contains-group-kinds: ReplicationController
-    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/tooling: kubectl/v1.2.3
   labels:
     applyset.kubernetes.io/id: applyset-rhp1a-HVAVT_dFgyEygyA1BEB82HPp2o10UiFTpqtAs-v1
   name: my-set
@@ -3133,6 +3142,7 @@ func TestApplyWithPruneV2(t *testing.T) {
 }
 
 func TestApplySetUpdateConflictsAreRetried(t *testing.T) {
+	pinApplySetToolVersion(t)
 	nameParentSecret := "my-set"
 	pathSecret := "/namespaces/test/secrets/" + nameParentSecret
 	secretYaml := `apiVersion: v1
@@ -3141,7 +3151,7 @@ metadata:
   annotations:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-resources: replicationcontrollers
-    applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
+    applyset.kubernetes.io/tooling: kubectl/v1.2.3
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set

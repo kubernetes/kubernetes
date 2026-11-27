@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -45,7 +46,17 @@ resourcepoolstatusrequest_controller_requests_processed_total{driver_name="unkno
 	}
 }
 
+// pinBuildVersion makes metrics deprecated in earlier releases visible, independent of the build version.
+func pinBuildVersion(t *testing.T) {
+	orig := metrics.BuildVersion
+	t.Cleanup(func() { metrics.BuildVersion = orig })
+	metrics.BuildVersion = func() apimachineryversion.Info {
+		return apimachineryversion.Info{GitVersion: "v1.0.0"}
+	}
+}
+
 func TestRequestProcessingErrors(t *testing.T) {
+	pinBuildVersion(t)
 	registry := metrics.NewKubeRegistry()
 	defer registry.Reset()
 	registry.MustRegister(RequestProcessingErrors)
