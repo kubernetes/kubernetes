@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onsi/gomega"
+	"math"
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
@@ -51,9 +52,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	. "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -2185,4 +2188,308 @@ func TestGetPodKeys(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestReportSortingDeletionAgeRatioMetric(t *testing.T) {
+	const metricName = "replicaset_controller_sorting_deletion_age_ratio"
+
+	gatherHistogram := func(t *testing.T) (uint64, float64, map[float64]uint64, bool) {
+		t.Helper()
+		mfs, err := legacyregistry.DefaultGatherer.Gather()
+		if err != nil {
+			t.Fatalf("failed to gather metrics: %v", err)
+		}
+		buckets := make(map[float64]uint64)
+		for _, mf := range mfs {
+			if mf.GetName() != metricName {
+				continue
+			}
+			for _, m := range mf.GetMetric() {
+				h := m.GetHistogram()
+				if h == nil {
+					continue
+				}
+				for _, b := range h.GetBucket() {
+					buckets[b.GetUpperBound()] = b.GetCumulativeCount()
+				}
+				return h.GetSampleCount(), h.GetSampleSum(), buckets, true
+			}
+		}
+		return 0, 0, nil, false
+	}
+
+	// Register metrics only if another test in this package has not already registered them.
+	if _, _, _, ok := gatherHistogram(t); !ok {
+		if err := metrics.Register(legacyregistry.Register); err != nil {
+			t.Fatalf("failed to register replicaset metrics: %v", err)
+		}
+	}
+
+	readHistogram := func(t *testing.T) (uint64, float64, map[float64]uint64) {
+		t.Helper()
+		count, sum, buckets, ok := gatherHistogram(t)
+		if !ok {
+			t.Fatalf("metric %q not found in legacyregistry", metricName)
+		}
+		return count, sum, buckets
+	}
+
+	rs := newReplicaSet(1, map[string]string{"name": "foo"})
+	newPodWithReadiness := func(name, node string, ready bool, createdAt *time.Time) *v1.Pod {
+		phase := v1.PodRunning
+		var readyTransition *metav1.Time
+		if createdAt != nil {
+			readyTransition = &metav1.Time{Time: *createdAt}
+		}
+		pod := newPod(name, rs, phase, readyTransition, true)
+		pod.Spec.NodeName = node
+		if !ready {
+			pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionFalse}}
+		}
+		if createdAt != nil {
+			pod.CreationTimestamp = metav1.Time{Time: *createdAt}
+		}
+		return pod
+	}
+
+	fixedNow := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	tests := []struct {
+		name          string
+		pods          []*v1.Pod
+		diff          int
+		expectedCount uint64
+		expectedSum   float64
+		checkBuckets  func(t *testing.T, before, after map[float64]uint64)
+	}{
+		{
+			name: "normal duration calculation",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted", "node-1", true, ptr.To(fixedNow.Add(-20*time.Second))),
+				newPodWithReadiness("kept", "node-2", true, ptr.To(fixedNow.Add(-10*time.Second))),
+			},
+			diff:          1,
+			expectedCount: 1,
+			expectedSum:   2.0,
+		},
+		{
+			name: "fractional ratio preserves precision and bucket placement",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted", "node-1", true, ptr.To(fixedNow.Add(-15*time.Second))),
+				newPodWithReadiness("kept", "node-2", true, ptr.To(fixedNow.Add(-10*time.Second))),
+			},
+			diff:          1,
+			expectedCount: 1,
+			expectedSum:   1.5,
+			checkBuckets: func(t *testing.T, before, after map[float64]uint64) {
+				t.Helper()
+				if delta := after[1.0] - before[1.0]; delta != 0 {
+					t.Errorf("expected le=1.0 bucket delta 0, got %d", delta)
+				}
+				if delta := after[2.0] - before[2.0]; delta != 1 {
+					t.Errorf("expected le=2.0 bucket delta 1, got %d", delta)
+				}
+			},
+		},
+		{
+			name: "sub-millisecond durations preserve precision without panic",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted", "node-1", true, ptr.To(fixedNow.Add(-300*time.Microsecond))),
+				newPodWithReadiness("kept", "node-2", true, ptr.To(fixedNow.Add(-200*time.Microsecond))),
+			},
+			diff:          1,
+			expectedCount: 1,
+			expectedSum:   1.5,
+		},
+		{
+			name: "zero denominator when youngest pod created at now",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted", "node-1", true, ptr.To(fixedNow.Add(-10*time.Second))),
+				newPodWithReadiness("youngest", "node-2", true, ptr.To(fixedNow)),
+			},
+			diff:          1,
+			expectedCount: 0,
+			expectedSum:   0,
+		},
+		{
+			name: "zero denominator when all ready pods created at now",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted", "node-1", true, ptr.To(fixedNow)),
+				newPodWithReadiness("kept", "node-2", true, ptr.To(fixedNow)),
+			},
+			diff:          1,
+			expectedCount: 0,
+			expectedSum:   0,
+		},
+		{
+			name: "multiple pods with mixed readiness and creation timestamps",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted-not-ready", "node-1", false, ptr.To(fixedNow.Add(-5*time.Second))),
+				newPodWithReadiness("deleted-oldest", "node-2", true, ptr.To(fixedNow.Add(-30*time.Second))),
+				newPodWithReadiness("deleted-mid", "node-3", true, ptr.To(fixedNow.Add(-15*time.Second))),
+				newPodWithReadiness("kept-youngest-ready", "node-4", true, ptr.To(fixedNow.Add(-10*time.Second))),
+				newPodWithReadiness("kept-newer-not-ready", "node-5", false, ptr.To(fixedNow.Add(-2*time.Second))),
+			},
+			diff:          3,
+			expectedCount: 2,
+			expectedSum:   4.5, // 30s/10s + 15s/10s
+		},
+		{
+			name: "future timestamp (clock skew) produces negative denominator safely skipped",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted", "node-1", true, ptr.To(fixedNow.Add(-10*time.Second))),
+				newPodWithReadiness("future-youngest", "node-2", true, ptr.To(fixedNow.Add(5*time.Second))),
+			},
+			diff:          1,
+			expectedCount: 0,
+			expectedSum:   0,
+		},
+		{
+			name: "zero creation timestamps on all ready pods safely skipped",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted", "node-1", true, nil),
+				newPodWithReadiness("kept", "node-2", true, nil),
+			},
+			diff:          1,
+			expectedCount: 0,
+			expectedSum:   0,
+		},
+		{
+			name: "zero creation timestamp on deleted pod skipped while valid youngest exists",
+			pods: []*v1.Pod{
+				newPodWithReadiness("deleted-unset", "node-1", true, nil),
+				newPodWithReadiness("kept", "node-2", true, ptr.To(fixedNow.Add(-10*time.Second))),
+			},
+			diff:          1,
+			expectedCount: 0,
+			expectedSum:   0,
+		},
+		{
+			name: "all not-ready pods safely skipped",
+			pods: []*v1.Pod{
+				newPodWithReadiness("not-ready-1", "node-1", false, ptr.To(fixedNow.Add(-20*time.Second))),
+				newPodWithReadiness("not-ready-2", "node-2", false, ptr.To(fixedNow.Add(-10*time.Second))),
+			},
+			diff:          1,
+			expectedCount: 0,
+			expectedSum:   0,
+		},
+		{
+			name: "diff greater than len(filteredPods) clamps safely",
+			pods: []*v1.Pod{
+				newPodWithReadiness("older", "node-1", true, ptr.To(fixedNow.Add(-20*time.Second))),
+				newPodWithReadiness("youngest", "node-2", true, ptr.To(fixedNow.Add(-10*time.Second))),
+			},
+			diff:          5,
+			expectedCount: 2,
+			expectedSum:   3.0, // 20s/10s + 10s/10s
+		},
+		{
+			name: "negative diff safely ignored",
+			pods: []*v1.Pod{
+				newPodWithReadiness("pod1", "node-1", true, ptr.To(fixedNow.Add(-10*time.Second))),
+			},
+			diff:          -1,
+			expectedCount: 0,
+			expectedSum:   0,
+		},
+		{
+			name:          "empty filteredPods slice safely ignored",
+			pods:          []*v1.Pod{},
+			diff:          1,
+			expectedCount: 0,
+			expectedSum:   0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			countBefore, sumBefore, bucketsBefore := readHistogram(t)
+
+			reportSortingDeletionAgeRatioMetricAt(tc.pods, tc.diff, fixedNow)
+
+			countAfter, sumAfter, bucketsAfter := readHistogram(t)
+			if gotCount := countAfter - countBefore; gotCount != tc.expectedCount {
+				t.Errorf("sample count delta = %d, want %d", gotCount, tc.expectedCount)
+			}
+			if gotSum := sumAfter - sumBefore; math.Abs(gotSum-tc.expectedSum) > 1e-9 || math.IsNaN(gotSum) || math.IsInf(gotSum, 0) {
+				t.Errorf("sample sum delta = %v, want %v", gotSum, tc.expectedSum)
+			}
+			if tc.checkBuckets != nil {
+				tc.checkBuckets(t, bucketsBefore, bucketsAfter)
+			}
+		})
+	}
+
+	t.Run("getPodsToDelete end-to-end selects colocated older pod and records fractional ratio", func(t *testing.T) {
+		countBefore, sumBefore, bucketsBefore := readHistogram(t)
+
+		now := time.Now()
+		// ActivePodsWithRanks prioritizes pods colocated with relatedPods on the same node
+		// (rule 5) ahead of readiness/creation age, so colocating olderPod on node-1 ensures
+		// getPodsToDelete selects olderPod and records ~1.5 (15s / 10s) rather than 1.0.
+		olderPod := newPodWithReadiness("older-colocated", "node-1", true, ptr.To(now.Add(-15*time.Second)))
+		extraRelatedOnNode1 := newPodWithReadiness("related-on-node-1", "node-1", true, ptr.To(now.Add(-30*time.Second)))
+		youngestPod := newPodWithReadiness("youngest-isolated", "node-2", true, ptr.To(now.Add(-10*time.Second)))
+
+		deleted := getPodsToDelete(
+			[]*v1.Pod{youngestPod, olderPod},
+			[]*v1.Pod{youngestPod, olderPod, extraRelatedOnNode1},
+			1,
+		)
+		if len(deleted) != 1 || deleted[0] != olderPod {
+			t.Fatalf("expected deleted pods [%s], got %v", olderPod.Name, deleted)
+		}
+
+		countAfter, sumAfter, bucketsAfter := readHistogram(t)
+		if gotCount := countAfter - countBefore; gotCount != 1 {
+			t.Fatalf("sample count delta = %d, want 1", gotCount)
+		}
+		if observed := sumAfter - sumBefore; math.Abs(observed-1.5) > 0.05 || math.IsNaN(observed) || math.IsInf(observed, 0) {
+			t.Errorf("expected fractional observation ~1.5, got %v", observed)
+		}
+		if delta := bucketsAfter[1.0] - bucketsBefore[1.0]; delta != 0 {
+			t.Errorf("expected le=1.0 bucket delta 0, got %d", delta)
+		}
+		if delta := bucketsAfter[2.0] - bucketsBefore[2.0]; delta != 1 {
+			t.Errorf("expected le=2.0 bucket delta 1, got %d", delta)
+		}
+	})
+
+	t.Run("getPodsToDelete real-time panic safety with future and zero-age timestamps", func(t *testing.T) {
+		countBefore, sumBefore, _ := readHistogram(t)
+
+		now := time.Now()
+		// Future timestamp (clock skew) produces a negative denominator; must not panic or record samples.
+		futurePod := newPodWithReadiness("future-pod", "node-2", true, ptr.To(now.Add(time.Minute)))
+		normalPod := newPodWithReadiness("normal-pod", "node-1", true, ptr.To(now.Add(-10*time.Second)))
+		deleted := getPodsToDelete([]*v1.Pod{normalPod, futurePod}, []*v1.Pod{normalPod, futurePod}, 1)
+		if len(deleted) != 1 {
+			t.Fatalf("expected 1 deleted pod, got %d", len(deleted))
+		}
+
+		countAfter, sumAfter, _ := readHistogram(t)
+		if got := countAfter - countBefore; got != 0 {
+			t.Errorf("expected 0 samples for future timestamp, got %d", got)
+		}
+		if sumAfter != sumBefore {
+			t.Errorf("expected sum unchanged (%v), got %v", sumBefore, sumAfter)
+		}
+
+		// Pods created just before getPodsToDelete must never panic regardless of scheduler timing.
+		justNow := time.Now()
+		older := newPodWithReadiness("just-older", "node-1", true, ptr.To(justNow.Add(-5*time.Millisecond)))
+		newer := newPodWithReadiness("just-newer", "node-2", true, ptr.To(justNow))
+		deleted = getPodsToDelete([]*v1.Pod{older, newer}, []*v1.Pod{older, newer}, 1)
+		if len(deleted) != 1 {
+			t.Fatalf("expected 1 deleted pod, got %d", len(deleted))
+		}
+		countEnd, sumEnd, _ := readHistogram(t)
+		if got := countEnd - countAfter; got != 1 {
+			t.Errorf("expected 1 sample for positive-age scale-down, got %d", got)
+		}
+		if delta := sumEnd - sumAfter; math.IsNaN(delta) || math.IsInf(delta, 0) || delta < 1.0 {
+			t.Errorf("expected finite sample >= 1.0, got %v", delta)
+		}
+	})
 }
