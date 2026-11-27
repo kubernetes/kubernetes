@@ -259,8 +259,8 @@ func (o *AutoscaleOptions) Run() error {
 			klog.V(1).Infof("Encountered an error with the autoscaling/v2 HorizontalPodAutoscaler: %v. "+
 				"Falling back to try the autoscaling/v1 HorizontalPodAutoscaler", err)
 			// check if the HPA can be created using v1 API.
-			if ok, err := o.canCreateHPAV1(); !ok {
-				return fmt.Errorf("failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1: %w", err)
+			if !o.canCreateHPAV1() {
+				return fmt.Errorf("failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1")
 			}
 			hpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)
 			if err := o.handleHPA(hpaV1); err != nil {
@@ -279,16 +279,19 @@ func (o *AutoscaleOptions) Run() error {
 	return nil
 }
 
-func (o *AutoscaleOptions) canCreateHPAV1() (bool, error) {
-	// Allow fallback to v1 HPA only if:
-	// 1. CPUPercent is set and Memory is not set.
-	// 2. Or, Memory is not set and the metric type is UtilizationMetricType.
-	_, _, metricsType, err := parseResourceInput(o.CPU, corev1.ResourceCPU)
-	if err != nil {
-		return false, err
+func (o *AutoscaleOptions) canCreateHPAV1() bool {
+	// autoscaling/v1 only supports a CPU utilization target, so allow fallback to v1 HPA only if:
+	// 1. --memory is not set
+	// 2. And, --cpu is a percentage (e.g. "70%"), or --cpu is not set (--cpu-percent or the
+	//    server default CPU utilization is used instead).
+	if o.Memory != "" {
+		return false
 	}
-	return (o.CPUPercent >= 0 && o.Memory == "") ||
-		(o.Memory == "" && metricsType == autoscalingv2.UtilizationMetricType), nil
+	if o.CPU == "" {
+		return true
+	}
+	_, _, metricsType, err := parseResourceInput(o.CPU, corev1.ResourceCPU)
+	return err == nil && metricsType == autoscalingv2.UtilizationMetricType
 }
 
 // handleHPA handles the creation and management of a single HPA object.
@@ -468,6 +471,11 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscalerV1(refName string, mappi
 	if o.Min > 0 {
 		v := int32(o.Min)
 		scaler.Spec.MinReplicas = &v
+	}
+	if o.CPU != "" {
+		if _, percent, metricsType, err := parseResourceInput(o.CPU, corev1.ResourceCPU); err == nil && metricsType == autoscalingv2.UtilizationMetricType {
+			scaler.Spec.TargetCPUUtilizationPercentage = &percent
+		}
 	}
 	if o.CPUPercent >= 0 {
 		c := int32(o.CPUPercent)

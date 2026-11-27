@@ -1055,11 +1055,98 @@ func TestCreateHorizontalPodAutoscalerV1(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "create with cpu utilization",
+			options: &AutoscaleOptions{
+				Name:       "cpu-utilization-hpa",
+				Max:        5,
+				Min:        1,
+				CPUPercent: -1,
+				CPU:        "70%",
+			},
+			refName: "deployment-1",
+			mapping: &meta.RESTMapping{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				},
+			},
+			expectedHPAV1: &autoscalingv1.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cpu-utilization-hpa",
+				},
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "deployment-1",
+					},
+					MinReplicas:                    ptr.To(int32(1)),
+					MaxReplicas:                    int32(5),
+					TargetCPUUtilizationPercentage: ptr.To(int32(70)),
+				},
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			hpa := tc.options.createHorizontalPodAutoscalerV1(tc.refName, tc.mapping)
 			assert.Equal(t, tc.expectedHPAV1, hpa)
+		})
+	}
+}
+
+func TestCanCreateHPAV1(t *testing.T) {
+	tests := []struct {
+		name     string
+		options  *AutoscaleOptions
+		expected bool
+	}{
+		{
+			name:     "no metric targets",
+			options:  &AutoscaleOptions{CPUPercent: -1},
+			expected: true,
+		},
+		{
+			name:     "cpu-percent only",
+			options:  &AutoscaleOptions{CPUPercent: 80},
+			expected: true,
+		},
+		{
+			name:     "cpu as utilization",
+			options:  &AutoscaleOptions{CPUPercent: -1, CPU: "70%"},
+			expected: true,
+		},
+		{
+			name:     "cpu as quantity",
+			options:  &AutoscaleOptions{CPUPercent: -1, CPU: "500m"},
+			expected: false,
+		},
+		{
+			name:     "cpu as bare number",
+			options:  &AutoscaleOptions{CPUPercent: -1, CPU: "500"},
+			expected: false,
+		},
+		{
+			name:     "memory only",
+			options:  &AutoscaleOptions{CPUPercent: -1, Memory: "200Mi"},
+			expected: false,
+		},
+		{
+			name:     "cpu-percent and memory",
+			options:  &AutoscaleOptions{CPUPercent: 80, Memory: "60%"},
+			expected: false,
+		},
+		{
+			name:     "cpu utilization and memory",
+			options:  &AutoscaleOptions{CPUPercent: -1, CPU: "70%", Memory: "60%"},
+			expected: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, tc.options.canCreateHPAV1())
 		})
 	}
 }
