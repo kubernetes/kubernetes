@@ -61,14 +61,14 @@ func TestDeclarativeValidateIngressClass(t *testing.T) {
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta()},
+						field.Required(field.NewPath("spec", "parameters", "name"), "")},
 				},
 				"missing parameter kind": {
 					input: mkValidIngressClass(func(obj *networking.IngressClass) {
 						obj.Spec.Parameters.Kind = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
+						field.Required(field.NewPath("spec", "parameters", "kind"), ""),
 					},
 				},
 				"controller is required": {
@@ -100,7 +100,7 @@ func TestDeclarativeValidateIngressClass(t *testing.T) {
 					}),
 					expectedErrs: field.ErrorList{
 						field.Required(field.NewPath("spec", "controller"), "").MarkAlpha(),
-						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta(),
+						field.Required(field.NewPath("spec", "parameters", "name"), ""),
 					},
 				},
 			}
@@ -145,7 +145,7 @@ func TestDeclarativeValidateIngressClassUpdate(t *testing.T) {
 						obj.Spec.Parameters.Name = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "name"), "").MarkBeta(),
+						field.Required(field.NewPath("spec", "parameters", "name"), ""),
 					},
 				},
 				"update fails when parameters kind is cleared": {
@@ -154,7 +154,7 @@ func TestDeclarativeValidateIngressClassUpdate(t *testing.T) {
 						obj.Spec.Parameters.Kind = ""
 					}),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parameters", "kind"), "").MarkBeta(),
+						field.Required(field.NewPath("spec", "parameters", "kind"), ""),
 					},
 				},
 				"controller is immutable": {
