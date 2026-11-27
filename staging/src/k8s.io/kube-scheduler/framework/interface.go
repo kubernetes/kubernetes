@@ -191,7 +191,7 @@ func (s *Status) IsSkip() bool {
 	return s.Code() == Skip
 }
 
-// IsRejected returns true if "Status" is Unschedulable (Unschedulable, UnschedulableAndUnresolvable, or Pending).
+// IsRejected returns true if "Status" is Unschedulable, UnschedulableAndUnresolvable, or Pending.
 func (s *Status) IsRejected() bool {
 	code := s.Code()
 	return code == Unschedulable || code == UnschedulableAndUnresolvable || code == Pending
