@@ -52,6 +52,19 @@ func New(crdColumns []apiextensionsv1.CustomResourceColumnDefinition) (rest.Tabl
 			return c, fmt.Errorf("unrecognized column definition %q", col.JSONPath)
 		}
 		path.AllowMissingKeys(true)
+		if col.Type == "array" {
+			// FindResults cannot distinguish a direct array from one array-valued match by result count alone.
+			parsed, err := jsonpath.Parse(col.Name, fmt.Sprintf("{%s}", col.JSONPath))
+			if err != nil {
+				return c, fmt.Errorf("unrecognized column definition %q", col.JSONPath)
+			}
+			if hasExpandingSelector(parsed.Root) {
+				if c.arrayExpandsMatches == nil {
+					c.arrayExpandsMatches = make(map[int]bool)
+				}
+				c.arrayExpandsMatches[len(c.additionalColumns)] = true
+			}
+		}
 
 		desc := fmt.Sprintf("Custom resource definition column (in JSONPath format): %s", col.JSONPath)
 		if len(col.Description) > 0 {
@@ -76,9 +89,27 @@ type columnPrinter interface {
 	PrintResults(w io.Writer, results []reflect.Value) error
 }
 
+func hasExpandingSelector(node jsonpath.Node) bool {
+	switch n := node.(type) {
+	case *jsonpath.ListNode:
+		for _, child := range n.Nodes {
+			if hasExpandingSelector(child) {
+				return true
+			}
+		}
+	case *jsonpath.ArrayNode:
+		// Only a single index has a derived end; explicit slices can expand matches.
+		return !n.Params[1].Derived
+	case *jsonpath.FilterNode, *jsonpath.RecursiveNode, *jsonpath.UnionNode, *jsonpath.WildcardNode:
+		return true
+	}
+	return false
+}
+
 type convertor struct {
-	headers           []metav1.TableColumnDefinition
-	additionalColumns []columnPrinter
+	headers             []metav1.TableColumnDefinition
+	additionalColumns   []columnPrinter
+	arrayExpandsMatches map[int]bool
 }
 
 func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
@@ -120,22 +151,50 @@ func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tabl
 				continue
 			}
 
-			// as we only support simple JSON path, we can assume to have only one result (or none, filtered out above)
-			value := results[0][0].Interface()
-			if customHeaders[i].Type == "string" {
-				if err := column.PrintResults(buf, []reflect.Value{reflect.ValueOf(value)}); err == nil {
-					cells = append(cells, buf.String())
-					buf.Reset()
-				} else {
-					cells = append(cells, nil)
-				}
+			if customHeaders[i].Type == "array" {
+				cells = append(cells, cellForJSONArray(results, c.arrayExpandsMatches[i]))
 			} else {
-				cells = append(cells, cellForJSONValue(customHeaders[i].Type, value))
+				// Non-array columns retain the historical behavior of using only the first match.
+				value := results[0][0].Interface()
+				if customHeaders[i].Type == "string" {
+					if err := column.PrintResults(buf, []reflect.Value{reflect.ValueOf(value)}); err == nil {
+						cells = append(cells, buf.String())
+						buf.Reset()
+					} else {
+						cells = append(cells, nil)
+					}
+				} else {
+					cells = append(cells, cellForJSONValue(customHeaders[i].Type, value))
+				}
 			}
 		}
 		return cells, nil
 	})
 	return table, err
+}
+
+func cellForJSONArray(results [][]reflect.Value, expandsMatches bool) interface{} {
+	if len(results) == 0 || len(results[0]) == 0 {
+		return nil
+	}
+
+	matches := results[0]
+	// A direct array field is the cell value; an array selected by a wildcard is one element of the cell value.
+	if len(matches) == 1 && !expandsMatches {
+		kind := matches[0].Kind()
+		if kind == reflect.Interface {
+			kind = matches[0].Elem().Kind()
+		}
+		if kind == reflect.Slice || kind == reflect.Array {
+			return matches[0].Interface()
+		}
+	}
+
+	values := make([]interface{}, 0, len(matches))
+	for _, result := range matches {
+		values = append(values, result.Interface())
+	}
+	return values
 }
 
 func cellForJSONValue(headerType string, value interface{}) interface{} {
