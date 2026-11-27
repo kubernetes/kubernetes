@@ -20,8 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
+	"os/user"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -9675,33 +9677,43 @@ func TestParseGetSubIdsOutput(t *testing.T) {
 	}
 }
 
-func TestGetentUserExists(t *testing.T) {
+func TestUserExists(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("getent is a Linux tool")
 	}
 	tests := []struct {
 		name       string
 		getentExit string // shell script body for a fake "getent"; empty means no getent on PATH
+		user       string
 		wantFound  bool
 		wantErr    bool
 	}{
 		{
 			name:       "user found",
 			getentExit: "exit 0",
+			user:       "kubelet",
 			wantFound:  true,
 		},
 		{
 			name:       "user not found",
 			getentExit: "exit 2", // getent(1): 2 = key not found
+			user:       "kubelet",
 			wantFound:  false,
 		},
 		{
 			name:       "getent fails for another reason",
 			getentExit: "exit 1",
+			user:       "kubelet",
 			wantErr:    true,
 		},
 		{
-			name:      "getent not installed",
+			name:      "no getent, os/user finds the user",
+			user:      "root",
+			wantFound: true,
+		},
+		{
+			name:      "no getent, os/user doesn't find the user",
+			user:      "kubelet-nonexistent-test-user",
 			wantFound: false,
 		},
 	}
@@ -9716,7 +9728,7 @@ func TestGetentUserExists(t *testing.T) {
 			}
 			t.Setenv("PATH", binDir)
 
-			found, err := getentUserExists("kubelet")
+			found, err := userExists(tc.user)
 			if tc.wantErr {
 				if err == nil {
 					t.Errorf("%s: expected error, got nil", tc.name)
@@ -9728,6 +9740,42 @@ func TestGetentUserExists(t *testing.T) {
 			}
 			if found != tc.wantFound {
 				t.Errorf("%s: got found=%v, want %v", tc.name, found, tc.wantFound)
+			}
+		})
+	}
+}
+
+func TestErrIsUnknownUser(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "unknown user (cgo, or /etc/passwd present)",
+			err:  user.UnknownUserError("kubelet"),
+			want: true,
+		},
+		{
+			name: "/etc/passwd missing (no cgo)",
+			err:  &fs.PathError{Op: "open", Path: "/etc/passwd", Err: fs.ErrNotExist},
+			want: true,
+		},
+		{
+			name: "/etc/passwd not readable",
+			err:  &fs.PathError{Op: "open", Path: "/etc/passwd", Err: fs.ErrPermission},
+			want: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := errIsUnknownUser(tc.err); got != tc.want {
+				t.Errorf("errIsUnknownUser(%v) = %v, want %v", tc.err, got, tc.want)
 			}
 		})
 	}

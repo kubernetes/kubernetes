@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -161,7 +162,7 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	// So we check for the kubelet user first, if it exist and getsubids is present, we expect
 	// to get _some_ configuration. If the user exist and getsubids doesn't give us any
 	// configuration, then we consider the remote down and fail to start the kubelet.
-	found, err := getentUserExists(kubeletUser)
+	found, err := userExists(kubeletUser)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -195,12 +196,21 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	return parseGetSubIdsOutput(string(outUids))
 }
 
-// getentUserExists checks name via getent(1), so it sees NSS accounts (sssd,
-// LDAP, FreeIPA) that a static (CGO_ENABLED=0) os/user would miss.
-func getentUserExists(name string) (bool, error) {
+// userExists reports whether name is a known account. It uses getent(1), which
+// sees NSS accounts (sssd, LDAP, FreeIPA), and if getent is not on $PATH, it
+// falls back to os/user.
+func userExists(name string) (bool, error) {
 	getent, err := exec.LookPath("getent")
 	if err != nil {
-		return false, nil // no getent: same as "not configured"
+		_, err := user.Lookup(name)
+		switch {
+		case errIsUnknownUser(err):
+			// No user found, same as not configured.
+			return false, nil
+		case err != nil:
+			return false, fmt.Errorf("looking up user %q via os/user: %w", name, err)
+		}
+		return true, nil
 	}
 	err = exec.Command(getent, "passwd", name).Run()
 	if err == nil {
@@ -211,6 +221,17 @@ func getentUserExists(name string) (bool, error) {
 		return false, nil // getent(1): 2 = key not found
 	}
 	return false, fmt.Errorf("looking up user %q via getent: %w", name, err)
+}
+
+// errIsUnknownUser reports whether err from user.Lookup means "no such user".
+//
+// os/user package when built with cgo returns user.UnknownUserError if /etc/passwd
+// doesn't exist. But when built without cgo, it returns os.ErrNotExist. So, let's
+// check for both errors, so we have the same behavior we had before, no matter if
+// compiled with or without cgo.
+func errIsUnknownUser(err error) bool {
+	var unknownUserErr user.UnknownUserError
+	return goerrors.As(err, &unknownUserErr) || goerrors.Is(err, os.ErrNotExist)
 }
 
 // Get a list of pods that have data directories.
