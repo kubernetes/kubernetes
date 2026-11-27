@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"cel.dev/cel-go/cel"
+	"cel.dev/cel-go/ext"
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -63,6 +64,23 @@ func TestBaseEnvironment(t *testing.T) {
 		defaultCompatibilityInvalid = []string{
 			"[1, 2].includes(2)",
 		}
+	}
+
+	// networkLibraryExpressions must be valid with both the kubernetes IP and CIDR libraries
+	// (before 1.38) and the cel-go network library that replaces them (from 1.38).
+	networkLibraryExpressions := []string{
+		"ip('192.168.0.1').family() == 4",
+		"isIP('2001:db8::68') && !isIP('192.168.0.1.0')",
+		"ip('::1').isLoopback()",
+		"string(ip('192.168.0.1')) == '192.168.0.1'",
+		"ip('192.168.0.1') == ip('192.168.0.1')",
+		"type(ip('192.168.0.1')) == net.IP",
+		"isCIDR('192.168.0.0/24') && !isCIDR('192.168.0.0/33')",
+		"cidr('192.168.0.0/24').containsIP(ip('192.168.0.1'))",
+		"cidr('192.168.0.0/16').containsCIDR('192.168.1.0/24')",
+		"cidr('192.168.0.1/24').masked() == cidr('192.168.0.0/24')",
+		"cidr('192.168.0.0/24').prefixLength() == 24",
+		"type(cidr('192.168.0.0/24')) == net.CIDR",
 	}
 
 	cases := []struct {
@@ -345,6 +363,29 @@ func TestBaseEnvironment(t *testing.T) {
 				"[1, 2].includes(2) == true",
 			},
 		},
+		{
+			name: "kubernetes IP and CIDR libraries (before 1.38)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: version.MajorMinor(1, 30), envType: NewExpressions},
+				{version: version.MajorMinor(1, 37), envType: NewExpressions},
+			},
+			validExpressions: networkLibraryExpressions,
+			invalidExpressions: []string{
+				"cidr('192.168.0.0/24').isMask()",
+			},
+		},
+		{
+			name: "cel-go network library (from 1.38, and stored expressions)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: version.MajorMinor(1, 38), envType: NewExpressions},
+				{version: version.MajorMinor(1, 30), envType: StoredExpressions},
+				{version: version.MajorMinor(1, 37), envType: StoredExpressions},
+			},
+			validExpressions: append(append([]string{}, networkLibraryExpressions...),
+				"cidr('192.168.0.0/24').isMask()",
+				"!cidr('192.168.0.1/24').isMask()",
+			),
+		},
 	}
 
 	for _, tc := range cases {
@@ -407,6 +448,75 @@ func isValid(env *cel.Env, expr string, activation any) (bool, error) {
 		return false, err
 	}
 	return result.Value() == true, nil
+}
+
+// TestNetworkLibraryMigration verifies that the kubernetes IP and CIDR libraries are used for
+// new expressions before 1.38, and that the cel-go network library is used from 1.38 and for
+// stored expressions.
+func TestNetworkLibraryMigration(t *testing.T) {
+	cases := []struct {
+		name    string
+		version *version.Version
+		envType Type
+		celGo   bool
+	}{
+		{name: "new expressions 1.30", version: version.MajorMinor(1, 30), envType: NewExpressions, celGo: false},
+		{name: "new expressions 1.37", version: version.MajorMinor(1, 37), envType: NewExpressions, celGo: false},
+		{name: "new expressions 1.38", version: version.MajorMinor(1, 38), envType: NewExpressions, celGo: true},
+		{name: "stored expressions 1.37", version: version.MajorMinor(1, 37), envType: StoredExpressions, celGo: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			env, err := MustBaseEnvSet(tc.version).Env(tc.envType)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			eval := func(expr string) any {
+				t.Helper()
+				ast, issues := env.Compile(expr)
+				if issues.Err() != nil {
+					t.Fatalf("unexpected compile error for %q: %v", expr, issues.Err())
+				}
+				prog, err := env.Program(ast)
+				if err != nil {
+					t.Fatalf("unexpected program error for %q: %v", expr, err)
+				}
+				result, _, err := prog.Eval(map[string]any{})
+				if err != nil {
+					t.Fatalf("unexpected eval error for %q: %v", expr, err)
+				}
+				return result
+			}
+
+			ipVal := eval("ip('192.168.0.1')")
+			cidrVal := eval("cidr('192.168.0.0/24')")
+			if tc.celGo {
+				if _, ok := ipVal.(ext.IP); !ok {
+					t.Errorf("expected cel-go ext.IP, got %T", ipVal)
+				}
+				if _, ok := cidrVal.(ext.CIDR); !ok {
+					t.Errorf("expected cel-go ext.CIDR, got %T", cidrVal)
+				}
+			} else {
+				if _, ok := ipVal.(apiservercel.IP); !ok {
+					t.Errorf("expected apiservercel.IP, got %T", ipVal)
+				}
+				if _, ok := cidrVal.(apiservercel.CIDR); !ok {
+					t.Errorf("expected apiservercel.CIDR, got %T", cidrVal)
+				}
+			}
+
+			// The cel-go network library validates ip() and cidr() string literals at compile
+			// time, the kubernetes libraries report invalid literals at runtime.
+			for _, expr := range []string{"ip('192.168.0.1.0')", "cidr('192.168.0.0/33')"} {
+				_, issues := env.Compile(expr)
+				if gotCompileErr := issues.Err() != nil; gotCompileErr != tc.celGo {
+					t.Errorf("expected compile error for %q: %v, got: %v", expr, tc.celGo, issues.Err())
+				}
+			}
+		})
+	}
 }
 
 type fakeAuthorizer struct {

@@ -1232,6 +1232,41 @@ func TestCelCostStability(t *testing.T) {
 				`[{'name': 'a'}, {'name': 'b'}, {'name': 'a'}].distinct() == [{'name': 'a'}, {'name': 'b'}]`: 30,
 			},
 		},
+		// Rules are evaluated with the StoredExpressions environment, which provides the IP and CIDR
+		// functions with the cel-go network library. The costs must match those of the kubernetes
+		// IP and CIDR libraries it replaced.
+		{name: "ip and cidr",
+			obj:    objs("192.168.0.1", "2001:db8::68", "192.168.0.0/24", "2001:db8::/32"),
+			schema: schemas(stringType, stringType, stringType, stringType),
+			expectCost: map[string]int64{
+				`isIP(self.val1)`:                                      4,
+				`ip(self.val1).family() == 4`:                          6,
+				`ip(self.val2).family() == 6`:                          6,
+				`ip.isCanonical(self.val2)`:                            5,
+				`!ip(self.val1).isUnspecified()`:                       6,
+				`!ip(self.val1).isLoopback()`:                          6,
+				`!ip(self.val1).isLinkLocalMulticast()`:                6,
+				`!ip(self.val1).isLinkLocalUnicast()`:                  6,
+				`ip(self.val1).isGlobalUnicast()`:                      5,
+				`string(ip(self.val2)) == self.val2`:                   9,
+				`ip(self.val1) == ip('192.168.0.1')`:                   7,
+				`ip(self.val1) != ip(self.val2)`:                       9,
+				`ip('192.168.0.1').family() == 4`:                      4,
+				`isCIDR(self.val3)`:                                    4,
+				`cidr(self.val3).containsIP(ip(self.val1))`:            9,
+				`cidr(self.val3).containsIP(self.val1)`:                9,
+				`cidr(self.val4).containsCIDR(cidr('2001:db8::/48'))`:  9,
+				`cidr(self.val4).containsCIDR('2001:db8::/48')`:        9,
+				`cidr(self.val3).ip() == ip('192.168.0.0')`:            8,
+				`cidr(self.val3).masked() == cidr(self.val3)`:          10,
+				`cidr(self.val3).prefixLength() == 24`:                 6,
+				`string(cidr(self.val4)) == self.val4`:                 9,
+				`cidr(self.val3) == cidr('192.168.0.0/24')`:            7,
+				`cidr(self.val3) != cidr(self.val4)`:                   9,
+				`cidr('192.168.0.0/24').containsIP(ip('192.168.0.1'))`: 5,
+				`cidr(self.val3).isMask()`:                             5,
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -2171,6 +2206,41 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"has(self.items) != has(self.labels)":                     3,
 				"has(self.count) == has(self.child)":                      3,
 				"self.budgets.all(b, has(b.schedule) == has(b.duration))": 303,
+			},
+		},
+		// New expressions are compiled with the kubernetes IP and CIDR libraries before Kubernetes 1.38 and
+		// with the cel-go network library from 1.38. These estimated costs are the same for both libraries.
+		// != and comparisons of string(ip) or string(cidr) with non-literal strings are not included: their
+		// estimated cost is lower with the cel-go network library, which estimates the size of the values
+		// it returns (see TestNetworkResultSizeCost in k8s.io/apiserver/pkg/cel/library).
+		// isMask is only available from 1.38.
+		{name: "ip and cidr",
+			schema: schemas(withMaxLength(stringType, ptr.To[int64](45)), withMaxLength(stringType, ptr.To[int64](45)),
+				withMaxLength(stringType, ptr.To[int64](49)), withMaxLength(stringType, ptr.To[int64](49))),
+			expectCost: map[string]uint64{
+				`isIP(self.val1)`:                                      20,
+				`ip(self.val1).family() == 4`:                          22,
+				`ip(self.val2).family() == 6`:                          22,
+				`ip.isCanonical(self.val2)`:                            38,
+				`!ip(self.val1).isUnspecified()`:                       22,
+				`!ip(self.val1).isLoopback()`:                          22,
+				`!ip(self.val1).isLinkLocalMulticast()`:                22,
+				`!ip(self.val1).isLinkLocalUnicast()`:                  22,
+				`ip(self.val1).isGlobalUnicast()`:                      21,
+				`string(ip(self.val2)) == '2001:db8::68'`:              23,
+				`ip(self.val1) == ip('192.168.0.1')`:                   23,
+				`ip('192.168.0.1').family() == 4`:                      4,
+				`isCIDR(self.val3)`:                                    22,
+				`cidr(self.val3).containsIP(ip(self.val1))`:            46,
+				`cidr(self.val3).containsIP(self.val1)`:                46,
+				`cidr(self.val4).containsCIDR(cidr('2001:db8::/48'))`:  31,
+				`cidr(self.val4).containsCIDR('2001:db8::/48')`:        31,
+				`cidr(self.val3).ip() == ip('192.168.0.0')`:            26,
+				`cidr(self.val3).masked() == cidr(self.val3)`:          46,
+				`cidr(self.val3).prefixLength() == 24`:                 24,
+				`string(cidr(self.val4)) == '2001:db8::/32'`:           25,
+				`cidr(self.val3) == cidr('192.168.0.0/24')`:            25,
+				`cidr('192.168.0.0/24').containsIP(ip('192.168.0.1'))`: 8,
 			},
 		},
 	}

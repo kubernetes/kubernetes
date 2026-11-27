@@ -53,7 +53,8 @@ func BenchmarkLoadBaseEnvDifferentVersions(b *testing.B) {
 //
 //   - No gaps and overlap in library inclusion, including when libraries are version bumped
 //   - RemovedVersion is always greater than IntroducedVersion
-//   - Libraries are not removed once added (although they can be replaced with new versions)
+//   - Libraries are not removed once added (although they can be replaced with new versions,
+//     or by a differently named library listed in libraryReplacements)
 func TestLibraryCoverage(t *testing.T) {
 	vops := make([]VersionedOptions, len(baseOpts))
 	copy(vops, baseOpts)
@@ -76,7 +77,7 @@ func TestLibraryCoverage(t *testing.T) {
 		for _, name := range librariesInVersions(t, vop) {
 			versionTracking, ok := tracked[name]
 			if !ok {
-				versionTracking = &versionTracker{}
+				versionTracking = &versionTracker{firstAdded: vop.IntroducedVersion}
 				tracked[name] = versionTracking
 			}
 			if versionTracking.added != nil {
@@ -108,11 +109,32 @@ func TestLibraryCoverage(t *testing.T) {
 		}
 	}
 	for name, lib := range tracked {
-		if lib.removed != nil {
-			t.Errorf("Unexpected RemovedVersion of %v for library %s without replacement. "+
-				"For backward compatibility, libraries should not be removed without being replaced by a new version.", lib.removed, name)
+		if lib.removed == nil {
+			continue
 		}
+		if replacement, ok := libraryReplacements[name]; ok {
+			replacementLib, found := tracked[replacement]
+			switch {
+			case !found || replacementLib.firstAdded == nil:
+				t.Errorf("Library %s was removed at version %v and is expected to be replaced by library %s, but %s is not in the base environment.", name, lib.removed, replacement, replacement)
+			case !replacementLib.firstAdded.EqualTo(lib.removed):
+				t.Errorf("Library %s was removed at version %v but its replacement %s was introduced at version %v. "+
+					"The replacement must be introduced at the same kubernetes version that the replaced library is removed.", name, lib.removed, replacement, replacementLib.firstAdded)
+			}
+			continue
+		}
+		t.Errorf("Unexpected RemovedVersion of %v for library %s without replacement. "+
+			"For backward compatibility, libraries should not be removed without being replaced by a new version.", lib.removed, name)
 	}
+}
+
+// libraryReplacements maps libraries to the differently named library that replaced them,
+// e.g. when a Kubernetes library is replaced by an equivalent cel-go library. The
+// replacement must be introduced at the same version that the replaced library is removed.
+var libraryReplacements = map[string]string{
+	// The cel-go network library provides both the IP and CIDR functions and types.
+	"kubernetes.net.ip":   "cel.lib.ext.network",
+	"kubernetes.net.cidr": "cel.lib.ext.network",
 }
 
 // TestKnownLibraries ensures that all libraries used in the base environment are also registered with
@@ -154,8 +176,10 @@ func librariesInVersions(t *testing.T, vops ...VersionedOptions) []string {
 }
 
 type versionTracker struct {
-	added   *version.Version
-	removed *version.Version
+	// firstAdded is the version the library was first introduced at.
+	firstAdded *version.Version
+	added      *version.Version
+	removed    *version.Version
 }
 
 // TestExpressionNodeLimitDisabled verifies that the AST node limit introduced in cel-go v0.33.0
