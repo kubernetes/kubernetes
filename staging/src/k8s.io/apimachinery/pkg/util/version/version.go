@@ -372,23 +372,24 @@ func (v *Version) compareInternal(other *Version) int {
 	vPR := strings.Split(v.preRelease, ".")
 	oPR := strings.Split(other.preRelease, ".")
 	for i := 0; i < len(vPR) && i < len(oPR); i++ {
-		vNum, err := strconv.ParseUint(vPR[i], 10, 0)
-		if err == nil {
-			oNum, err := strconv.ParseUint(oPR[i], 10, 0)
-			if err == nil {
-				switch {
-				case oNum < vNum:
-					return 1
-				case oNum > vNum:
-					return -1
-				default:
-					continue
-				}
+		vNum, vErr := strconv.ParseUint(vPR[i], 10, 0)
+		oNum, oErr := strconv.ParseUint(oPR[i], 10, 0)
+		switch {
+		case vErr == nil && oErr == nil:
+			if oNum < vNum {
+				return 1
+			} else if oNum > vNum {
+				return -1
 			}
-		}
-		if oPR[i] < vPR[i] {
+		case vErr == nil:
+			// SemVer 2.0.0 §11.4.3: numeric identifiers always have lower precedence
+			// than non-numeric identifiers.
+			return -1
+		case oErr == nil:
 			return 1
-		} else if oPR[i] > vPR[i] {
+		case oPR[i] < vPR[i]:
+			return 1
+		case oPR[i] > vPR[i]:
 			return -1
 		}
 	}
