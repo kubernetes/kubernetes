@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	core "k8s.io/client-go/testing"
@@ -269,6 +271,23 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 	}
 }
 
+func applyPodPatch(original *v1.Pod, action core.Action) (*v1.Pod, error) {
+	patchAction := action.(core.PatchAction)
+	originalBytes, err := json.Marshal(original)
+	if err != nil {
+		return nil, err
+	}
+	patchedBytes, err := strategicpatch.StrategicMergePatch(originalBytes, patchAction.GetPatch(), v1.Pod{})
+	if err != nil {
+		return nil, err
+	}
+	patched := &v1.Pod{}
+	if err := json.Unmarshal(patchedBytes, patched); err != nil {
+		return nil, err
+	}
+	return patched, nil
+}
+
 func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	recorder := record.NewFakeRecorder(10)
@@ -279,10 +298,13 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 	claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
 	control := NewStatefulPodControl(fakeClient, nil, claimLister, recorder, consistency.NewNoopConsistencyStore())
 	var updated *v1.Pod
-	fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		updated = update.GetObject().(*v1.Pod)
-		return true, update.GetObject(), nil
+	originalPod := pod.DeepCopy()
+	originalPod.Labels[apps.StatefulSetPodNameLabel] = "goo-0"
+	originalPod.Labels["extra-label"] = "keep"
+	fakeClient.PrependReactor("patch", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		var err error
+		updated, err = applyPodPatch(originalPod, action)
+		return true, updated, err
 	})
 	pod.Name = "goo-0"
 	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
@@ -296,6 +318,9 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 	}
 	if !identityMatches(set, updated) {
 		t.Error("Name update failed identity does not match")
+	}
+	if updated.Labels["extra-label"] != "keep" {
+		t.Errorf("Expected extra-label to be preserved, got %q", updated.Labels["extra-label"])
 	}
 }
 
@@ -313,7 +338,7 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 	claimIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	claimLister := corelisters.NewPersistentVolumeClaimLister(claimIndexer)
 	control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("patch", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		pod.Name = "goo-0"
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
@@ -342,26 +367,27 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
 	control := NewStatefulPodControl(fakeClient, nil, pvcLister, recorder, consistency.NewNoopConsistencyStore())
 	pvcs := getPersistentVolumeClaims(set, pod)
-	volumes := make([]v1.Volume, 0, len(pod.Spec.Volumes))
+	volumes := make([]v1.Volume, 0, len(pod.Spec.Volumes)+1)
 	for i := range pod.Spec.Volumes {
 		if _, contains := pvcs[pod.Spec.Volumes[i].Name]; !contains {
 			volumes = append(volumes, pod.Spec.Volumes[i])
 		}
 	}
-	pod.Spec.Volumes = volumes
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
+	volumes = append(volumes, v1.Volume{
+		Name:         "extra-vol",
+		VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
 	})
+	pod.Spec.Volumes = volumes
+	originalPod := pod.DeepCopy()
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
+		create := action.(core.CreateAction)
+		return true, create.GetObject(), nil
 	})
 	var updated *v1.Pod
-	fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		updated = update.GetObject().(*v1.Pod)
-		return true, update.GetObject(), nil
+	fakeClient.PrependReactor("patch", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		var err error
+		updated, err = applyPodPatch(originalPod, action)
+		return true, updated, err
 	})
 	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
 		t.Errorf("Successful update returned an error: %s", err)
@@ -377,6 +403,15 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 	}
 	if !storageMatches(set, updated) {
 		t.Error("Name update failed identity does not match")
+	}
+	hasExtraVol := false
+	for _, v := range updated.Spec.Volumes {
+		if v.Name == "extra-vol" && v.EmptyDir != nil {
+			hasExtraVol = true
+		}
+	}
+	if !hasExtraVol {
+		t.Error("Expected extra-vol to be preserved after storage patch")
 	}
 }
 
@@ -397,9 +432,10 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 		}
 	}
 	pod.Spec.Volumes = volumes
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), nil
+	originalPod := pod.DeepCopy()
+	fakeClient.AddReactor("patch", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		patched, err := applyPodPatch(originalPod, action)
+		return true, patched, err
 	})
 	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
@@ -438,14 +474,16 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 	}
 	control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder, consistency.NewNoopConsistencyStore())
 	conflict := false
-	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
+	fakeClient.AddReactor("patch", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		patched, err := applyPodPatch(gooPod, action)
+		if err != nil {
+			return true, nil, err
+		}
 		if !conflict {
 			conflict = true
-			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
+			return true, patched, apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
 		}
-		return true, update.GetObject(), nil
-
+		return true, patched, nil
 	})
 	pod.Labels[apps.StatefulSetPodNameLabel] = "goo-0"
 	if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
@@ -926,10 +964,13 @@ func TestStatefulPodControlConsistencyStore(t *testing.T) {
 			},
 			resource: podGroupResource,
 			setupMocks: func(fakeClient *fake.Clientset, claimIndexer cache.Indexer, pod *v1.Pod, set *apps.StatefulSet) {
-				fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-					update := action.(core.UpdateAction)
-					update.GetObject().(*v1.Pod).ResourceVersion = "2"
-					return true, update.GetObject(), nil
+				fakeClient.PrependReactor("patch", "pods", func(action core.Action) (bool, runtime.Object, error) {
+					patched, err := applyPodPatch(pod, action)
+					if err != nil {
+						return true, nil, err
+					}
+					patched.ResourceVersion = "2"
+					return true, patched, nil
 				})
 			},
 		},

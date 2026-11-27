@@ -1439,6 +1439,8 @@ func TestStalePodDisruption(t *testing.T) {
 						{
 							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
+							Reason:             v1.PodReasonPreemptionByScheduler,
+							Message:            "preempted",
 							LastTransitionTime: metav1.Time{Time: now},
 						},
 					},

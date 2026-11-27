@@ -32,7 +32,17 @@ import (
 
 // PatchPodStatus patches pod status. It returns true and avoids an update if the patch contains no changes.
 func PatchPodStatus(ctx context.Context, c clientset.Interface, namespace, name string, uid types.UID, oldPodStatus, newPodStatus v1.PodStatus) (*v1.Pod, []byte, bool, error) {
-	patchBytes, unchanged, err := preparePatchBytesForPodStatus(namespace, name, uid, oldPodStatus, newPodStatus)
+	return patchPodStatus(ctx, c, namespace, name, uid, "", oldPodStatus, newPodStatus)
+}
+
+// PatchPodStatusWithResourceVersion patches pod status with both UID and ResourceVersion preconditions.
+// It returns true and avoids an update if the patch contains no changes.
+func PatchPodStatusWithResourceVersion(ctx context.Context, c clientset.Interface, namespace, name string, uid types.UID, resourceVersion string, oldPodStatus, newPodStatus v1.PodStatus) (*v1.Pod, []byte, bool, error) {
+	return patchPodStatus(ctx, c, namespace, name, uid, resourceVersion, oldPodStatus, newPodStatus)
+}
+
+func patchPodStatus(ctx context.Context, c clientset.Interface, namespace, name string, uid types.UID, resourceVersion string, oldPodStatus, newPodStatus v1.PodStatus) (*v1.Pod, []byte, bool, error) {
+	patchBytes, unchanged, err := preparePatchBytesForPodStatus(namespace, name, uid, resourceVersion, oldPodStatus, newPodStatus)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -42,32 +52,43 @@ func PatchPodStatus(ctx context.Context, c clientset.Interface, namespace, name 
 
 	updatedPod, err := c.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	if err != nil {
-		return nil, nil, false, fmt.Errorf("failed to patch status %q for pod %q/%q: %v", patchBytes, namespace, name, err)
+		return nil, nil, false, fmt.Errorf("failed to patch status %q for pod %q/%q: %w", patchBytes, namespace, name, err)
 	}
 	return updatedPod, patchBytes, false, nil
 }
 
-func preparePatchBytesForPodStatus(namespace, name string, uid types.UID, oldPodStatus, newPodStatus v1.PodStatus) ([]byte, bool, error) {
+func preparePatchBytesForPodStatus(namespace, name string, uid types.UID, resourceVersion string, oldPodStatus, newPodStatus v1.PodStatus) ([]byte, bool, error) {
 	oldData, err := json.Marshal(v1.Pod{
 		Status: oldPodStatus,
 	})
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to Marshal oldData for pod %q/%q: %v", namespace, name, err)
+		return nil, false, fmt.Errorf("failed to Marshal oldData for pod %q/%q: %w", namespace, name, err)
 	}
 
 	newData, err := json.Marshal(v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{UID: uid}, // only put the uid in the new object to ensure it appears in the patch as a precondition
+		ObjectMeta: metav1.ObjectMeta{UID: uid, ResourceVersion: resourceVersion}, // only put the uid and optional resourceVersion in the new object to ensure they appear in the patch as preconditions
 		Status:     newPodStatus,
 	})
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to Marshal newData for pod %q/%q: %v", namespace, name, err)
+		return nil, false, fmt.Errorf("failed to Marshal newData for pod %q/%q: %w", namespace, name, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Pod{})
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to CreateTwoWayMergePatch for pod %q/%q: %v", namespace, name, err)
+		return nil, false, fmt.Errorf("failed to CreateTwoWayMergePatch for pod %q/%q: %w", namespace, name, err)
 	}
-	return patchBytes, bytes.Equal(patchBytes, []byte(fmt.Sprintf(`{"metadata":{"uid":%q}}`, uid))), nil
+	var unchangedPatch []byte
+	switch {
+	case len(uid) > 0 && len(resourceVersion) > 0:
+		unchangedPatch = []byte(fmt.Sprintf(`{"metadata":{"resourceVersion":%q,"uid":%q}}`, resourceVersion, uid))
+	case len(uid) > 0:
+		unchangedPatch = []byte(fmt.Sprintf(`{"metadata":{"uid":%q}}`, uid))
+	case len(resourceVersion) > 0:
+		unchangedPatch = []byte(fmt.Sprintf(`{"metadata":{"resourceVersion":%q}}`, resourceVersion))
+	default:
+		unchangedPatch = []byte(`{}`)
+	}
+	return patchBytes, bytes.Equal(patchBytes, unchangedPatch), nil
 }
 
 // ReplaceOrAppendPodCondition replaces the first pod condition with equal type or appends if there is none
