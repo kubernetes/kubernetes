@@ -1,0 +1,244 @@
+<!doctype html>
+<!-- Copyright The Kubernetes Authors. Licensed under Apache-2.0. -->
+<!--@@GO_SOURCE_NOTICE@@-->
+<!-- Generated from docs/proof-explorer.template.html, docs/notes.json, and accepted Lean declarations. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SSA ownership — Lean proof explorer</title>
+<style>
+:root{color-scheme:light;--ink:#142235;--muted:#526579;--line:#dce4eb;--paper:#f3f6f9;--nav:#112638;--teal:#007d78;--amber:#805400;--red:#9c3030;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input{font:inherit}button,a{touch-action:manipulation}button{cursor:pointer}a{color:var(--teal)}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #dfac45;outline-offset:3px}
+.layout{display:grid;grid-template-columns:310px minmax(0,1fr);min-height:100vh}.sidebar{background:var(--nav);color:#f4f8fa;padding:26px 18px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.brand{font-size:12px;letter-spacing:.15em;font-weight:750;color:#8ed7d1}.sidebar h2{font-size:21px;line-height:1.3;margin:8px 0 20px}.search{width:100%;padding:10px 12px;border:1px solid #4b6375;border-radius:7px;color:white;background:#1b3449}
+.filters{display:flex;align-items:center;gap:8px;font-size:12px;color:#bdd0dd;margin:12px 0}.count{color:#b3c6d3;font-size:12px;margin:0 0 10px}.proof-list{overflow:auto;flex:1;padding-right:6px}.list-item{display:block;width:100%;border:0;border-left:3px solid transparent;border-radius:0 6px 6px 0;text-align:left;color:#dce8f0;background:transparent;padding:10px 12px;margin:3px 0;font-size:13px;line-height:1.35}
+.list-item:hover{background:#213e55}.list-item.active{border-left-color:#63d6c4;background:#25465e;color:white}.list-item small{display:block;color:#b0c6d5;margin-top:4px;font-size:10px;letter-spacing:.04em}.sidebar-note{border-top:1px solid #385367;padding-top:12px;margin-top:15px;font-size:11px;color:#b3c6d3}
+main{min-width:0;padding:34px clamp(20px,3.4vw,56px) 60px;max-width:1440px}.eyebrow{text-transform:uppercase;letter-spacing:.13em;font-size:11px;font-weight:750;color:var(--teal)}h1{font-size:clamp(26px,3vw,39px);line-height:1.17;margin:8px 0 14px;letter-spacing:-.035em}h2{font-size:23px;line-height:1.3;letter-spacing:-.02em;margin:0 0 12px}h3{font-size:15px;margin:0 0 10px}p{margin:0 0 12px}.lede{font-size:16px;color:var(--muted);max-width:900px}.stats{display:flex;flex-wrap:wrap;gap:8px;margin:17px 0}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:5px;padding:4px 9px;font-size:11px;background:white;font-weight:650}.badge.general,.badge.helper{background:#e9f6f3;border-color:#b0d9d0;color:#12675b}.badge.guard,.badge.definition{background:#edf0f9;color:#414d84;border-color:#ccd3e8}.badge.execution{background:#f8eddb;color:#805400;border-color:#e4cfaa}
+.notice{padding:12px 15px;border:1px solid #e7d5b4;border-left:4px solid #c29442;border-radius:6px;background:#fff8e9;font-size:13px;margin:15px 0 22px}.tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line);gap:5px;margin-bottom:24px}.tab{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);padding:11px 12px;font-weight:650;font-size:13px}.tab.active{color:var(--teal);border-bottom-color:var(--teal)}
+.view[hidden]{display:none}.card{background:white;border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:18px;box-shadow:0 2px 3px #182c4010}.card p:last-child{margin-bottom:0}.selected-head{display:flex;align-items:start;justify-content:space-between;gap:16px}.name{font:11px/1.55 var(--mono);color:var(--muted);overflow-wrap:anywhere}.scope-note{padding:12px 14px;background:#f4f7fa;border-left:3px solid #89a4bc;color:#415468;font-size:13px;margin-top:14px}.source-link{font-size:12px;white-space:nowrap}
+pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f8fb;border:1px solid #e3eaf0;border-radius:6px;margin:0;padding:15px;tab-size:2;overflow:auto}pre.source{max-height:520px}.statement{background:#102c3d;color:#eff8ff;border-color:#102c3d;font-size:13px}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}.graph{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}.graph h3{text-transform:uppercase;font-size:10px;letter-spacing:.08em;color:var(--muted)}.graph-center{border:2px solid #8abbb7;background:#f0faf7;padding:14px;border-radius:8px;align-self:center}.graph-label{font-size:11px;color:var(--teal);margin-bottom:5px;font-weight:750}.dependency{display:block;width:100%;text-align:left;border:1px solid #d5e1e8;background:#f8fafc;color:var(--ink);padding:9px 10px;border-radius:5px;font:11px/1.5 var(--mono);overflow-wrap:anywhere;margin-bottom:7px}.dependency:hover{border-color:var(--teal);background:#e9f8f4}.empty{font-size:12px;color:var(--muted)}.chips{display:flex;flex-wrap:wrap;gap:7px}.chip{font:11px var(--mono);background:#f5f8fb;border:1px solid var(--line);border-radius:5px;padding:7px;overflow-wrap:anywhere;text-align:left}.quiet{color:var(--muted);font-size:12px}.legend{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}.legend span{font-size:11px}.definition-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.definition-button{text-align:left;border:1px solid var(--line);border-radius:8px;background:white;padding:16px;color:var(--ink)}.definition-button:hover{border-color:var(--teal)}.definition-button strong{font:13px var(--mono);display:block;margin-bottom:6px}.definition-button span{display:block;font-size:12px;color:var(--muted)}
+.walkthrough{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.step{background:white;border:1px solid var(--line);border-radius:9px;padding:17px;min-width:0}.step-number{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;width:27px;height:27px;background:#e4f3f0;color:var(--teal);font-weight:800;font-size:12px;margin-bottom:9px}.step pre{font-size:12px;padding:12px}.step p{font-size:13px}.step h3{min-height:42px}.step.bad{border-color:#e0b0a8}.bad .step-number{background:#fae7e1;color:var(--red)}.result{font-size:12px;padding-top:12px;color:var(--teal);font-weight:650}.bad .result{color:var(--red)}.gap{border-left:4px solid #b85842}.comparison{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:15px 0}.comparison h3{font-size:12px;color:var(--muted)}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:12px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.06em}.check-list{margin:0;padding-left:20px}.check-list li{margin:9px 0}.footer{font-size:11px;color:var(--muted);margin-top:25px;border-top:1px solid var(--line);padding-top:14px;overflow-wrap:anywhere}code{font-family:var(--mono);font-size:.9em}b{font-weight:800}
+@media(min-width:1050px){.graph-center:before{content:"→";position:absolute;margin-left:-32px;color:#7e9aa5;font-size:20px}.graph-center:after{content:"→";float:right;margin-right:-36px;margin-top:-25px;color:#7e9aa5;font-size:20px}}
+@media(max-width:1050px){.layout{grid-template-columns:260px minmax(0,1fr)}.sidebar{padding:22px 13px}.graph{grid-template-columns:1fr}.graph-center{order:-1}.walkthrough{grid-template-columns:1fr}.step h3{min-height:0}}
+@media(max-width:720px){.layout{display:block}.sidebar{position:relative;height:auto;max-height:430px;padding:20px}.sidebar h2{font-size:19px;margin-bottom:12px}.proof-list{max-height:190px}.sidebar-note{display:none}main{padding:23px 17px 45px}.two-col,.comparison,.definition-grid{grid-template-columns:1fr}.card{padding:17px}.selected-head{display:block}.source-link{display:block;margin:10px 0}.tabs{gap:0}.tab{font-size:12px;padding:10px 9px}.stats{gap:6px}.statement{font-size:11px}}
+@media print{.sidebar,.tabs,.search,.filters{display:none}.layout{display:block}main{max-width:none}.card{break-inside:avoid;box-shadow:none}.source{max-height:none!important}.view[hidden]{display:none}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar" aria-label="Theorem navigation">
+  <div class="brand">KUBERNETES / API MACHINERY</div>
+  <h2>Ownership proofs</h2>
+  <input class="search" id="search" type="search" placeholder="Find a theorem or concept" aria-label="Find a theorem or concept">
+  <label class="filters"><input id="helpers" type="checkbox"> Include internal helper lemmas</label>
+  <div id="count" class="count"></div>
+  <nav class="proof-list" id="proof-list" aria-label="Theorems"></nav>
+  <div class="sidebar-note">Statements and dependency edges come from Lean's accepted environment. Explanations and model choices require human review.</div>
+</aside>
+<main>
+  <div class="eyebrow">Executable reference model</div>
+  <h1>What does this model prove?</h1>
+  <p class="lede">Explore the exact statements, their premises, and the lemmas they use. The model separates current SSA, the pinned PR, the stronger full-manager policy, and admission composition.</p>
+  <div class="stats" id="stats"></div>
+  <div class="notice"><strong>Two baseline bugs reproduced.</strong> Empty-list intent can disappear, and empty-map intent can become null despite a presence claim. Validation can reject every retry. <a href="ssa-bugs.md">Bug register and evidence</a>.</div>
+  <nav class="tabs" aria-label="Explorer views">
+    <button class="tab" data-view="proofs">Proofs</button>
+    <button class="tab" data-view="definitions">Definitions</button>
+    <button class="tab" data-view="yaml">YAML walkthrough</button>
+    <button class="tab" data-view="gaps">Scope and PR failures</button>
+    <button class="tab" data-view="checks">Verification</button>
+  </nav>
+  <section class="view" id="view-proofs" aria-label="Selected proof">
+    <div class="card" id="selected"></div>
+    <div class="card"><h3>Exact Lean proposition</h3><pre id="statement" class="statement"></pre></div>
+    <div class="card" id="sketch-card"><h3>Proof idea</h3><p id="sketch"></p></div>
+    <div class="card">
+      <h3>Direct proof dependencies</h3>
+      <p class="quiet">Click a lemma to inspect it. Edges come from constants used in the accepted proof term and its type. Lean standard-library constants and generated auxiliary declarations are omitted.</p>
+      <div class="graph" id="graph"></div>
+    </div>
+    <div class="card"><h3>Model definitions used directly</h3><div id="definitions-used" class="chips"></div></div>
+    <div class="card"><h3>Axiom dependencies</h3><div id="axioms" class="chips"></div><p class="quiet" style="margin-top:12px">The audit permits only propext, Quot.sound, and Classical.choice. It rejects proof holes, custom axioms, and native-evaluation axioms.</p></div>
+    <div class="card"><h3>Lean source</h3><p id="source-position" class="quiet"></p><pre id="source" class="source"></pre></div>
+    <div class="legend">
+      <span class="badge general">General theorem</span>
+      <span class="badge guard">Acceptance-guard consequence</span>
+      <span class="badge definition">Definitional law</span>
+      <span class="badge execution">Concrete execution</span>
+      <span class="badge helper">Internal helper</span>
+    </div>
+    <p class="quiet" style="margin-top:10px">The number of statements is not a correctness score. Read the premises, scope, and definitions.</p>
+  </section>
+  <section class="view" id="view-definitions" hidden>
+    <div class="card"><h2>The ownership contract</h2>
+      <p>A manager is <strong>full for one item</strong> when it claims that item's membership and its entire recursively required core. The same manager must cover every required object branch. Optional nested items have their own lifetimes and can have different full managers.</p>
+      <p>Optional required-bearing maps and the root have independent object scopes. Full ownership of an optional child may belong to a different manager. One required branch of a parent still needs the parent manager to cover that whole branch.</p>
+      <p>For a key-only item, every membership claimant is full. Last-claim deletion follows the same lifetime rule. A full child does not protect a deleted ancestor.</p>
+    </div>
+    <div class="definition-grid" id="definition-grid"></div>
+  </section>
+  <section class="view" id="view-yaml" hidden>
+    <div class="card"><h2>Values can remain valid while ownership breaks</h2>
+      <p>Schema: <code>items</code> is an associative list keyed by <code>name</code>; <code>host</code> and <code>port</code> are required. <strong>Bold means required</strong>; <strong><u>underlined bold means key</u></strong>.</p>
+    </div>
+    <div class="walkthrough">
+      <article class="step"><div class="step-number">1</div><h3>A applies a complete item</h3>
+        <pre>items:
+- <b><u>name</u></b>: database
+  <b>host</b>: db.example.com
+  <b>port</b>: "5432"</pre>
+        <div class="result">A is full.</div>
+      </article>
+      <article class="step"><div class="step-number">2</div><h3>B co-claims only port</h3>
+        <pre>items:
+- <b><u>name</u></b>: database
+  <b>port</b>: "5432"</pre>
+        <div class="result">A remains full. B is partial.</div>
+      </article>
+      <article class="step bad"><div class="step-number">3</div><h3>A tries to release port</h3>
+        <pre>items:
+- <b><u>name</u></b>: database
+  <b>host</b>: db.example.com</pre>
+        <div class="result">Full policy: rejected. Raw PR: accepted.</div>
+      </article>
+    </div>
+    <div class="card" style="margin-top:18px"><h3>Why the value check is insufficient</h3>
+      <p>B still claims port, so both values remain in the candidate. But A would own only host and B only port. The full-manager invariant requires an individual witness, not a coalition. Rejection retains A's original port claim.</p>
+      <p>A handoff first has B acquire the entire required core. Only then can A release it while B remains full.</p>
+      <div id="yaml-links" class="chips"></div>
+    </div>
+  </section>
+  <section class="view" id="view-gaps" hidden>
+    <div class="card gap"><h2>SSA-03 / BASE-03: a shared scalar can disappear with its item</h2>
+      <p>A creates <code>endpoints: [{name: db, host: old}]</code>. B Updates host to <code>new</code>. A then Applies the same <code>host: new</code>, so both managers own that exact scalar, while A alone owns item membership. A omits the item without force: the list becomes null, the item disappears and both claims are lost.</p>
+      <p>If B acquires the item through Apply, A's omission retains it. Nullable CRD HTTP persists the shared-child deletion; non-nullable validation rejects it and leaves data, claims and resourceVersion unchanged. The shared-omission guarantee needs an enclosing-item lifetime premise even in existing SSA. <a href="ssa-bugs.md#shared-scalar-ownership-also-fails-to-preserve-the-item-base-03">Trace, control and source boundary</a>.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.HandoffCounterexamples.reassertion_shares_update_owned_child">Actual scalar co-ownership</button><button class="chip" data-proof="SSA.HandoffCounterexamples.unrestricted_shared_omission_safety_is_false">BASE-03 refutation</button><button class="chip" data-proof="SSA.HandoffCounterexamples.imported_pruning_removes_shared_child">Imported pruning chain</button></div>
+    </div>
+    <div class="card gap"><h2>SSA-06: FieldsV1 rounds one integer item key into another</h2>
+      <p>A owns <code>endpoints: [{id: 9007199254740993, payload: old}]</code>. B adds the distinct item <code>{id: 9007199254740992, payload: independent}</code>. The API falsely conflicts against A: reading the exact stored ownership key into float64 rounds it to B's neighbor. Small independent keys 42 and 41 work.</p>
+      <p>Forcing B's request keeps both items and A's old payload, but removes A's claims. The original raw payload claim is checked before decoding. Exact key magnitudes and bytes expose the codec loss; Go's mixed <code>Has</code>/<code>Equals</code> can mask it. <a href="ssa-bugs.md#ssa-06-fieldsv1-rounding-aliases-distinct-integer-list-keys">Schema, source witnesses and API evidence</a>.</p>
+      <p>Exclusive omission also fails: A owns two adjacent integer-keyed items; B co-applies the upper payload unchanged. A's lower payload is still exclusively A-owned on the wire. When A omits only that payload, B's rounded upper selector falsely protects it. Both item keys remain asserted. Small keys and the large-key history without B remove the payload correctly.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.NumericCodecCounterexamples.exact_numeric_path_roundtrip_is_false">BASE-10 refutation</button><button class="chip" data-proof="SSA.GranularKeyCounterexamples.unconditional_independent_item_progress_is_false">BASE-09b refutation</button><button class="chip" data-proof="SSA.NumericOmissionCounterexamples.unconditional_exclusive_omission_is_false">BASE-02 refutation</button><button class="chip" data-proof="SSA.NumericOmissionCounterexamples.lower_payload_is_raw_exclusive">Exclusive before decoding</button><button class="chip" data-proof="SSA.GranularKeyCounterexamples.unchanged_foreign_payload_ownership_is_false">Forced claim loss</button><button class="chip" data-proof="SSA.NumericCodecCounterexamples.original_trie_is_canonical">Canonical input</button></div>
+    </div>
+    <div class="card gap"><h2>SSA-05: rounded equality loses numeric intent or misses a conflict</h2>
+      <p>A owns exact int64 <code>amount: 9223372036854775807</code>. B asserts <code>9223372036854775808</code>, represented as binary64 2<sup>63</sup>, without force. Alone, the assertion is lost as a false no-op while B acquires the claim. With unrelated <code>note: changed</code>, the new numeric magnitude persists while A and B both retain ownership. An exact int64 change correctly conflicts.</p>
+      <p>Force also leaves A's claim on the rounded change; an exact forced integer change correctly transfers it. Mixed equality and comparator incomparability are nontransitive, with no faithful ordinary-equality quotient. Imported source execution, native Go and real HTTP/GET agree; general IEEE and typed/updater refinement remain separate. <a href="ssa-bugs.md#ssa-05-rounded-numeric-comparison-loses-intent-or-misses-a-conflict">Schema, outcomes and proof boundary</a>.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.NumericCounterexamples.exact_scalar_intent_is_false">BASE-01 refutation</button><button class="chip" data-proof="SSA.NumericCounterexamples.nonforce_foreign_value_safety_is_false">BASE-04 refutation</button><button class="chip" data-proof="SSA.NumericCounterexamples.forced_transfer_is_false">BASE-06 refutation</button><button class="chip" data-proof="SSA.NumericCounterexamples.forced_integer_control_transfers">Successful force control</button><button class="chip" data-proof="SSA.NumericCounterexamples.no_faithful_equality_projection">No equality quotient</button><button class="chip" data-proof="SSA.NumericCounterexamples.difference_retains_an_excluded_member">Set-algebra witness</button></div>
+    </div>
+    <div class="card gap"><h2>SSA-02: an empty map becomes null despite its claim</h2>
+      <p>A replaces <code>settings: {left: old}</code> with <code>settings: {}</code>. Pruning returns <code>settings: null</code> while A still owns map presence. An optional non-nullable schema rejects every retry. A nullable schema stores null; B's identical empty-map intent then conflicts until A repeats and repairs the data.</p>
+      <p>Actual HTTP tests confirm nullable/CEL behavior, unchanged state on rejection, successful empty-map creation, and atomic/defaulted control cases. <a href="ssa-bugs.md#ssa-02-an-explicitly-empty-map-becomes-null">Detailed trace and schema</a>.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.ContainerCounterexamples.empty_map_first_apply_creates_null">Claim retained, intent lost</button><button class="chip" data-proof="SSA.ContainerCounterexamples.nonnullable_map_retries_never_empty">Every finite retry count</button><button class="chip" data-proof="SSA.ContainerCounterexamples.empty_map_can_conflict_with_identical_previous_intent">Conflict and repair</button></div>
+    </div>
+    <div class="card gap"><h2>Current SSA: empty-list repetition changes data</h2>
+      <p>A previously owns <code>endpoints: [{name: db, host: old}]</code>, then applies <code>endpoints: []</code>. The first request removes the field. The second identical request creates the empty list. Actual CRD HTTP execution confirms the data difference and a later ownership bootstrap by <code>before-first-apply</code>.</p>
+      <p>OpenAPI <code>required: [endpoints]</code> or CEL <code>has(self.endpoints)</code> rejects the first request and every identical retry. The populated state, ownership and resourceVersion remain unchanged, although empty-list creation succeeds.</p>
+      <p><a href="baseline-empty-list.md">Requests, source cause and exact proof boundaries</a></p>
+      <div class="chips"><button class="chip" data-proof="SSA.Counterexamples.raw_apply_is_not_unconditionally_idempotent">Kernel-checked refutation</button><button class="chip" data-proof="SSA.Counterexamples.required_list_retries_never_empty_the_list">Every finite retry count</button><button class="chip" data-proof="SSA.RawSourceCounterexamples.imported_pruning_loses_explicit_empty_list">Imported pruning witness</button></div>
+    </div>
+    <div class="card"><h2>Resolved: structural consistency and invented ownership</h2>
+      <p>Every proper ancestor must be a real container. Scalars cannot have descendants. Structural context no longer invents presence ownership for nonempty maps; actual empty-map claims are compared.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.Contracts.scalar_has_no_descendants">Structural theorem</button><button class="chip" data-proof="SSA.Contracts.accepted_preserves_cells">Separate data and ownership</button></div>
+    </div>
+    <div class="card gap"><h2>PR #336: fragmentation and partial-owner deletion</h2>
+      <p>The raw PR accepts A releasing half its required core while B owns the other half. B's later omission can then delete A's remaining required field. The strict full policy rejects the fragmenting request atomically.</p>
+      <button class="chip" data-proof="SSA.Counterexamples.pr_partial_can_delete_foreign_required_branch">Inspect the kernel-checked counterexample</button>
+    </div>
+    <div class="card gap"><h2>PR #336: required maps and granular lists</h2>
+      <p>A direct claim on <code>conn: {}</code> bypasses required-child recursion. Conversely, a known non-null granular list has no direct member claim, including when explicitly applied empty. The PR classifies its supplier as partial. Explicit null creates a direct member and is retained by the classifier; pinned map/list controls verify this distinction.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.explicit_map_shortcuts_required_children">General map shortcut</button><button class="chip" data-proof="SSA.Counterexamples.pr_required_list_owner_is_misclassified">Actual list failure</button></div>
+    </div>
+    <div class="card gap"><h2>Source ownership updates cannot add claim paths</h2>
+      <p>The complete imported private <code>update</code> body preserves a bound on every manager's paths, including arbitrary finite manager lists, versions, force, errors and lawful map schedules. The remaining field-set premise is exact left-subset preservation by Difference. This phase starts after decoding and actor-field installation.</p>
+      <p>The complete typed field-set map/list visitor bodies have an atomic-entry certificate: only the whole nonempty scope path is added, child traversal is not invoked, and captured deferred cleanup runs. Existing descendants remain if already present; the empty root is not tracked. Actual insertion/coercion/allocator realization remains separate.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.AtomicFieldContracts.imported_atomic_fields">Atomic visitor source certificate</button><button class="chip" data-proof="SSA.AtomicFieldContracts.imported_atomic_never_adds_descendant">No new child claims</button></div>
+      <p>Complete map/list merge dispatch additionally composes imported <code>doLeaf</code> and the actual <code>ruleKeepRHS</code> closure. A present right value replaces the entire atomic unit, including explicit JSON null; absence falls back to the whole left. An existing leaf is protected. Fresh function frames preserve caller locals/defers and free the outer resources right before left. Actual primitive/heap realization, schema/top-level dispatch, removal/comparison and full SSA remain open.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.AtomicMergeContracts.imported_keep_right">Whole-operand source closure</button><button class="chip" data-proof="SSA.AtomicMergeContracts.imported_leaf">One rule call per leaf</button><button class="chip" data-proof="SSA.AtomicMergeContracts.imported_atomic_merge">Complete atomic dispatch</button></div>
+      <p>Complete structural scalar/map/list removal bodies now have a separate atomic-entry proof. Matching extraction copies the whole raw value; remove preserves prior output, so absent output requires a fresh walker. Shape mismatches return unchanged. Captured frees preserve caller locals and pending cleanup. Non-atomic loops and closures remain in the AST; executing an unsupported subtree fails explicitly. The certificate proves atomic execution returns first. The complete caller now derives zero initialization; Schema.Resolve has a separate source value/cache proof; named lookup/copy/sync and primitive/heap realization remain open.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.AtomicRemoveContracts.imported_atomic_container">Atomic remove/extract source</button><button class="chip" data-proof="SSA.AtomicRemoveContracts.imported_atomic_remove_fresh">Fresh-output premise</button></div>
+      <p>The complete <code>removeItemsWithSchema</code> caller now derives fresh struct fields and wraps the selected handler's result. Its source-handler composition removes the extra fresh-output assumption. Arbitrary normal resolver errors are explicitly discarded; this differs from unsupported interpreter execution. Selection is now source-derived; schema lookup has a separate proof; named lookup/copy/sync, allocator/wrapping and heap remain separate. Another 1,152 native caller cases include missing types and invalid atoms.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.RemoveFactoryContracts.imported_factory">Source caller initialization</button><button class="chip" data-proof="SSA.RemoveFactoryBridge.imported_atomic_factory">Composed atomic caller</button></div>
+      <p>Complete <code>resolveSchema</code>, <code>deduceAtom</code> and <code>handleAtom</code> ASTs now derive selection: exact type pointers, no implicit switch fallthrough, map/scalar/list priority, normal errors and callback post-state. The source constructor and removal handlers compose through this resolver. A successful atomic-map lookup yields the whole-value caller law. Schema.Resolve is source-derived separately below; named lookup/copy/sync and value/formatter/heap primitives remain open. Independent Go comparisons cover 9,168 helper cases and the existing full-caller family.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.SchemaDispatchContracts.imported_deduce">Source type deduction</button><button class="chip" data-proof="SSA.SchemaDispatchHandler.imported_handle">Source handler priority</button><button class="chip" data-proof="SSA.SchemaDispatchFactoryBridge.imported_atomic_map">Atomic caller from lookup</button></div>
+      <p>The complete <code>Schema.Resolve</code> and <code>resolveNoOverrides</code> bodies now derive named/inline choice, override-cache allocation/hits/misses, map/list copies, failure exits and deferred unlock. Arbitrary finite histories match cache-free resolution and preserve cache soundness under stable immutable references and a fixed named lookup. Arbitrary invalid cached hits are covered by source execution but excluded from the correctness theorem. Writes to a local copy after its pointer escapes fail explicitly. Native Go checks 5,120 cases and pointer/content preservation; a 64-goroutine control also runs with the race detector. Fresh-map copying has a separate source proof below; named-type search, key/heap representation and synchronization primitives remain boundaries.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.SchemaResolveContracts.imported_resolve">Complete source schema/cache execution</button><button class="chip" data-proof="SSA.SchemaResolveCache.imported_history">Arbitrary immutable lookup histories</button><button class="chip" data-proof="SSA.SchemaLookupBridge.imported_schema_and_dispatch">Schema lookup feeds typed dispatch</button></div>
+      <p>The complete <code>Map.CopyInto</code> AST now derives the resolver copy contract, including all exported fields, nil destination, private cache transfer, Once reset and the full callback. A fresh target preserves source-index coherence. A normally initialized reused target can instead retain its old field index when the source cache is nil; both a formal counterexample and actual Go reproduce that helper defect. Resolve supplies a fresh target, so no additional SSA bug is claimed. Another 252 direct Go/source comparisons cover independent cache/Once states and pointer sharing; two mutations remove Fields assignment or Once reset.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.MapCopyContracts.imported_copy">Full source CopyInto</button><button class="chip" data-proof="SSA.MapCopyContracts.imported_resolver_copy">Resolver primitive realized</button><button class="chip" data-proof="SSA.MapCopyContracts.imported_fresh_valid_index">Fresh-index coherence</button><button class="chip" data-proof="SSA.MapCopyContracts.initialized_destination_can_break_index">Reused-target counterexample</button></div>
+      <p>The interpreter models comparison references and in-place filtering through the version cache. Its source-backed callback now composes with imported Apply's reset exclusion. Native vendored/pinned Go checks cache filtering and forced removal of B's claim; a claim-growth source mutation fails both the Lean certificate and native witness. General typed/set/filter and complete request refinement remain open.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.UpdaterContracts.imported_update_never_adds_claims">General source non-growth</button><button class="chip" data-proof="SSA.UpdaterBridge.source_apply_excludes_reset_fields">Source-backed reset composition</button><button class="chip" data-proof="SSA.UpdaterExamples.imported_update_observes_in_place_filter">Shared cache reference</button><button class="chip" data-proof="SSA.UpdaterExamples.imported_forced_update_does_not_give_B_new_fields">Force control</button></div>
+    </div>
+    <div class="card gap"><h2>Recursive Difference preserves exact path origin</h2>
+      <p>Go sets store direct members separately from child sets. The complete imported <code>Set.Difference</code> and <code>SetNodeMap.Difference</code> bodies preserve that distinction at every finite depth. Every output path already occurs in the left tree, for every comparator and every <code>Empty()</code> result. Sorting and faithful numeric equality are unnecessary for this weaker guarantee.</p>
+      <p>The recursive adapter now discharges the updater's Difference premise. Native vendored and pinned Go comparisons cover 4,102 pairs, numeric collisions and depth 64. A mutation returning the right matched-child label fails both the source proof and exact native path-origin check. Actual ownership decoding/heap representation and other recursive membership laws remain explicit boundaries.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.SetContracts.imported_difference_never_adds_paths">Source path origin</button><button class="chip" data-proof="SSA.SetContracts.imported_node_matches">Complete child loop</button><button class="chip" data-proof="SSA.SetBridge.source_updater_with_recursive_difference_does_not_grow_actor">Derived updater premise</button></div>
+    </div>
+    <div class="card gap"><h2>Conventional reset roots exclude complete claim subtrees</h2>
+      <p>The actual <code>excludeFilter.Filter</code> wrapper and both <code>RecursiveDifference</code> bodies are imported. For flat reset roots such as <code>spec</code>, <code>status</code> and <code>metadata</code>, the child source only filters whole root subtrees. Descendant keys are never compared; their numeric collisions do not require a global order assumption.</p>
+      <p>The direct-member proof uses order only in its active field-name domain. Has recognition is now derived through the selected-library source; actual comparison/root/heap representation remain explicit. The native overlay checks 518 pairs, independent-prefix preservation and depth 64. Substituting ordinary Difference must fail both the source proof and native prefix-exclusion check. Object-data restoration and complete Apply/API composition remain separate.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.SetFilterContracts.locally_ordered_filter_excludes_root">Source root exclusion</button><button class="chip" data-proof="SSA.ElementLocalOrder.imported_local_membership">Local-domain algebra</button><button class="chip" data-proof="SSA.SetFilterContracts.imported_flat_node_matches">Complete suffix iteration</button></div>
+    </div>
+    <div class="card gap"><h2>Has and the actual selected-library search are source-bound</h2>
+      <p>The complete Has/Less wrappers and Go BinarySearchFunc are imported. A finite-interval proof covers every representable array size and every pure comparator; exact membership additionally requires local ordering and comparator-zero faithfulness. The unsigned midpoint is modeled with its word residue and proved safe even when the signed intermediate sum overflows.</p>
+      <p>The reset filter’s former Has-recognition premise is now derived. Actual field-name comparison, root/heap/ownership representation and complete request composition remain open. Native checks cover 776 lookup queries, 128 Less results and 16 near-limit 32/64-bit midpoint controls; the final-zero-test mutation must fail both source and native membership checks.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.SearchContracts.imported_search_matches">Complete binary-search execution</button><button class="chip" data-proof="SSA.HasBridge.imported_has_membership">Source Has membership</button><button class="chip" data-proof="SSA.FilterHasBridge.source_filter_excludes_root">Derived root lookup</button><button class="chip" data-proof="SSA.SearchIndex.unsigned_midpoint_eq_half">Go midpoint arithmetic</button></div>
+    </div>
+    <div class="card"><h2>Boundaries still requiring separate work</h2>
+      <p>Theorems quantify over arbitrary finite normalized model inputs. Go comparisons cover supplied structural schemas, recursive types, composite keys, sets, atomics, empty/null containers and Apply/Update. They are bounded evidence, not a universal Go refinement proof.</p>
+      <p>Conversion, defaults, schema evolution, key defaults, duplicate-list behavior, reset/subresource filters and storage retries are not fully modeled. Admission and CEL are function parameters with composition theorems, not verified interpreters. The stronger required-empty-list rule still requires an ownership representation design.</p>
+    </div>
+  </section>
+  <section class="view" id="view-checks" hidden>
+    <div class="card"><h2>Three distinct questions</h2>
+      <table><thead><tr><th>Question</th><th>Mechanism</th><th>Current boundary</th></tr></thead><tbody>
+        <tr><td>Does the formal statement follow?</td><td>Pinned Lean build, automatic transitive axiom audit, fresh kernel replay.</td><td>Checks the chosen definitions and statements.</td></tr>
+        <tr><td>Does the model describe the intended SSA contract?</td><td>Human review of definitions, premises, YAML examples, KEP/test mapping, and known gaps.</td><td>Still open. A stronger proof cannot repair a wrong specification by itself.</td></tr>
+        <tr><td>Does Go agree on tested inputs?</td><td>Independent YAML corpus, real managedfields wrappers, FieldsV1 round trips, generated scalar and structural Apply/Update traces; actual pinned PR head/base updater.</td><td>Bounded exact comparison with explicit policy differences. No tolerated model gaps and no universal Go refinement proof.</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><h3>Automated entrypoint</h3><pre>bash ci/verify.sh</pre>
+      <ol class="check-list">
+        <li>Check the pinned toolchain and rebuild from clean project artifacts.</li>
+        <li>Audit all project declarations and require complete module coverage.</li>
+        <li>Replay Main and its imports with <code>leanchecker --fresh</code>.</li>
+        <li>Reject five negative audit probes, including hidden proof holes and imported modules outside the SSA namespace.</li>
+        <li>Execute the model scenarios, replay the JSON snapshot, and verify fixture regeneration.</li>
+        <li>Run Go adapter tests and live model/Go comparisons after each request.</li>
+        <li>Run actual merge suites and exact comparisons against pinned PR head and base.</li>
+        <li>Regenerate this explorer and reject stale documentation.</li>
+      </ol>
+      <p class="quiet">The Prow job definition is a proposal for kubernetes/test-infra; this directory does not activate that job.</p>
+    </div>
+  </section>
+  <footer class="footer" id="footer"></footer>
+</main>
+</div>
+<script>
+"use strict";
+const DATA=/*@@PROOF_DATA@@*/{};
+const NODES=Object.fromEntries(DATA.nodes.map(node=>[node.name,node]));
+const DEFAULT="SSA.Counterexamples.raw_apply_is_not_unconditionally_idempotent";
+const LABELS={general:"General theorem",guard:"Guard consequence",definition:"Definitional law",execution:"Concrete execution",helper:"Internal helper"};
+let selected=DEFAULT;
+function el(tag,attributes,...children){const node=document.createElement(tag);for(const [key,value] of Object.entries(attributes||{})){if(key==="class")node.className=value;else node.setAttribute(key,value);}for(const child of children.flat()){if(child!==null&&child!==undefined)node.append(child instanceof Node?child:document.createTextNode(String(child)));}return node;}
+function route(view,proof){const params=new URLSearchParams({view:view||"proofs"});if(proof)params.set("proof",proof);location.hash=params.toString();}
+function nodeButton(name,style){const node=NODES[name];const button=el("button",{class:style||"dependency","data-proof":name},node.title);if(style!=="chip")button.append(el("span",{class:"name",style:"display:block;margin-top:3px"},name));return button;}
+function sourceRoot(){try{const url=new URL(location.search.slice(1));const suffix="/docs/proofs.html";if(url.hostname==="github.com"&&url.pathname.endsWith(suffix))return url.origin+url.pathname.slice(0,-suffix.length)+"/";}catch{}return DATA.sourceRoot;}
+function renderList(){const search=document.querySelector("#search").value.trim().toLowerCase();const helpers=document.querySelector("#helpers").checked;const list=document.querySelector("#proof-list");list.replaceChildren();const nodes=DATA.nodes.filter(node=>node.kind==="theorem"&&((!node.private&&node.scope!=="helper")||helpers)&&(!search||(node.name+" "+node.title+" "+(node.meaning||"")).toLowerCase().includes(search)));for(const node of nodes){const button=el("button",{class:"list-item"+(node.name===selected?" active":""),"data-proof":node.name},node.title,el("small",{},LABELS[node.scope]||node.scope));if(node.name===selected)button.setAttribute("aria-current","true");list.append(button);}document.querySelector("#count").textContent=nodes.length+" statements shown";}
+function renderProof(name){const node=NODES[name]||NODES[DEFAULT];selected=node.name;const head=el("div",{class:"selected-head"},el("div",{},el("div",{class:"name"},node.name),el("h2",{style:"margin-top:7px"},node.title)),el("a",{class:"source-link",href:sourceRoot()+node.file+"#L"+node.line,target:"_blank",rel:"noopener"},"View source ↗"));const card=document.querySelector("#selected");card.replaceChildren(head,el("span",{class:"badge "+node.scope},node.kind==="definition"?"Model definition":(LABELS[node.scope]||node.scope)));if(node.meaning)card.append(el("p",{style:"margin-top:13px"},node.meaning));if(node.limits)card.append(el("div",{class:"scope-note"},el("strong",{},"Scope: "),node.limits));document.querySelector("#statement").textContent=node.statement;document.querySelector("#source").textContent=node.source;document.querySelector("#source-position").textContent=node.file+":"+node.line+" • embedded source from this documentation snapshot";document.querySelector("#sketch-card").hidden=!node.sketch;document.querySelector("#sketch").textContent=node.sketch||"";const dependencies=node.dependencies.filter(id=>NODES[id].kind==="theorem");const dependents=node.dependents.filter(id=>NODES[id].kind==="theorem");const graph=document.querySelector("#graph");const column=(title,names)=>el("div",{},el("h3",{},title),names.length?names.map(id=>nodeButton(id)):el("p",{class:"empty"},"No explicit project theorem at this level."));graph.replaceChildren(column("Uses these lemmas",dependencies),el("div",{class:"graph-center"},el("div",{class:"graph-label"},"SELECTED STATEMENT"),el("strong",{},node.title),el("div",{class:"name",style:"margin-top:6px"},node.name)),column("Used by",dependents));const definitions=node.dependencies.filter(id=>NODES[id].kind!=="theorem");document.querySelector("#definitions-used").replaceChildren(...(definitions.length?definitions.map(id=>nodeButton(id,"chip")):[el("span",{class:"empty"},"No direct model definition after filtering generated declarations.")]));document.querySelector("#axioms").replaceChildren(...(node.axioms.length?node.axioms.map(name=>el("code",{class:"chip"},name)):[el("span",{class:"badge general"},"No axioms")]));renderList();}
+function render(){const params=new URLSearchParams(location.hash.slice(1));const view=["proofs","definitions","yaml","gaps","checks"].includes(params.get("view"))?params.get("view"):"proofs";for(const element of document.querySelectorAll(".view"))element.hidden=element.id!=="view-"+view;for(const button of document.querySelectorAll(".tab")){const active=button.dataset.view===view;button.classList.toggle("active",active);button.setAttribute("aria-current",active?"page":"false");}renderProof(params.get("proof")||selected);}
+document.addEventListener("click",event=>{const proof=event.target.closest("[data-proof]");if(proof){route("proofs",proof.dataset.proof);return;}const tab=event.target.closest("[data-view]");if(tab)route(tab.dataset.view,selected);});
+document.querySelector("#search").addEventListener("input",renderList);
+document.querySelector("#helpers").addEventListener("change",renderList);
+window.addEventListener("hashchange",render);
+const publicTheorems=DATA.nodes.filter(node=>node.kind==="theorem"&&!node.private&&node.scope!=="helper").length;
+document.querySelector("#stats").replaceChildren(el("span",{class:"badge general"},DATA.toolchain),el("span",{class:"badge"},publicTheorems+" public statements"),el("span",{class:"badge"},DATA.scenarioCount+" execution scenarios / "+DATA.transitionCount+" transitions"),el("span",{class:"badge execution"},"3 contracts · actual PR head/base checks"));
+const definitionNames=["SSA.RequiredCore","SSA.ItemSpec","SSA.State","SSA.full","SSA.covers","SSA.complete","SSA.objectFull","SSA.objectsValid","SSA.writeScoped","SSA.applyWith","SSA.prCovers","SSA.pruneFieldSets","SSA.update","SSA.requiredPresent","SSA.shapeValid","SSA.valid","SSA.normalized","SSA.deletesItem","SSA.candidate","SSA.apply","SSA.commit"];
+document.querySelector("#definition-grid").replaceChildren(...definitionNames.filter(name=>NODES[name]).map(name=>{const node=NODES[name];return el("button",{class:"definition-button","data-proof":name},el("strong",{},name),el("span",{},node.description||node.statement));}));
+document.querySelector("#yaml-links").replaceChildren(...["SSA.Counterexamples.pr_accepts_fragment_without_full_owner","SSA.Counterexamples.pr_partial_can_delete_foreign_required_branch","SSA.Counterexamples.full_contract_rejects_same_fragment","SSA.Counterexamples.sibling_objects_have_independent_roles"].map(name=>nodeButton(name,"chip")));
+document.querySelector("#footer").textContent="Self-contained generated artifact • source SHA-256 "+DATA.sourceDigest+" • no external JavaScript or fonts • statements, source, and human explanations are included offline.";
+render();
+</script>
+</body>
+</html>

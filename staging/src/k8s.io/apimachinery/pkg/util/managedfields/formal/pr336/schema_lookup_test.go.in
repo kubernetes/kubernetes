@@ -1,0 +1,288 @@
+/*
+Copyright 2026 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package schema
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"reflect"
+	"sync"
+	"testing"
+	"time"
+)
+
+type ssaFormalLookupContainer struct {
+	Payload      string `json:"payload"`
+	Relationship string `json:"relationship"`
+}
+
+type ssaFormalLookupAtom struct {
+	Map    *ssaFormalLookupContainer `json:"map"`
+	Scalar *string                   `json:"scalar"`
+	List   *ssaFormalLookupContainer `json:"list"`
+}
+
+type ssaFormalLookupEntry struct {
+	Key  int                 `json:"key"`
+	Atom ssaFormalLookupAtom `json:"atom"`
+}
+
+type ssaFormalLookupCase struct {
+	Operation    string                 `json:"operation"`
+	Atom         ssaFormalLookupAtom    `json:"atom"`
+	Named        *string                `json:"named"`
+	Relationship *ElementRelationship   `json:"relationship"`
+	Found        bool                   `json:"found"`
+	Key          int                    `json:"key"`
+	Allocated    bool                   `json:"allocated"`
+	Cached       []ssaFormalLookupEntry `json:"cached"`
+	Observe      []int                  `json:"observe"`
+}
+
+type ssaFormalLookupReport struct {
+	Atom      ssaFormalLookupAtom    `json:"atom"`
+	Found     bool                   `json:"found"`
+	Allocated bool                   `json:"allocated"`
+	Cached    []ssaFormalLookupEntry `json:"cached"`
+	Held      bool                   `json:"held"`
+}
+
+func TestSSAFormalSchemaLookup(t *testing.T) {
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	encode := func(value any) string {
+		t.Helper()
+		data, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	pointer := func(text string) *string { return &text }
+	view := func(atom Atom) ssaFormalLookupAtom {
+		result := ssaFormalLookupAtom{}
+		if atom.Map != nil {
+			// Serialize exported contents independently of private sync/cache state.
+			payload := struct {
+				Fields      []StructField
+				Unions      []Union
+				ElementType TypeRef
+			}{atom.Map.Fields, atom.Map.Unions, atom.Map.ElementType}
+			result.Map = &ssaFormalLookupContainer{encode(payload), string(atom.Map.ElementRelationship)}
+		}
+		if atom.Scalar != nil {
+			result.Scalar = pointer(string(*atom.Scalar))
+		}
+		if atom.List != nil {
+			payload := struct {
+				ElementType TypeRef
+				Keys        []string
+			}{atom.List.ElementType, atom.List.Keys}
+			result.List = &ssaFormalLookupContainer{encode(payload), string(atom.List.ElementRelationship)}
+		}
+		return result
+	}
+	atomicRel, separableRel, associativeRel := Atomic, Separable, Associative
+	cases := []ssaFormalLookupCase{}
+	expected := []ssaFormalLookupReport{}
+	for _, operation := range []string{"plain", "resolve"} {
+		for mask := 0; mask < 8; mask++ {
+			for _, name := range []*string{nil, pointer("unit"), pointer(""), pointer("λ类型"), pointer("missing")} {
+				for _, rel := range []*ElementRelationship{nil, &atomicRel, &separableRel, &associativeRel} {
+					for cacheMode := 0; cacheMode < 4; cacheMode++ {
+						for _, warmed := range []bool{false, true} {
+							// Each request gets an immutable schema and stable pointer-valued TypeRef keys.
+							primitive := String
+							mapType := &Map{Fields: []StructField{{Name: "x", Type: TypeRef{Inlined: Atom{Scalar: &primitive}}}},
+								Unions: []Union{{Discriminator: pointer("kind")}}, ElementType: TypeRef{Nullable: true}, ElementRelationship: Separable}
+							listType := &List{Keys: []string{"key", "other"}, ElementType: TypeRef{Inlined: Atom{Map: mapType}}, ElementRelationship: Associative}
+							if warmed {
+								mapType.FindField("x")
+							}
+							input := Atom{}
+							if mask&1 != 0 {
+								input.Map = mapType
+							}
+							if mask&2 != 0 {
+								input.Scalar = &primitive
+							}
+							if mask&4 != 0 {
+								input.List = listType
+							}
+							original := encode(input)
+							schema := &Schema{Types: []TypeDef{{Name: "unit", Atom: input}, {Name: "", Atom: input}, {Name: "λ类型", Atom: input}}}
+							reference := TypeRef{NamedType: name, ElementRelationship: rel}
+							if name == nil {
+								reference.Inlined = input
+							}
+							other := TypeRef{NamedType: pointer("other-cache-key")}
+							cachedScalar := Numeric
+							cached := Atom{Scalar: &cachedScalar}
+							if cacheMode > 0 {
+								schema.resolvedTypes = map[TypeRef]Atom{}
+							}
+							if cacheMode == 2 {
+								schema.resolvedTypes[reference] = cached
+							}
+							if cacheMode == 3 {
+								schema.resolvedTypes[other] = cached
+							}
+							cacheView := func() []ssaFormalLookupEntry {
+								entries := []ssaFormalLookupEntry{}
+								for key, ref := range []TypeRef{reference, other} {
+									if atom, found := schema.resolvedTypes[ref]; found {
+										entries = append(entries, ssaFormalLookupEntry{key, view(atom)})
+									}
+								}
+								if len(entries) != len(schema.resolvedTypes) {
+									t.Fatal("schema resolution introduced an unexpected cache key")
+								}
+								return entries
+							}
+							for repetition := 0; repetition < 2; repetition++ {
+								foundName := name == nil || *name != "missing"
+								cases = append(cases, ssaFormalLookupCase{operation, view(input), name, rel, foundName, 0,
+									schema.resolvedTypes != nil, cacheView(), []int{0, 1}})
+								want, wantFound := input, foundName
+								if !foundName {
+									want = Atom{}
+								}
+								beforeCache, cacheHit := schema.resolvedTypes[reference]
+								copyMap, copyList := false, false
+								if operation == "resolve" && rel != nil {
+									if cacheHit {
+										want, wantFound = beforeCache, true
+									} else if wantFound && mask&1 != 0 {
+										copyMap = true
+									} else if wantFound && mask&4 != 0 {
+										copyList = true
+									} else {
+										want, wantFound = Atom{}, false
+									}
+								}
+								var actual Atom
+								var found bool
+								if operation == "plain" {
+									actual, found = schema.resolveNoOverrides(reference)
+								} else {
+									actual, found = schema.Resolve(reference)
+								}
+								wantView := view(want)
+								if copyMap {
+									wantView.Map.Relationship = string(*rel)
+									if actual.Map == nil || actual.Map == input.Map {
+										t.Fatal("schema override did not allocate a separate map")
+									}
+									if field, ok := actual.Map.FindField("x"); !ok || field.Name != "x" {
+										t.Fatal("schema map copy lost its field index")
+									}
+								} else if actual.Map != want.Map {
+									t.Fatal("schema resolution changed an unmodified map pointer")
+								}
+								if copyList {
+									wantView.List.Relationship = string(*rel)
+									if actual.List == nil || actual.List == input.List {
+										t.Fatal("schema override did not allocate a separate list")
+									}
+								} else if actual.List != want.List {
+									t.Fatal("schema resolution changed an unmodified list pointer")
+								}
+								if actual.Scalar != want.Scalar || found != wantFound || !reflect.DeepEqual(view(actual), wantView) || encode(input) != original {
+									t.Fatalf("source schema lookup violated result, contents, relationship or input immutability: %s mask=%d cache=%d repetition=%d got=%s/%v want=%s/%v",
+										operation, mask, cacheMode, repetition, encode(view(actual)), found, encode(wantView), wantFound)
+								}
+								if operation == "resolve" && rel != nil && found {
+									if entry, ok := schema.resolvedTypes[reference]; !ok || entry != actual {
+										t.Fatal("schema resolver failed to retain the exact returned pointers in its cache")
+									}
+								}
+								if cacheMode == 3 && schema.resolvedTypes[other] != cached {
+									t.Fatal("schema resolution changed an unrelated cache entry")
+								}
+								if !schema.lock.TryLock() {
+									t.Fatal("schema resolver returned with its mutex held")
+								}
+								schema.lock.Unlock()
+								expected = append(expected, ssaFormalLookupReport{view(actual), found, schema.resolvedTypes != nil, cacheView(), false})
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	command := exec.CommandContext(ctx, model, "--schema-lookup", "-")
+	command.Stdin = bytes.NewBufferString(encode(cases))
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("source schema lookup model: %v: %s", err, output)
+	}
+	var actual []ssaFormalLookupReport
+	if err := json.Unmarshal(output, &actual); err != nil {
+		t.Fatalf("decode schema lookup model: %v: %s", err, output)
+	}
+	if len(actual) != len(expected) {
+		t.Fatalf("schema lookup result count: got %d want %d", len(actual), len(expected))
+	}
+	for index := range actual {
+		if !reflect.DeepEqual(actual[index], expected[index]) {
+			t.Fatalf("Go/source schema lookup mismatch at case %d (%s): got=%s want=%s", index, encode(cases[index]), encode(actual[index]), encode(expected[index]))
+		}
+	}
+	t.Logf("Compared %d actual Go schema lookups and source executions, including repeated calls, cache hits/misses, nil/empty caches, pointer copies and preserved input contents", len(cases))
+}
+
+func TestSSAFormalSchemaLookupConcurrent(t *testing.T) {
+	name, relationship := "unit", Atomic
+	mapType := &Map{ElementRelationship: Separable}
+	schema := &Schema{Types: []TypeDef{{Name: name, Atom: Atom{Map: mapType}}}}
+	reference := TypeRef{NamedType: &name, ElementRelationship: &relationship}
+	var wait sync.WaitGroup
+	results := make(chan *Map, 64)
+	for i := 0; i < cap(results); i++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			atom, ok := schema.Resolve(reference)
+			if !ok || atom.Map == nil || atom.Map.ElementRelationship != Atomic {
+				t.Error("concurrent schema resolution lost its override")
+			}
+			results <- atom.Map
+		}()
+	}
+	wait.Wait()
+	close(results)
+	var first *Map
+	for pointer := range results {
+		if first == nil {
+			first = pointer
+		} else if pointer != first {
+			t.Fatal("concurrent schema resolution returned distinct cache copies")
+		}
+	}
+	if first == mapType || mapType.ElementRelationship != Separable {
+		t.Fatal("concurrent schema resolution changed the original type")
+	}
+	t.Log("Concurrent schema resolution retained one immutable cached copy.")
+}

@@ -1,0 +1,197 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package fieldpath
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"reflect"
+	"slices"
+	"testing"
+	"time"
+
+	"sigs.k8s.io/structured-merge-diff/v6/value"
+)
+
+type ssaFormalSearchCase struct {
+	Members []int `json:"members"`
+	Target  int   `json:"target"`
+}
+type ssaFormalSearchReport struct {
+	Index int  `json:"index"`
+	Found bool `json:"found"`
+	Has   bool `json:"has"`
+}
+
+func TestSSAFormalHasSearch(t *testing.T) {
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	run := func(mode string, input any, result any) {
+		t.Helper()
+		encoded, err := json.Marshal(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		command := exec.CommandContext(ctx, model, mode, "-")
+		command.Stdin = bytes.NewReader(encoded)
+		var stderr bytes.Buffer
+		command.Stderr = &stderr
+		output, err := command.Output()
+		if err != nil {
+			t.Fatalf("%s source model failed: %v: %s", mode, err, stderr.String())
+		}
+		if err := json.Unmarshal(output, result); err != nil {
+			t.Fatalf("invalid %s source output: %v", mode, err)
+		}
+	}
+	domain := []PathElement{
+		FieldNameElement("metadata"), FieldNameElement("spec"), FieldNameElement("status"),
+		KeyElementByFields("name", "db"), ValueElement(value.NewValueInterface("member")), IndexElement(0),
+		KeyElementByFields("id", int64(9007199254740993)), KeyElementByFields("id", float64(9007199254740992)),
+	}
+	compare, less := make([][]int, len(domain)), make([][]bool, len(domain))
+	for a := range domain {
+		compare[a], less[a] = make([]int, len(domain)), make([]bool, len(domain))
+		for b := range domain {
+			compare[a][b], less[a][b] = domain[a].Compare(domain[b]), domain[a].Less(domain[b])
+			if a < 6 && b < 6 && (less[a][b] != (a < b) || (compare[a][b] == 0) != (a == b)) {
+				t.Fatalf("independent lawful rank domain differs at %d/%d", a, b)
+			}
+		}
+	}
+	first, err := SerializePathElement(domain[6])
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := SerializePathElement(domain[7])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second || compare[6][7] != 0 || compare[7][6] != 0 {
+		t.Fatal("mixed numeric collision control no longer differs in exact tokens")
+	}
+	cases := []ssaFormalSearchCase{}
+	expected := []ssaFormalSearchReport{}
+	observe := func(members []int, target int) ssaFormalSearchReport {
+		t.Helper()
+		set := &PathElementSet{members: make(sortedPathElements, 0, len(members))}
+		before := []string{}
+		for _, rank := range members {
+			set.members = append(set.members, domain[rank])
+			token, err := SerializePathElement(domain[rank])
+			if err != nil {
+				t.Fatal(err)
+			}
+			before = append(before, token)
+		}
+		index, found := slices.BinarySearchFunc(set.members, domain[target], func(a, b PathElement) int { return a.Compare(b) })
+		has := set.Has(domain[target])
+		after := []string{}
+		for _, member := range set.members {
+			token, err := SerializePathElement(member)
+			if err != nil {
+				t.Fatal(err)
+			}
+			after = append(after, token)
+		}
+		if !reflect.DeepEqual(before, after) {
+			t.Fatal("Has or BinarySearchFunc mutated input selectors")
+		}
+		return ssaFormalSearchReport{index, found, has}
+	}
+	for mask := 0; mask < 64; mask++ {
+		members := []int{}
+		for rank := 0; rank < 6; rank++ {
+			if mask&(1<<rank) != 0 {
+				members = append(members, rank)
+			}
+		}
+		for target := 0; target < 6; target++ {
+			actual := observe(members, target)
+			index := 0
+			for _, rank := range members {
+				if rank < target {
+					index++
+				}
+			}
+			found := mask&(1<<target) != 0
+			if actual != (ssaFormalSearchReport{index, found, found}) {
+				t.Fatalf("Has violated exact membership for mask %d target %d: got=%v wantIndex=%d wantFound=%v", mask, target, actual, index, found)
+			}
+			cases = append(cases, ssaFormalSearchCase{members, target})
+			expected = append(expected, actual)
+		}
+	}
+	for _, request := range []ssaFormalSearchCase{{[]int{6}, 7}, {[]int{7}, 6}, {[]int{6, 7}, 6}, {[]int{7, 6}, 7}} {
+		actual := observe(request.Members, request.Target)
+		if actual != (ssaFormalSearchReport{0, true, true}) {
+			t.Fatalf("numeric source control changed: %v", actual)
+		}
+		cases, expected = append(cases, request), append(expected, actual)
+	}
+	for _, bits := range []int{32, 64} {
+		input := struct {
+			Compare  [][]int               `json:"compare"`
+			WordBits int                   `json:"wordBits"`
+			Cases    []ssaFormalSearchCase `json:"cases"`
+		}{compare, bits, cases}
+		var actual struct {
+			Results []ssaFormalSearchReport `json:"results"`
+			Less    [][]bool                `json:"less"`
+		}
+		run("--has-search", input, &actual)
+		if !reflect.DeepEqual(expected, actual.Results) || !reflect.DeepEqual(less, actual.Less) {
+			t.Fatalf("source search/Has/Less differs from native Go at word width %d", bits)
+		}
+	}
+	type midpointCase struct {
+		Bits  int    `json:"bits"`
+		Left  uint64 `json:"left"`
+		Right uint64 `json:"right"`
+	}
+	midpoints, want := []midpointCase{}, []uint64{}
+	for _, bits := range []int{32, 64} {
+		maximum := (uint64(1) << (bits - 1)) - 1
+		pairs := [][2]uint64{{0, 0}, {0, maximum}, {1, maximum}, {maximum - 1, maximum}, {maximum, maximum},
+			{maximum / 2, maximum/2 + 1}, {maximum/2 + 1, maximum}, {maximum - 8, maximum - 2}}
+		for _, pair := range pairs {
+			var actual uint64
+			if bits == 32 {
+				actual = uint64(int32(uint32(int32(pair[0])+int32(pair[1])) >> 1))
+			} else {
+				actual = uint64(int64(uint64(int64(pair[0])+int64(pair[1])) >> 1))
+			}
+			if actual != (pair[0]+pair[1])/2 {
+				t.Fatalf("native unsigned midpoint differs at %d bits: %v", bits, pair)
+			}
+			midpoints, want = append(midpoints, midpointCase{bits, pair[0], pair[1]}), append(want, actual)
+		}
+	}
+	var actual []uint64
+	run("--search-midpoints", midpoints, &actual)
+	if !reflect.DeepEqual(actual, want) {
+		t.Fatalf("source/native unsigned midpoint differs: source=%v Go=%v", actual, want)
+	}
+	t.Log("776 search/Has queries, 128 Less comparisons and 16 signed-overflow midpoint controls match source/Go; four numeric collision controls per width")
+}

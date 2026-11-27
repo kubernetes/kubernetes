@@ -1,0 +1,12 @@
+name = "ssa-formal"
+version = "0.1.0"
+defaultTargets = ["SSA", "SSA.Audit", "ssa-model"]
+moreLeanArgs = ["-DwarningAsError=true"]
+
+[[lean_lib]]
+name = "SSA"
+roots = ["SSA", "Main"]
+
+[[lean_exe]]
+name = "ssa-model"
+root = "Main"

@@ -1,0 +1,3 @@
+# Review the generators and source; these snapshots are reproducibility outputs.
+docs/proofs.html linguist-generated=true
+fixtures/scenarios.json linguist-generated=true
