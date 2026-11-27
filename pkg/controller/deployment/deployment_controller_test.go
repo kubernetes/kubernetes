@@ -18,12 +18,15 @@ package deployment
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -266,6 +269,194 @@ func filterInformerActions(actions []core.Action) []core.Action {
 	}
 
 	return ret
+}
+
+func TestSyncDeploymentAnnotationUpdateError(t *testing.T) {
+	statusErr := errors.New("deployment status update failed")
+	for _, tc := range []struct {
+		name       string
+		strategy   apps.DeploymentStrategyType
+		state      string
+		statusErr  error
+		wantStatus v1.ConditionStatus
+		wantReason string
+		wantWrites int
+	}{
+		{name: "rolling update times out", wantStatus: v1.ConditionFalse, wantReason: util.TimedOutReason, wantWrites: 1},
+		{name: "recreate times out", strategy: apps.RecreateDeploymentStrategyType, wantStatus: v1.ConditionFalse, wantReason: util.TimedOutReason, wantWrites: 1},
+		{name: "both update errors are returned", statusErr: statusErr, wantStatus: v1.ConditionFalse, wantReason: util.TimedOutReason, wantWrites: 1},
+		{name: "before deadline", state: "recent", wantStatus: v1.ConditionTrue, wantReason: util.ReplicaSetUpdatedReason, wantWrites: 1},
+		{name: "new availability is progress", state: "progress", wantStatus: v1.ConditionTrue, wantReason: util.ReplicaSetUpdatedReason, wantWrites: 1},
+		{name: "completed rollout stays complete", state: "complete", wantStatus: v1.ConditionTrue, wantReason: util.NewRSAvailableReason, wantWrites: 1},
+		{name: "pending minReadySeconds cannot establish completion", state: "pending minReadySeconds", wantStatus: v1.ConditionTrue, wantReason: util.ReplicaSetUpdatedReason},
+		{name: "stale new ReplicaSet status cannot establish completion", state: "stale new status", wantStatus: v1.ConditionTrue, wantReason: util.ReplicaSetUpdatedReason},
+		{name: "stale old ReplicaSet status cannot establish completion", state: "stale old status", wantStatus: v1.ConditionTrue, wantReason: util.ReplicaSetUpdatedReason},
+		{name: "stale status cannot advance progress", state: "stale progress", wantStatus: v1.ConditionTrue, wantReason: util.ReplicaSetUpdatedReason},
+		{name: "unobserved ReplicaSet status is not used", state: "unobserved status", wantStatus: v1.ConditionTrue, wantReason: util.ReplicaSetUpdatedReason},
+		{name: "deadline resumes after status is observed", state: "stale then observed", wantStatus: v1.ConditionTrue, wantReason: util.ReplicaSetUpdatedReason},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			d := newDeployment("annotation-sync", 3, nil, ptr.To(intstr.FromInt32(1)), ptr.To(intstr.FromInt32(0)), map[string]string{"app": "annotation-sync"})
+			d.Generation = 2
+			d.Annotations[util.RevisionAnnotation] = "2"
+			d.Spec.ProgressDeadlineSeconds = ptr.To[int32](600)
+			newRS := newReplicaSet(d, "annotation-sync-new", 1)
+			newRS.Generation = 1
+			newRS.Annotations = map[string]string{util.RevisionAnnotation: "2", util.DesiredReplicasAnnotation: "3", util.MaxReplicasAnnotation: "4"}
+			newRS.Status.Replicas = 1
+			newRS.Status.ObservedGeneration = newRS.Generation
+			oldRS := newReplicaSet(d, "annotation-sync-old", 3)
+			oldRS.Generation = 1
+			oldRS.Annotations = map[string]string{util.RevisionAnnotation: "1", util.DesiredReplicasAnnotation: "3", util.MaxReplicasAnnotation: "4"}
+			oldRS.Spec.Template = *d.Spec.Template.DeepCopy()
+			oldRS.Spec.Template.Spec.Containers[0].Image = "foo/old"
+			oldRS.Status = apps.ReplicaSetStatus{Replicas: 3, ReadyReplicas: 3, AvailableReplicas: 3, ObservedGeneration: oldRS.Generation}
+			if tc.strategy == apps.RecreateDeploymentStrategyType {
+				d.Spec.Strategy = apps.DeploymentStrategy{Type: tc.strategy}
+				oldRS.Spec.Replicas = ptr.To[int32](0)
+				oldRS.Status = apps.ReplicaSetStatus{ObservedGeneration: oldRS.Generation}
+				oldRS.Annotations[util.MaxReplicasAnnotation] = "3"
+				newRS.Annotations[util.MaxReplicasAnnotation] = "3"
+			}
+			if tc.state == "complete" || tc.state == "pending minReadySeconds" || tc.state == "stale new status" || tc.state == "stale old status" {
+				oldRS.Spec.Replicas = ptr.To[int32](0)
+				oldRS.Status = apps.ReplicaSetStatus{ObservedGeneration: oldRS.Generation}
+				newRS.Spec.Replicas = ptr.To[int32](3)
+				newRS.Status = apps.ReplicaSetStatus{Replicas: 3, ReadyReplicas: 3, AvailableReplicas: 3, ObservedGeneration: newRS.Generation}
+				if tc.state != "complete" {
+					newRS.Status.ReadyReplicas = 2
+					newRS.Status.AvailableReplicas = 2
+				}
+			}
+			allRSs := []*apps.ReplicaSet{oldRS, newRS}
+			d.Status = calculateStatus(allRSs, newRS, d)
+			condition := util.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, util.ReplicaSetUpdatedReason, "Deployment is progressing")
+			condition.LastUpdateTime = metav1.NewTime(time.Now().Add(-time.Hour))
+			if tc.state == "recent" {
+				condition.LastUpdateTime = metav1.Now()
+			}
+			if tc.state == "complete" {
+				condition.Reason = util.NewRSAvailableReason
+			}
+			condition.LastTransitionTime = condition.LastUpdateTime
+			util.SetDeploymentCondition(&d.Status, *condition)
+			if tc.state == "progress" || tc.state == "stale progress" {
+				newRS.Status.ReadyReplicas = 1
+				newRS.Status.AvailableReplicas = 1
+			}
+			if tc.state == "pending minReadySeconds" {
+				d.Spec.MinReadySeconds = 10
+				newRS.Status.ReadyReplicas = 3
+				newRS.Status.AvailableReplicas = 3
+			}
+			if tc.state == "stale new status" {
+				d.Spec.MinReadySeconds = 10
+				newRS.Spec.MinReadySeconds = 10
+				newRS.Generation++
+				newRS.Status.ReadyReplicas = 3
+				newRS.Status.AvailableReplicas = 3
+			}
+			if tc.state == "stale old status" {
+				oldRS.Spec.Replicas = ptr.To[int32](1)
+				oldRS.Generation++
+				newRS.Status.ReadyReplicas = 3
+				newRS.Status.AvailableReplicas = 3
+			}
+			if tc.state == "stale progress" || tc.state == "stale then observed" {
+				newRS.Generation++
+			}
+			if tc.state == "unobserved status" {
+				newRS.Status.ObservedGeneration = 0
+			}
+			d.Annotations["example.com/change-cause"] = "updated"
+			d.Generation++
+
+			f := newFixture(t)
+			f.dLister = []*apps.Deployment{d}
+			f.rsLister = allRSs
+			f.objects = []runtime.Object{d, oldRS, newRS}
+			dc, informerSet, err := f.newController(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(dc.queue.ShutDown)
+			rsErr := apierrors.NewForbidden(schema.GroupResource{Group: "apps", Resource: "replicasets"}, newRS.Name, errors.New("annotation update rejected"))
+			var attempts int
+			f.client.PrependReactor("update", "replicasets", func(action core.Action) (bool, runtime.Object, error) {
+				attempts++
+				updated := action.(core.UpdateAction).GetObject().(*apps.ReplicaSet)
+				if updated.Name != newRS.Name || *updated.Spec.Replicas != *newRS.Spec.Replicas || updated.Annotations["example.com/change-cause"] != "updated" {
+					t.Errorf("expected annotation synchronization without scaling, got %+v", updated)
+				}
+				return true, nil, rsErr
+			})
+			var statusWrites []*apps.Deployment
+			f.client.PrependReactor("update", "deployments", func(action core.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() != "status" {
+					t.Fatalf("unexpected Deployment update: %v", action)
+				}
+				statusWrites = append(statusWrites, action.(core.UpdateAction).GetObject().(*apps.Deployment).DeepCopy())
+				return tc.statusErr != nil, nil, tc.statusErr
+			})
+			err = dc.syncDeployment(ctx, d.Namespace+"/"+d.Name)
+			if !errors.Is(err, rsErr) || (tc.statusErr != nil && !errors.Is(err, tc.statusErr)) {
+				t.Errorf("update error was lost: %v", err)
+			}
+			if tc.statusErr == nil && err != rsErr {
+				t.Errorf("original API error identity changed: %v", err)
+			}
+			if attempts != 1 || len(statusWrites) != tc.wantWrites {
+				t.Errorf("ReplicaSet updates=%d, status updates=%d; want 1, %d", attempts, len(statusWrites), tc.wantWrites)
+			}
+			got := d
+			if len(statusWrites) != 0 {
+				got = statusWrites[len(statusWrites)-1]
+				if got.Status.ObservedGeneration != d.Generation {
+					t.Errorf("observed generation = %d, want %d", got.Status.ObservedGeneration, d.Generation)
+				}
+			}
+			progressing := util.GetDeploymentCondition(got.Status, apps.DeploymentProgressing)
+			if progressing == nil || progressing.Status != tc.wantStatus || progressing.Reason != tc.wantReason {
+				t.Fatalf("Progressing = %+v, want %s/%s", progressing, tc.wantStatus, tc.wantReason)
+			}
+			if tc.state == "progress" {
+				if !progressing.LastUpdateTime.After(condition.LastUpdateTime.Time) {
+					t.Error("new availability did not advance the progress timestamp")
+				}
+			} else if tc.wantStatus == v1.ConditionTrue && !progressing.LastUpdateTime.Equal(&condition.LastUpdateTime) {
+				t.Error("annotation synchronization changed the progress timestamp without new progress")
+			}
+			if newRS.Annotations["example.com/change-cause"] != "" {
+				t.Error("cached ReplicaSet was mutated")
+			}
+			if tc.state == "stale new status" || tc.state == "stale then observed" {
+				observed := newRS.DeepCopy()
+				observed.Status.ObservedGeneration = observed.Generation
+				if err := f.client.Tracker().Update(apps.SchemeGroupVersion.WithResource("replicasets"), observed, observed.Namespace); err != nil {
+					t.Fatal(err)
+				}
+				if err := informerSet.Apps().V1().ReplicaSets().Informer().GetIndexer().Update(observed); err != nil {
+					t.Fatal(err)
+				}
+				if err := dc.syncDeployment(ctx, d.Namespace+"/"+d.Name); err != rsErr {
+					t.Fatalf("error after observing status = %v, want original ReplicaSet error", err)
+				}
+				if attempts != 2 || len(statusWrites) != 1 {
+					t.Fatalf("after observing status: ReplicaSet updates=%d, status updates=%d; want 2, 1", attempts, len(statusWrites))
+				}
+				updated := statusWrites[0]
+				wantReason, wantStatus := util.TimedOutReason, v1.ConditionFalse
+				if tc.state == "stale new status" {
+					wantReason, wantStatus = util.NewRSAvailableReason, v1.ConditionTrue
+				}
+				condition := util.GetDeploymentCondition(updated.Status, apps.DeploymentProgressing)
+				if condition == nil || condition.Reason != wantReason || condition.Status != wantStatus || updated.Status.ObservedGeneration != d.Generation {
+					t.Fatalf("status reconciliation did not resume: %+v", updated.Status)
+				}
+			}
+		})
+	}
 }
 
 func TestSyncDeploymentCreatesReplicaSet(t *testing.T) {
