@@ -110,6 +110,9 @@ type serializer struct {
 
 func (serializer) private() {}
 
+// IsStrict reports whether the serializer performs strict decoding.
+func (s *serializer) IsStrict() bool { return s.options.strict }
+
 // NewSerializer creates and returns a serializer configured with the provided options. The default
 // options are equivalent to explicitly passing Strict(false) and Transcode(true).
 func NewSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper, options ...Option) Serializer {

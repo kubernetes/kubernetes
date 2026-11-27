@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -31,10 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
@@ -539,6 +544,102 @@ spec:
 	}
 	`
 )
+
+func TestFieldValidationCustomResourceEncodings(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+	client := clientset.NewForConfigOrDie(server.ClientConfig).Discovery().RESTClient()
+	ctx := context.Background()
+
+	for _, preserve := range []bool{false, true} {
+		group := fmt.Sprintf("preserve-%t.example.com", preserve)
+		crd := setupCRD(t, server.ClientConfig, group, preserve)
+		version := crd.Spec.Versions[0].Name
+		path := fmt.Sprintf("/apis/%s/%s/%s", group, version, crd.Spec.Names.Plural)
+		obj := &unstructured.Unstructured{}
+		obj.SetAPIVersion(group + "/" + version)
+		obj.SetKind(crd.Spec.Names.Kind)
+		obj.SetName("existing")
+		existing, err := dynamic.NewForConfigOrDie(server.ClientConfig).Resource(schema.GroupVersionResource{
+			Group: group, Version: version, Resource: crd.Spec.Names.Plural,
+		}).Create(ctx, obj, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, method := range []string{http.MethodPost, http.MethodPut} {
+			body := obj.DeepCopy()
+			body.SetName("new")
+			if method == http.MethodPut {
+				body.SetName(existing.GetName())
+				body.SetResourceVersion(existing.GetResourceVersion())
+			}
+			body.Object["spec"] = map[string]interface{}{"bogusField": "sentinel"}
+			for _, format := range []struct {
+				mediaType string
+				marshal   func(interface{}) ([]byte, error)
+			}{{"application/json", json.Marshal}, {"application/cbor", direct.Marshal}} {
+				data, err := format.marshal(body.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, mode := range []string{"Strict", "Warn", "", "Ignore"} {
+					if preserve && mode != "Strict" {
+						continue
+					}
+					t.Run(fmt.Sprintf("%s/%s/%s/preserve=%t", method, format.mediaType, mode, preserve), func(t *testing.T) {
+						req := client.Verb(method).AbsPath(path)
+						if method == http.MethodPut {
+							req = req.Suffix(existing.GetName())
+						}
+						req.Param("dryRun", metav1.DryRunAll).SetHeader("Content-Type", format.mediaType).SetHeader("Accept", "application/json").Body(data)
+						if mode != "" {
+							req.Param("fieldValidation", mode)
+						}
+						result := req.Do(ctx)
+						var status int
+						err := result.StatusCode(&status).Error()
+						const message = `unknown field "spec.bogusField"`
+						warned := false
+						for _, w := range result.Warnings() {
+							if w.Text == message {
+								warned = true
+							}
+						}
+						if warned != (mode == "Warn" || mode == "") {
+							t.Errorf("unexpected warnings: %v", result.Warnings())
+						}
+						if mode == "Strict" && !preserve {
+							if status != http.StatusBadRequest || err == nil || !strings.Contains(err.Error(), message) {
+								t.Fatalf("status %d, error %v; want 400 with %s", status, err, message)
+							}
+							return
+						}
+						wantStatus := http.StatusCreated
+						if method == http.MethodPut {
+							wantStatus = http.StatusOK
+						}
+						if err != nil || status != wantStatus {
+							t.Fatalf("status %d, error %v; want %d", status, err, wantStatus)
+						}
+						var got unstructured.Unstructured
+						raw, err := result.Raw()
+						if err != nil {
+							t.Fatal(err)
+						}
+						if err := json.Unmarshal(raw, &got); err != nil {
+							t.Fatal(err)
+						}
+						value, found, err := unstructured.NestedString(got.Object, "spec", "bogusField")
+						if err != nil || found != preserve || (preserve && value != "sentinel") {
+							t.Errorf("unexpected spec.bogusField: %q, present=%t, error=%v", value, found, err)
+						}
+					})
+				}
+			}
+		}
+	}
+}
 
 func TestFieldValidation(t *testing.T) {
 	server, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
