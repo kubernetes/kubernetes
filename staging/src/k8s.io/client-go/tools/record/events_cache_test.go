@@ -282,6 +282,32 @@ func TestEventCorrelator(t *testing.T) {
 	}
 }
 
+// TestEventAggregateKeepsReportingFields ensures the aggregate event keeps
+// ReportingController and ReportingInstance, which are part of the aggregation key.
+func TestEventAggregateKeepsReportingFields(t *testing.T) {
+	clock := &testclocks.SimpleIntervalClock{Time: time.Now(), Duration: time.Second}
+	correlator := NewEventCorrelator(clock)
+	template := makeEvent("similar", "similar message", makeObjectReference("Pod", "my-pod", "my-ns"))
+	template.ReportingController = "kubelet"
+	template.ReportingInstance = "node1"
+
+	var result *EventCorrelateResult
+	for _, event := range makeSimilarEvents(defaultAggregateMaxEvents, template, template.Message) {
+		var err error
+		result, err = correlator.EventCorrelate(&event)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+	if !strings.HasPrefix(result.Event.Message, "(combined from similar events): ") {
+		t.Fatalf("expected an aggregate event, got message %q", result.Event.Message)
+	}
+	if result.Event.ReportingController != template.ReportingController || result.Event.ReportingInstance != template.ReportingInstance {
+		t.Errorf("aggregate event has ReportingController=%q ReportingInstance=%q, want %q and %q",
+			result.Event.ReportingController, result.Event.ReportingInstance, template.ReportingController, template.ReportingInstance)
+	}
+}
+
 func TestEventSpamFilter(t *testing.T) {
 	spamKeyFuncBasedOnObjectsAndReason := func(e *v1.Event) string {
 		return strings.Join([]string{
