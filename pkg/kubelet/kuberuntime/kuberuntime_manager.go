@@ -1211,7 +1211,7 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 				errs = append(errs, fmt.Errorf("missing container %q memory usage", cStats.Name))
 			} else if *cStats.Memory.UsageBytes >= uint64(desiredLimit) {
 				errs = append(errs, fmt.Errorf("attempting to set container %q memory limit (%d) below current usage (%d)",
-					cStats.Name, desiredLimit, *podUsageStats.Memory.UsageBytes))
+					cStats.Name, desiredLimit, *cStats.Memory.UsageBytes))
 			}
 		}
 	}
