@@ -84,6 +84,9 @@ type DefaultPreemption struct {
 	Evaluator         *preemption.Evaluator
 	pgLister          fwk.PodGroupLister
 	podGroupEvaluator podGroupEvaluator
+	// rankInvalidator is told when condemning or reprieving victims changes what RankNodes
+	// would return. It is nil when the handle doesn't track node ranks.
+	rankInvalidator framework.NodeRankInvalidator
 
 	// IsEligiblePod returns whether a victim (individual pod/pod group) is allowed to be preempted by a preemptor pod.
 	// This filtering is in addition to the internal requirement that the victim pod have lower
@@ -108,10 +111,17 @@ var _ fwk.PodGroupPostFilterPlugin = &DefaultPreemption{}
 var _ framework.RankNodesPlugin = &DefaultPreemption{}
 var _ fwk.ReservePlugin = &DefaultPreemption{}
 var _ fwk.RelevancePlugin = &DefaultPreemption{}
+var _ fwk.SignPlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
 	return Name
+}
+
+// SignPod implements fwk.SignPlugin for RankNodes. Node ranks depend on
+// PodGroupPreemptionState rather than individual preemptor pod attributes.
+func (pl *DefaultPreemption) SignPod(_ context.Context, _ *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	return nil, nil
 }
 
 // IsRelevantForPodResize returns true to indicate that DefaultPreemption is relevant for pod resizes,
@@ -121,7 +131,7 @@ func (pl *DefaultPreemption) IsRelevantForPodResize() bool {
 }
 
 // New initializes a new plugin and returns it. The plugin type is retained to allow modification.
-func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Features) (*DefaultPreemption, error) {
+func New(ctx context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Features) (*DefaultPreemption, error) {
 	args, ok := dpArgs.(*config.DefaultPreemptionArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
@@ -141,6 +151,10 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	if pl.fts.EnableGenericWorkload {
 		pl.pgLister = fh.PodGroupManager().PodGroups()
 		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh)
+		var ok bool
+		if pl.rankInvalidator, ok = fh.(framework.NodeRankInvalidator); !ok {
+			klog.FromContext(ctx).Info("The framework handle doesn't implement NodeRankInvalidator, so changed node ranks can't be reported to it. Opportunistic batching may reuse outdated ranks in PodGroupPostFilter", "plugin", Name)
+		}
 	}
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim
@@ -630,6 +644,11 @@ func (pl *DefaultPreemption) Reserve(ctx context.Context, state fwk.CycleState, 
 	if victims := pl.computeDeltaVictimsOnNode(nodeName, preemptionState); len(victims) > 0 {
 		state.Write(reserveStateKey, &reserveState{condemnedByPod: victims})
 		preemptionState.AddCondemned(victims)
+		// Condemning a victim changes the preemption cost, and with it the rank, of every node
+		// it has pods on. Only a change of other nodes than nodeName has to be reported.
+		if pl.rankInvalidator != nil && hasPodsOnOtherNodes(victims, nodeName) {
+			pl.rankInvalidator.InvalidateNodeRanks()
+		}
 	}
 	return nil
 }
@@ -655,7 +674,25 @@ func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState
 	if len(s.condemnedByPod) > 0 {
 		preemptionState.RemoveCondemned(s.condemnedByPod)
 		s.condemnedByPod = nil
+		// Unlike Reserve, Unreserve isn't limited to the pod that was scheduled last,
+		// so a change of the rank of nodeName has to be reported as well.
+		if pl.rankInvalidator != nil {
+			pl.rankInvalidator.InvalidateNodeRanks()
+		}
 	}
+}
+
+// hasPodsOnOtherNodes tells whether any of the victims has a pod on a node other than nodeName,
+// which takes a PodGroup victim.
+func hasPodsOnOtherNodes(victims []fwk.PreemptionVictim, nodeName string) bool {
+	for _, v := range victims {
+		for _, pi := range v.Pods() {
+			if pi.GetPod().Spec.NodeName != nodeName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // computeDeltaVictimsOnNode returns the surviving victims on nodeName that would be

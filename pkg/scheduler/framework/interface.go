@@ -158,6 +158,8 @@ func NewPodsToActivate() *PodsToActivate {
 type SortedScoredNodes interface {
 	Pop() fwk.NodePluginScores
 	Len() int
+	// Ranked reports whether the nodes are ordered by node rank first.
+	Ranked() bool
 	// UnorderedList returns all nodes in heap-internal order (not sorted by score).
 	UnorderedList() []fwk.NodePluginScores
 }
@@ -176,6 +178,19 @@ type RankNodesPlugin interface {
 	// RankNodes ranks the given nodes for the pod. Nodes should be returned
 	// ordered by non-decreasing Rank (0 is best). If the plugin does not wish
 	// to rank nodes for this cycle, it may return a Skip status.
+	//
+	// Opportunistic batching reuses the order for the following pods of the cycle, which
+	// puts four requirements on the plugin:
+	//   - it must implement fwk.SignPlugin so that pods whose attributes lead to different
+	//     node orders do not share a signature (or are marked unsignable);
+	//   - returning Skip leaves the batch unranked (ignoring rank invalidations), so whether
+	//     RankNodes skips or ranks must not change across pods sharing a signature in the
+	//     same PodGroup scheduling cycle;
+	//   - whether a node ranks before, after or equal to another one must not depend on
+	//     the other nodes passed in the same call, so that a subset can be ranked again
+	//     on its own;
+	//   - whenever the rank of a node changes, the plugin has to report it through
+	//     NodeRankInvalidator, which names the one change that needs no report.
 	RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
 }
 
@@ -376,6 +391,18 @@ type NominatedNodeNameGetter interface {
 	TracksNominationInMemory(pod *v1.Pod) bool
 }
 
+// NodeRankInvalidator is implemented by the handle that the framework passes to plugins.
+// It lets a plugin report that the order returned by a RankNodesPlugin no longer holds,
+// typically from Reserve or Unreserve, where the state that the ranks are derived from changes.
+// The framework then stops reusing the results it cached for that order.
+type NodeRankInvalidator interface {
+	// InvalidateNodeRanks reports that node ranks may have changed. A plugin doesn't need to
+	// report a change that Reserve makes to the rank of the node it reserves, and of no other
+	// node: opportunistic batching evaluates the node of the last scheduled pod again anyway.
+	// It is safe for concurrent use.
+	InvalidateNodeRanks()
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -383,6 +410,7 @@ type Framework interface {
 	NominatedNodeNameGetter
 	NominationExtensionsRunner
 	VictimExtensionsRunner
+	NodeRankInvalidator
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []fwk.PreEnqueuePlugin
@@ -433,11 +461,9 @@ type Framework interface {
 	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
 	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
 
-	// IsBatchingDisabled reports whether opportunistic batching is currently disabled on the framework.
-	IsBatchingDisabled() bool
-
-	// SetBatchingDisabled disables or re-enables opportunistic batching on the framework.
-	SetBatchingDisabled(disabled bool)
+	// FlushBatch drops any cached batching state without counting a cache flush metric,
+	// for when the caller switches to scheduling pods against another view of the cluster.
+	FlushBatch()
 
 	// RunRawScorePlugins runs only the Score() phase of each active scoring plugin for a single node,
 	// without NormalizeScore or weighting and returns pre-NormalizeScore values.
