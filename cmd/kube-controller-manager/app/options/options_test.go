@@ -17,7 +17,13 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -40,6 +46,10 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
+	"k8s.io/component-base/metrics/legacyregistry"
+	_ "k8s.io/component-base/metrics/prometheus/clientgo"
+	"k8s.io/component-base/metrics/testutil"
 
 	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
@@ -49,6 +59,7 @@ import (
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgofeaturegate "k8s.io/client-go/features"
+	certutil "k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
@@ -1826,5 +1837,88 @@ func TestValidateLeaderElectionRecoveryDeadline(t *testing.T) {
 				t.Errorf("expected an error containing %q, got %q", tc.wantErr, got)
 			}
 		})
+	}
+}
+
+func TestConfigNativeHistograms(t *testing.T) {
+	t.Cleanup(func() { metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate) })
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, false)
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	tempDir := t.TempDir()
+	caCert, _, err := certutil.GenerateSelfSignedCertKey("localhost", nil, nil)
+	if err != nil {
+		t.Fatalf("failed to generate client CA cert: %v", err)
+	}
+	clientCAFile := filepath.Join(tempDir, "client-ca.crt")
+	if err := os.WriteFile(clientCAFile, caCert, 0600); err != nil {
+		t.Fatalf("failed to write client CA file: %v", err)
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to listen on free port: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	s, err := NewKubeControllerManagerOptions()
+	if err != nil {
+		t.Fatalf("NewKubeControllerManagerOptions failed: %v", err)
+	}
+	s.SecureServing.Listener = ln
+
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
+		fs.AddFlagSet(f)
+	}
+	if err := fs.Parse([]string{
+		"--feature-gates=NativeHistograms=true",
+		"--master=" + server.URL,
+		"--cert-dir=" + tempDir,
+		"--client-ca-file=" + clientCAFile,
+		"--authentication-skip-lookup=true",
+	}); err != nil {
+		t.Fatalf("fs.Parse failed: %v", err)
+	}
+	if err := s.ComponentGlobalsRegistry.Set(); err != nil {
+		t.Fatalf("ComponentGlobalsRegistry.Set failed: %v", err)
+	}
+
+	cfg, err := s.Config(context.Background(), []string{""}, []string{""}, nil)
+	if err != nil {
+		t.Fatalf("s.Config failed: %v", err)
+	}
+	t.Cleanup(cfg.EventBroadcaster.Shutdown)
+
+	// Trigger a REST client request so rest_client_request_duration_seconds is populated.
+	_, _ = cfg.Client.Discovery().RESTClient().Get().AbsPath("/version").DoRaw(context.Background())
+
+	mfs, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+	byName := make(map[string]*testutil.MetricFamily, len(mfs))
+	for _, mf := range mfs {
+		byName[mf.GetName()] = mf
+	}
+
+	for _, metricName := range []string{
+		"rest_client_request_duration_seconds",
+		"workqueue_queue_duration_seconds",
+		"workqueue_work_duration_seconds",
+		"apiserver_client_certificate_expiration_seconds",
+	} {
+		mf, ok := byName[metricName]
+		if !ok {
+			t.Fatalf("metric %q not found in gathered metrics", metricName)
+		}
+		testutil.AssertHasNativeHistogram(t, mf, nil)
 	}
 }
