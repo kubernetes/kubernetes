@@ -23,12 +23,14 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -38,6 +40,20 @@ import (
 const (
 	// DefaultExtenderTimeout defines the default extender timeout in second.
 	DefaultExtenderTimeout = 5 * time.Second
+
+	// extenderFailureThreshold is how many consecutive tolerated failures
+	// put an HTTP extender into backoff. A hung extender otherwise costs
+	// every pod a full httpTimeout.
+	extenderFailureThreshold = 3
+	extenderBackoffInitial   = time.Second
+	extenderBackoffMax       = 30 * time.Second
+)
+
+type extenderCall int
+
+const (
+	extenderFilter extenderCall = iota
+	extenderPrioritize
 )
 
 // HTTPExtender implements the Extender interface.
@@ -52,6 +68,14 @@ type HTTPExtender struct {
 	nodeCacheCapable bool
 	managedResources sets.Set[string]
 	ignorable        bool
+
+	// now is replaced in tests. Nil means time.Now.
+	now func() time.Time
+
+	mu           sync.Mutex
+	failures     int
+	backoffUntil time.Time
+	backoffStep  time.Duration
 }
 
 func makeTransport(config *schedulerapi.Extender) (http.RoundTripper, error) {
@@ -286,9 +310,15 @@ func (h *HTTPExtender) Filter(
 		NodeNames: nodeNames,
 	}
 
+	if h.inBackoff(extenderFilter) {
+		return nil, nil, nil, fmt.Errorf("extender %q is in failure backoff", h.extenderURL)
+	}
+
 	if err := h.send(h.filterVerb, args, &result); err != nil {
+		h.recordFailure(extenderFilter)
 		return nil, nil, nil, err
 	}
+	h.recordSuccess(extenderFilter)
 	if result.Error != "" {
 		return nil, nil, nil, errors.New(result.Error)
 	}
@@ -353,9 +383,15 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []fwk.NodeInfo) (*extenderv
 		NodeNames: nodeNames,
 	}
 
+	if h.inBackoff(extenderPrioritize) {
+		return nil, 0, fmt.Errorf("extender %q is in failure backoff", h.extenderURL)
+	}
+
 	if err := h.send(h.prioritizeVerb, args, &result); err != nil {
+		h.recordFailure(extenderPrioritize)
 		return nil, 0, err
 	}
+	h.recordSuccess(extenderPrioritize)
 	return &result, h.weight, nil
 }
 
@@ -394,6 +430,77 @@ func (h *HTTPExtender) IsPrioritizer() bool {
 // IsFilter returns whether this extender is configured for the Filter method.
 func (h *HTTPExtender) IsFilter() bool {
 	return h.filterVerb != ""
+}
+
+// backoffApplies is true only where an extender error is already tolerated:
+// an ignorable filter, and prioritize. Bind and a non-ignorable filter keep
+// failing on every call.
+func (h *HTTPExtender) backoffApplies(call extenderCall) bool {
+	switch call {
+	case extenderFilter:
+		return h.ignorable && h.filterVerb != ""
+	case extenderPrioritize:
+		return h.prioritizeVerb != ""
+	default:
+		return false
+	}
+}
+
+func (h *HTTPExtender) currentTime() time.Time {
+	if h.now != nil {
+		return h.now()
+	}
+	return time.Now()
+}
+
+func (h *HTTPExtender) inBackoff(call extenderCall) bool {
+	if !h.backoffApplies(call) {
+		return false
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return !h.backoffUntil.IsZero() && h.currentTime().Before(h.backoffUntil)
+}
+
+func (h *HTTPExtender) recordFailure(call extenderCall) {
+	if !h.backoffApplies(call) {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.failures++
+	if h.failures < extenderFailureThreshold {
+		return
+	}
+	delay := h.backoffStep
+	if delay == 0 {
+		delay = extenderBackoffInitial
+	}
+	h.backoffUntil = h.currentTime().Add(delay)
+	next := delay * 2
+	if next > extenderBackoffMax {
+		next = extenderBackoffMax
+	}
+	h.backoffStep = next
+	klog.InfoS("HTTP extender entered failure backoff", "extender", h.extenderURL, "failures", h.failures, "backoff", delay)
+}
+
+func (h *HTTPExtender) recordSuccess(call extenderCall) {
+	if !h.backoffApplies(call) {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.failures == 0 && h.backoffUntil.IsZero() {
+		return
+	}
+	wasDown := h.failures >= extenderFailureThreshold
+	h.failures = 0
+	h.backoffUntil = time.Time{}
+	h.backoffStep = 0
+	if wasDown {
+		klog.InfoS("HTTP extender left failure backoff", "extender", h.extenderURL)
+	}
 }
 
 // Helper function to send messages to the extender
