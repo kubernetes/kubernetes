@@ -33,7 +33,8 @@ import (
 const WaitForAPIServerSyncPeriod = 1 * time.Second
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
-func NewSourceApiserver(logger klog.Logger, c clientset.Interface, nodeName types.NodeName, nodeHasSynced func() bool, updates chan<- sourceUpdate) {
+func NewSourceApiserver(ctx context.Context, c clientset.Interface, nodeName types.NodeName, nodeHasSynced func() bool, updates chan<- sourceUpdate) {
+	logger := klog.FromContext(ctx)
 	lw := cache.NewListWatchFromClient(c.CoreV1().RESTClient(), "pods", metav1.NamespaceAll, fields.OneTermEqualSelector("spec.nodeName", string(nodeName)))
 
 	// The Reflector responsible for watching pods at the apiserver should be run only after
@@ -49,12 +50,13 @@ func NewSourceApiserver(logger klog.Logger, c clientset.Interface, nodeName type
 			logger.V(4).Info("node sync has not completed yet")
 		}
 		logger.Info("Watching apiserver")
-		newSourceApiserverFromLW(logger, lw, updates)
+		newSourceApiserverFromLW(ctx, lw, updates)
 	}()
 }
 
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
-func newSourceApiserverFromLW(logger klog.Logger, lw cache.ListerWatcher, updates chan<- sourceUpdate) {
+func newSourceApiserverFromLW(ctx context.Context, lw cache.ListerWatcher, updates chan<- sourceUpdate) {
+	logger := klog.FromContext(ctx)
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
@@ -65,5 +67,5 @@ func newSourceApiserverFromLW(logger klog.Logger, lw cache.ListerWatcher, update
 	r := cache.NewReflectorWithOptions(lw, &v1.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), cache.ReflectorOptions{
 		Logger: &logger,
 	})
-	go r.RunWithContext(klog.NewContext(context.Background(), logger))
+	go r.RunWithContext(ctx)
 }

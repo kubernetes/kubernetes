@@ -157,6 +157,6 @@ func NewWatchingConfigMapManager(ctx context.Context, kubeClient clientset.Inter
 	}
 	gr := corev1.Resource("configmap")
 	return &configMapManager{
-		manager: manager.NewWatchBasedManager(listConfigMap, watchConfigMap, newConfigMap, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getConfigMapNames),
+		manager: manager.NewWatchBasedManager(ctx, listConfigMap, watchConfigMap, newConfigMap, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getConfigMapNames),
 	}
 }
