@@ -19,6 +19,8 @@ package get
 import (
 	"fmt"
 	"io"
+	"math"
+	"math/big"
 	"reflect"
 	"sort"
 
@@ -251,6 +253,9 @@ func isLess(i, j reflect.Value) (bool, error) {
 			if jtype, ok := j.Interface().(int64); ok {
 				return itype < jtype, nil
 			}
+			if less, ok := lessMixedNumbers(itype, j.Interface()); ok {
+				return less, nil
+			}
 		case uint:
 			if jtype, ok := j.Interface().(uint); ok {
 				return itype < jtype, nil
@@ -266,6 +271,9 @@ func isLess(i, j reflect.Value) (bool, error) {
 		case float64:
 			if jtype, ok := j.Interface().(float64); ok {
 				return itype < jtype, nil
+			}
+			if less, ok := lessMixedNumbers(itype, j.Interface()); ok {
+				return less, nil
 			}
 		case string:
 			if jtype, ok := j.Interface().(string); ok {
@@ -289,6 +297,34 @@ func isLess(i, j reflect.Value) (bool, error) {
 	default:
 		return false, fmt.Errorf("unsortable type: %v", i.Kind())
 	}
+}
+
+// lessMixedNumbers reports whether i is less than j when one is an int64 and the other a float64.
+// JSON decoding turns whole numbers into int64 and fractional numbers into float64, so the same
+// field can hold both types across objects. The values are compared exactly, so an int64 that
+// float64 cannot represent is not rounded. ok is false when i and j are not such a pair.
+func lessMixedNumbers(i, j any) (less bool, ok bool) {
+	iNumber, iOK := exactNumber(i)
+	jNumber, jOK := exactNumber(j)
+	if !iOK || !jOK {
+		return false, false
+	}
+	return iNumber.Cmp(jNumber) < 0, true
+}
+
+// exactNumber returns v as a big.Float without losing precision, if v is an int64 or a float64
+// other than NaN.
+func exactNumber(v any) (*big.Float, bool) {
+	switch n := v.(type) {
+	case int64:
+		return new(big.Float).SetInt64(n), true
+	case float64:
+		if math.IsNaN(n) {
+			return nil, false
+		}
+		return big.NewFloat(n), true
+	}
+	return nil, false
 }
 
 func (r *RuntimeSort) Less(i, j int) bool {
