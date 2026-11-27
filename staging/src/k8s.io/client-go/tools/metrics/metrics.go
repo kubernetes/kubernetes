@@ -140,6 +140,8 @@ var (
 	ClientCertRotationAge DurationMetric = noopDuration{}
 	// RequestLatency is the latency metric that rest clients will update.
 	RequestLatency LatencyMetric = noopLatency{}
+	// WatchListLatency measures time from Watch invocation through decoding the initial-events-end bookmark.
+	WatchListLatency LatencyMetric = noopLatency{}
 	// ResolverLatency is the latency metric that DNS resolver will update
 	ResolverLatency ResolverLatencyMetric = noopResolverLatency{}
 	// RequestSize is the request size metric that rest clients will update.
@@ -180,6 +182,7 @@ type RegisterOpts struct {
 	ClientCertExpiry             ExpiryMetric
 	ClientCertRotationAge        DurationMetric
 	RequestLatency               LatencyMetric
+	WatchListLatency             LatencyMetric
 	ResolverLatency              ResolverLatencyMetric
 	RequestSize                  SizeMetric
 	ResponseSize                 SizeMetric
@@ -213,6 +216,9 @@ func Register(opts RegisterOpts) {
 		}
 		if opts.RequestLatency != nil {
 			RequestLatency = opts.RequestLatency
+		}
+		if opts.WatchListLatency != nil {
+			WatchListLatency = opts.WatchListLatency
 		}
 		if opts.ResolverLatency != nil {
 			ResolverLatency = opts.ResolverLatency
