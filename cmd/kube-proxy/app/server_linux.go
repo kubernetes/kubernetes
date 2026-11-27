@@ -39,6 +39,7 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	"k8s.io/kubernetes/pkg/proxy/nftables"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/utils/ptr"
 	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
@@ -241,6 +242,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 				s.Recorder,
 				s.HealthzServer,
 				initOnly,
+				ptr.Deref(config.NFTables.SNATNodeInternalIP, false),
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack
@@ -255,6 +257,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 				s.Recorder,
 				s.HealthzServer,
 				initOnly,
+				ptr.Deref(config.NFTables.SNATNodeInternalIP, false),
 			)
 		}
 
