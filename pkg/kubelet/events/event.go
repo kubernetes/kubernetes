@@ -26,6 +26,7 @@ const (
 	PreemptContainer        = "Preempting"
 	BackOffStartContainer   = "BackOff"
 	ExceededGracePeriod     = "ExceededGracePeriod"
+	OOMKilledContainer      = "OOMKilled"
 )
 
 // Pod event reason list
