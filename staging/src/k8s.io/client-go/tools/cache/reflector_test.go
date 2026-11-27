@@ -1429,6 +1429,47 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 	}
 }
 
+func TestReflectorRejectsIncompleteFullList(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	pods := []v1.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", ResourceVersion: "10"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod-2", ResourceVersion: "10"}},
+	}
+	knownObjects := NewStore(MetaNamespaceKeyFunc)
+	for i := range pods {
+		require.NoError(t, knownObjects.Add(&pods[i]))
+	}
+	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KnownObjects: knownObjects})
+	var requests []metav1.ListOptions
+	lw := &ListWatch{
+		ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			requests = append(requests, options)
+			// Model a list-options callback that overrides even the fallback's limit=0.
+			options.Limit = 1
+			if options.Continue != "" {
+				return nil, apierrors.NewResourceExpired("continuation expired")
+			}
+			return &v1.PodList{
+				ListMeta: metav1.ListMeta{ResourceVersion: "11", Continue: "next"},
+				Items:    pods[:options.Limit],
+			}, nil
+		},
+	}
+	r := NewReflectorWithOptions(lw, &v1.Pod{}, fifo, ReflectorOptions{Logger: &logger})
+	r.WatchListPageSize = 1
+	r.setLastSyncResourceVersion("10")
+
+	require.Error(t, r.list(ctx))
+	assert.Equal(t, []metav1.ListOptions{
+		{ResourceVersion: "10", Limit: 1},
+		{Continue: "next", Limit: 1},
+		{ResourceVersion: "10"},
+	}, requests)
+	// Replacing the queue with the partial list would infer a deletion for pod-2.
+	assert.Empty(t, fifo.list())
+	assert.Equal(t, "10", r.LastSyncResourceVersion())
+}
+
 func TestReflectorFullListIfTooLarge(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	var cancelCtx context.Context

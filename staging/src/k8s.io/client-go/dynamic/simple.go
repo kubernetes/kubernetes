@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/features"
+	"k8s.io/client-go/internal/listoptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/apply"
 )
@@ -263,6 +264,7 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 }
 
 func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+	listoptions.PreserveFullList(ctx, &opts)
 	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
 		return nil, err
 	}
