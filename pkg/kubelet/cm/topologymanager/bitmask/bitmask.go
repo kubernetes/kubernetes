@@ -164,7 +164,7 @@ func (s *bitMask) IsGreaterThan(mask BitMask) bool {
 func (s *bitMask) String() string {
 	grouping := 2
 	for shift := 64 - grouping; shift > 0; shift -= grouping {
-		if *s > (1 << uint(shift)) {
+		if *s >= (1 << uint(shift)) {
 			return fmt.Sprintf("%0"+strconv.Itoa(shift+grouping)+"b", *s)
 		}
 	}
