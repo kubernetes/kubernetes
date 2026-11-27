@@ -164,7 +164,7 @@ func kubeOpenAPIResultToFieldErrors(fldPath *field.Path, result *validate.Result
 				if i, ok := err.Valid.(int64); ok {
 					max = i
 				}
-				allErrs = append(allErrs, field.TooLong(errPath, "" /*unused*/, int(max)))
+				allErrs = append(allErrs, field.TooLongCharacters(errPath, "" /*unused*/, int(max)))
 
 			case openapierrors.TooShortFailCode:
 				min := int64(-1)
