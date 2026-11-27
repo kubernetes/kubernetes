@@ -22,10 +22,12 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 type deleteContextTest struct {
@@ -50,6 +52,60 @@ func TestDeleteContext(t *testing.T) {
 	}
 
 	test.run(t)
+}
+
+func TestDeleteContextWithoutArgs(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Contexts: map[string]*clientcmdapi.Context{
+			"minikube": {Cluster: "minikube"},
+		},
+	}
+
+	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
+	err = clientcmd.WriteToFile(conf, fakeKubeFile.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pathOptions := clientcmd.NewDefaultPathOptions()
+	pathOptions.GlobalFile = fakeKubeFile.Name()
+	pathOptions.EnvVar = ""
+
+	defer cmdutil.DefaultBehaviorOnFatal()
+	fatalCalled := false
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		fatalCalled = true
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(str, "context to delete is required") {
+			t.Errorf("expected error to contain %q, got %q", "context to delete is required", str)
+		}
+	})
+
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdConfigDeleteContext(buf, errBuf, pathOptions)
+	cmd.SetArgs([]string{})
+	cmd.Execute()
+
+	if !fatalCalled {
+		t.Fatal("expected a usage error when no context name is provided, got none")
+	}
+
+	// Verify no contexts were removed from the kubeconfig file
+	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
+	if err != nil {
+		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
+	}
+
+	if _, ok := config.Contexts["minikube"]; !ok {
+		t.Errorf("expected context minikube to still exist in kubeconfig")
+	}
 }
 
 func (test deleteContextTest) run(t *testing.T) {
