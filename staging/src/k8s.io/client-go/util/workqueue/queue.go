@@ -327,6 +327,10 @@ func (q *Typed[T]) Pause() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
+	if q.shuttingDown {
+		return
+	}
+
 	q.paused = true
 }
 
@@ -335,7 +339,7 @@ func (q *Typed[T]) Resume() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
-	if !q.paused {
+	if !q.paused || q.shuttingDown {
 		return
 	}
 	q.paused = false

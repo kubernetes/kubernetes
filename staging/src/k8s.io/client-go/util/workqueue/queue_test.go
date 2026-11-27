@@ -712,4 +712,43 @@ func TestQueuePauseAndResume(t *testing.T) {
 			t.Fatalf("timed out waiting for Get after Resume")
 		}
 	})
+
+	t.Run("Resume after ShutDown on a paused queue does not resume dequeuing", func(t *testing.T) {
+		q := workqueue.NewTyped[string]()
+		q.Add("item-1")
+		q.Pause()
+		q.ShutDown()
+
+		// Calling Resume on a shut-down queue must not reset paused or resurrect item retrieval.
+		q.Resume()
+
+		item, shutdown := q.Get()
+		if !shutdown {
+			t.Fatalf("expected shutdown=true after Resume on shut down queue, got item=%q, shutdown=false", item)
+		}
+		if item != "" {
+			t.Fatalf("expected empty item after Resume on shut down queue, got %q", item)
+		}
+	})
+
+	t.Run("Pause after ShutDown on an unpaused queue does not abort draining", func(t *testing.T) {
+		q := workqueue.NewTyped[string]()
+		q.Add("item-1")
+		q.ShutDown()
+
+		// Calling Pause after ShutDown should be a no-op so that the pending items
+		// continue to drain as guaranteed by ShutDown().
+		q.Pause()
+
+		item, shutdown := q.Get()
+		if shutdown || item != "item-1" {
+			t.Fatalf("expected item-1 to be drained after ShutDown even if Pause was called, got %q (shutdown=%v)", item, shutdown)
+		}
+		q.Done(item)
+
+		item2, shutdown := q.Get()
+		if !shutdown {
+			t.Fatalf("expected shutdown=true once empty, got %q", item2)
+		}
+	})
 }
