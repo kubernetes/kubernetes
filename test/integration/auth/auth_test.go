@@ -1102,6 +1102,137 @@ func TestImpersonateWithUID(t *testing.T) {
 	})
 }
 
+// TestImpersonationAuditPolicyMatchesOriginalUser ensures that audit policy
+// rules are evaluated against the authenticated user, not the impersonated one.
+// Policies commonly drop requests from noisy system users and groups. A user
+// who impersonates one of them must still be audited.
+func TestImpersonationAuditPolicyMatchesOriginalUser(t *testing.T) {
+	superUser := "admin/system:masters"
+	nodeUser := "system:node:node1"
+
+	authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		superUser:    {Name: "admin", Groups: []string{user.SystemPrivilegedGroup}},
+		"alice":      {Name: "alice"},
+		"kube-proxy": {Name: user.KubeProxy},
+		"node1":      {Name: nodeUser, Groups: []string{user.NodesGroup}},
+	})))
+
+	dir := t.TempDir()
+	policyFile := filepath.Join(dir, "audit-policy.yaml")
+	auditLogFile := filepath.Join(dir, "audit.log")
+	policy := `
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages:
+  - "RequestReceived"
+rules:
+  - level: None
+    users: ["system:kube-proxy"]
+  - level: None
+    userGroups: ["system:nodes"]
+  - level: Metadata
+`
+	if err := os.WriteFile(policyFile, []byte(policy), 0644); err != nil {
+		t.Fatalf("failed to write audit policy: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
+
+	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.Authorization.Modes = []string{"RBAC"}
+			opts.Audit.PolicyFile = policyFile
+			opts.Audit.LogOptions.Path = auditLogFile
+			opts.Audit.LogOptions.GroupVersionString = "audit.k8s.io/v1"
+			opts.Audit.LogOptions.BatchOptions.Mode = "blocking"
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator
+		},
+	})
+	t.Cleanup(tearDownFn)
+
+	superuserClient, _ := clientsetForToken(superUser, kubeConfig)
+	listServices := rbacv1.PolicyRule{
+		Verbs:     []string{"list"},
+		APIGroups: []string{""},
+		Resources: []string{"services"},
+	}
+	authutil.GrantUserAuthorization(t, ctx, superuserClient, user.KubeProxy, listServices)
+	authutil.GrantUserAuthorization(t, ctx, superuserClient, nodeUser, listServices)
+	authutil.GrantUserAuthorization(t, ctx, superuserClient, "alice", rbacv1.PolicyRule{
+		Verbs:     []string{"impersonate"},
+		APIGroups: []string{""},
+		Resources: []string{"users", "groups"},
+	})
+
+	for _, tc := range []struct {
+		name                 string
+		token                string
+		impersonate          rest.ImpersonationConfig
+		wantUser             string
+		wantImpersonatedUser string
+	}{
+		{
+			name:     "kube-proxy is dropped by the policy",
+			token:    "kube-proxy",
+			wantUser: user.KubeProxy,
+		},
+		{
+			name:     "node is dropped by the policy",
+			token:    "node1",
+			wantUser: nodeUser,
+		},
+		{
+			name:                 "alice impersonating kube-proxy is audited",
+			token:                "alice",
+			impersonate:          rest.ImpersonationConfig{UserName: user.KubeProxy},
+			wantUser:             "alice",
+			wantImpersonatedUser: user.KubeProxy,
+		},
+		{
+			name:                 "alice impersonating a node is audited",
+			token:                "alice",
+			impersonate:          rest.ImpersonationConfig{UserName: nodeUser, Groups: []string{user.NodesGroup}},
+			wantUser:             "alice",
+			wantImpersonatedUser: nodeUser,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			truncateAuditLog(t, auditLogFile)
+
+			clientConfig := rest.CopyConfig(kubeConfig)
+			clientConfig.BearerToken = tc.token
+			clientConfig.Impersonate = tc.impersonate
+			client := clientset.NewForConfigOrDie(clientConfig)
+			if _, err := client.CoreV1().Services(metav1.NamespaceAll).List(ctx, metav1.ListOptions{}); err != nil {
+				t.Fatalf("failed to list services: %v", err)
+			}
+
+			var got []testutils.AuditEvent
+			for _, event := range getAuditEvents(t, auditLogFile) {
+				if event.User == tc.wantUser && event.Verb == "list" && event.Resource == "services" {
+					got = append(got, event)
+				}
+			}
+
+			if len(tc.wantImpersonatedUser) == 0 {
+				if len(got) != 0 {
+					t.Fatalf("expected the policy to drop requests from %q, got %d audit event(s): %v", tc.wantUser, len(got), got)
+				}
+				return
+			}
+			if len(got) != 1 {
+				t.Fatalf("expected 1 audit event from %q, got %d: %v", tc.wantUser, len(got), got)
+			}
+			if got[0].ImpersonatedUser != tc.wantImpersonatedUser {
+				t.Errorf("expected impersonated user %q, got %q", tc.wantImpersonatedUser, got[0].ImpersonatedUser)
+			}
+		})
+	}
+}
+
 // TestConstrainedImpersonation tests the constrained impersonation feature.
 // It ensures that users can only perform actions on behalf of other users
 // if they have the appropriate permissions.
