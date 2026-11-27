@@ -19,137 +19,96 @@ limitations under the License.
 package main
 
 import (
-	"bufio"
-	"bytes"
-	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"go/types"
+	"io/fs"
 	"os"
-	"regexp"
-
-	"github.com/spf13/cobra"
+	"path/filepath"
+	"strings"
 )
 
-const (
-	// e.g. framework.ConformanceIt("should provide secure master service", func(ctx context.Context) {
-	patternStartConformance = `framework.ConformanceIt\(.*, func\(\) {$`
-	patternEndConformance   = `}\)$`
-	patternSkip             = `e2eskipper.Skip.*\(`
-)
+func isConformance(name string) bool { return name == "framework.ConformanceIt" }
 
-// This function checks the requirement: it works for all providers (e.g., no SkipIfProviderIs/SkipUnlessProviderIs calls)
-func checkAllProviders(e2eFile string) error {
-	checkFailed := false
-	inConformanceCode := false
-
-	regStartConformance := regexp.MustCompile(patternStartConformance)
-	regEndConformance := regexp.MustCompile(patternEndConformance)
-	regSkip := regexp.MustCompile(patternSkip)
-
-	fileInput, err := os.ReadFile(e2eFile)
-	if err != nil {
-		return fmt.Errorf("Failed to read file %s: %w", e2eFile, err)
+func isSkip(name string) bool {
+	// [LinuxOnly] tests may skip on Windows nodes.
+	if name == "e2eskipper.SkipIfNodeOSDistroIs" {
+		return false
 	}
-	scanner := bufio.NewScanner(bytes.NewReader(fileInput))
-	scanner.Split(bufio.ScanLines)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if regStartConformance.MatchString(line) {
-			if inConformanceCode {
-				return errors.New("Missed the end of previous conformance test. There might be a bug in this script.")
-			}
-			inConformanceCode = true
-		}
-		if inConformanceCode {
-			if regSkip.MatchString(line) {
-				// To list all invalid places in a single operation of this tool, here doesn't return error and continues checking.
-				fmt.Fprintf(os.Stderr, "%v: Conformance test should not call any e2eskipper.Skip*()\n", e2eFile)
-				checkFailed = true
-			}
-			if regEndConformance.MatchString(line) {
-				inConformanceCode = false
-			}
-		}
-	}
-	if inConformanceCode {
-		return errors.New("Missed the end of previous conformance test. There might be a bug in this script.")
-	}
-	if checkFailed {
-		return errors.New("We need to fix the above errors.")
-	}
-	return nil
+	return name == "ginkgo.Skip" || strings.HasPrefix(name, "e2eskipper.Skip")
 }
 
-func processFile(e2ePath string) error {
-	regGoFile := regexp.MustCompile(`.*\.go`)
-
-	files, err := os.ReadDir(e2ePath)
-	if err != nil {
-		return fmt.Errorf("Failed to read dir %s: %w", e2ePath, err)
-	}
-	for _, file := range files {
-		if file.IsDir() {
-			continue
+// find returns the calls under n to functions that match.
+func find(n ast.Node, match func(name string) bool) []token.Pos {
+	var found []token.Pos
+	ast.Inspect(n, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok && match(types.ExprString(call.Fun)) {
+			found = append(found, call.Pos())
 		}
-		if !regGoFile.MatchString(file.Name()) {
-			continue
-		}
-		e2eFile := fmt.Sprintf("%s/%s", e2ePath, file.Name())
-		err = checkAllProviders(e2eFile)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+		return true
+	})
+	return found
 }
 
-func processDir(e2ePath string) error {
-	err := processFile(e2ePath)
-	if err != nil {
-		return err
-	}
-
-	// Search sub directories if exist
-	files, err := os.ReadDir(e2ePath)
-	if err != nil {
-		return fmt.Errorf("Failed to read dir %s: %w", e2ePath, err)
-	}
-	for _, file := range files {
-		if !file.IsDir() {
-			continue
+// checkFile checks the requirement: it works for all providers (e.g., no SkipIfProviderIs/SkipUnlessProviderIs calls).
+// It returns the skip calls in conformance tests and in the BeforeEach nodes that run before them.
+func checkFile(file *ast.File) []token.Pos {
+	var skips []token.Pos
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) == 0 {
+			return true
 		}
-		err = processDir(fmt.Sprintf("%s/%s", e2ePath, file.Name()))
-		if err != nil {
-			return err
+		fn, ok := call.Args[len(call.Args)-1].(*ast.FuncLit)
+		if !ok {
+			return true
 		}
-	}
-	return nil
-}
-
-func newCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "check_conformance_test_requirements [e2e-test-path]",
-		Short: "Check conformance test code follows the requirements",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 1 {
-				cmd.Help()
-				os.Exit(1)
+		if isConformance(types.ExprString(call.Fun)) {
+			skips = append(skips, find(fn, isSkip)...)
+			return false
+		}
+		// Any other call that takes a function may be a container.
+		if len(find(fn, isConformance)) == 0 {
+			return false
+		}
+		for _, stmt := range fn.Body.List {
+			if expr, ok := stmt.(*ast.ExprStmt); ok && strings.HasPrefix(types.ExprString(expr.X), "ginkgo.BeforeEach(") {
+				skips = append(skips, find(expr, isSkip)...)
 			}
-			e2eRootPath := args[0]
-			err := processDir(e2eRootPath)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
-			}
-			os.Exit(0)
-		},
-	}
-	return cmd
+		}
+		return true
+	})
+	return skips
 }
 
 func main() {
-	command := newCommand()
-	if err := command.Execute(); err != nil {
+	if len(os.Args) != 2 {
+		fmt.Fprintln(os.Stderr, "Usage: check_conformance_test_requirements [e2e-test-path]")
+		os.Exit(1)
+	}
+	failed := false
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(os.Args[1], func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return err
+		}
+		file, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		for _, pos := range checkFile(file) {
+			fmt.Fprintf(os.Stderr, "%v: Conformance test should not call any e2eskipper.Skip*()\n", fset.Position(pos))
+			failed = true
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	if failed {
 		os.Exit(1)
 	}
 }
