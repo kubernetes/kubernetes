@@ -71,17 +71,17 @@ var _ = SIGDescribe("Probe Stress", framework.WithSerial(), func() {
 	})
 })
 
-// runProbeStressTest creates a pod with many containers, waits for them to be running,
-// and verifies that none of the containers have restarted unexpectedly.
+// runProbeStressTest creates a pod with many containers, waits for the pod to be
+// running, and verifies that none of the containers restart or terminate unexpectedly.
 func runProbeStressTest(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s with %d containers", pod.Name, len(pod.Spec.Containers)))
 	pod = e2epod.NewPodClient(f).Create(ctx, pod)
 
-	ginkgo.By("Waiting for all containers to be running")
+	ginkgo.By("Waiting for the pod to be running")
 	err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 	framework.ExpectNoError(err, "Failed to start pod")
 
-	ginkgo.By("Verifying no containers restarted")
+	ginkgo.By("Verifying no containers restart or terminate")
 	gomega.Consistently(ctx, func(ctx context.Context) error {
 		updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
@@ -91,11 +91,30 @@ func runProbeStressTest(ctx context.Context, f *framework.Framework, pod *v1.Pod
 			if containerStatus.RestartCount > 0 {
 				return fmt.Errorf("container %s restarted %d times", containerStatus.Name, containerStatus.RestartCount)
 			}
+			// The pod uses RestartPolicy Never, so a failed liveness probe kills
+			// the container without incrementing RestartCount; a Terminated state
+			// is the signal for a probe-induced kill. Waiting states and missing
+			// statuses are tolerated here as transient.
+			if containerStatus.State.Terminated != nil {
+				return fmt.Errorf("container %s terminated: reason=%s, exitCode=%d", containerStatus.Name, containerStatus.State.Terminated.Reason, containerStatus.State.Terminated.ExitCode)
+			}
 		}
 		return nil
 	}, probeStressWaitTime, 1*time.Second).Should(gomega.Succeed())
 
-	ginkgo.By("Test passed: no unexpected container restarts")
+	// The Consistently loop above tolerates Waiting states and missing statuses
+	// as transient, so a container that never started would not fail it. Do a
+	// final one-time check that every container is actually Running, otherwise a
+	// pod stuck in Waiting for the whole window could pass without ever being probed.
+	ginkgo.By("Verifying all containers are running after the stress window")
+	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get pod after stress window")
+	gomega.Expect(updatedPod.Status.ContainerStatuses).To(gomega.HaveLen(len(pod.Spec.Containers)))
+	for _, containerStatus := range updatedPod.Status.ContainerStatuses {
+		gomega.Expect(containerStatus.State.Running).NotTo(gomega.BeNil(), "container %s never started: %+v", containerStatus.Name, containerStatus.State)
+	}
+
+	ginkgo.By("Test passed: no unexpected container restarts or terminations")
 }
 
 func createPodWithHTTPProbes(numContainers int) *v1.Pod {
@@ -114,7 +133,7 @@ func createPodWithHTTPProbes(numContainers int) *v1.Pod {
 			FailureThreshold: 3,
 		}
 		ports := []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolTCP}}
-		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port)}
+		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port), "--udp-port=-1"}
 		return probe, ports, args
 	})
 }
@@ -134,7 +153,7 @@ func createPodWithTCPProbes(numContainers int) *v1.Pod {
 			FailureThreshold: 3,
 		}
 		ports := []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolTCP}}
-		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port)}
+		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port), "--udp-port=-1"}
 		return probe, ports, args
 	})
 }
@@ -154,7 +173,7 @@ func createPodWithGRPCProbes(numContainers int) *v1.Pod {
 			FailureThreshold: 3,
 		}
 		ports := []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolTCP}}
-		args := []string{"grpc-health-checking", fmt.Sprintf("--port=%d", port)}
+		args := []string{"grpc-health-checking", fmt.Sprintf("--port=%d", port), fmt.Sprintf("--http-port=%d", 9000+i)}
 		return probe, ports, args
 	})
 }
