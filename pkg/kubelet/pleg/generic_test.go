@@ -890,7 +890,7 @@ func TestRequestRelistQueueFullIncrementsDroppedMetric(t *testing.T) {
 
 	after, err := testutil.GetCounterMetricValue(metrics.PLEGRelistRequestsDropped)
 	require.NoError(t, err)
-	assert.Equal(t, before+1, after)
+	assert.InDelta(t, before+1, after, 0.0001)
 }
 
 func TestWorkerLoop(t *testing.T) {
