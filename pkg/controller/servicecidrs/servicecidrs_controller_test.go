@@ -18,6 +18,7 @@ package servicecidrs
 
 import (
 	"context"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -277,6 +278,13 @@ func makeIPAddress(name string) *networkingapiv1.IPAddress {
 	}
 }
 
+// deleting marks a ServiceCIDR as being deleted, in place.
+func deleting(cidr *networkingapiv1.ServiceCIDR) *networkingapiv1.ServiceCIDR {
+	now := metav1.Now()
+	cidr.DeletionTimestamp = &now
+	return cidr
+}
+
 func expectAction(t *testing.T, actions []k8stesting.Action, expected [][]string) {
 	t.Helper()
 	if len(actions) != len(expected) {
@@ -423,9 +431,79 @@ func TestController_canDeleteCIDR(t *testing.T) {
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			want:       true,
 		},
+		{
+			name: "CIDR with same range overlapping being deleted and IPs",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+				deleting(makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64")),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.0.23"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			want:       false,
+		},
+		{
+			name: "CIDR with smaller range overlapping being deleted and IPs",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+				deleting(makeServiceCIDR("overlapping", "192.168.0.0/26", "2001:db2::/64")),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.0.23"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			want:       false,
+		},
+		{
+			name: "CIDR with larger range overlapping being deleted and IPs",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+				deleting(makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/64")),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.0.23"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			want:       false,
+		},
+		{
+			name: "CIDR with larger range overlapping being deleted and no IPs",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+				deleting(makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/64")),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.1.23"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			want:       true,
+		},
+		{
+			// The overlapping ServiceCIDR covers the IP address, but it is
+			// that subnet's broadcast address, so it can not be allocated
+			// from there and the IPAddress would be orphan.
+			name: "CIDR with smaller range overlapping and an IP that is the broadcast address of that smaller range",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/16", ""),
+				makeServiceCIDR("overlapping", "192.168.1.0/24", ""),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.1.255"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/16", ""),
+			want:       false,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			// canDeleteCIDR is only called for ServiceCIDRs being deleted.
+			deleting(tc.cidrSynced)
+			for _, cidr := range tc.cidrs {
+				if cidr.Name == tc.cidrSynced.Name {
+					deleting(cidr)
+				}
+			}
 			tCtx := ktesting.Init(t)
 			_, controller := newController(tCtx, t, tc.cidrs, tc.ips)
 			got, err := controller.canDeleteCIDR(tCtx, tc.cidrSynced)
@@ -437,6 +515,269 @@ func TestController_canDeleteCIDR(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestController_anyServiceCIDRContainsPrefix(t *testing.T) {
+	tests := []struct {
+		name   string
+		cidrs  []*networkingapiv1.ServiceCIDR
+		prefix string
+		want   bool
+	}{
+		{
+			name:   "no ServiceCIDRs",
+			prefix: "192.168.0.0/24",
+			want:   false,
+		}, {
+			name: "same subnet",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			prefix: "192.168.0.0/24",
+			want:   true,
+		}, {
+			name: "larger subnet",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("larger", "192.168.0.0/16", ""),
+			},
+			prefix: "192.168.0.0/24",
+			want:   true,
+		}, {
+			name: "smaller subnet does not contain it",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("smaller", "192.168.0.0/26", ""),
+			},
+			prefix: "192.168.0.0/24",
+			want:   false,
+		}, {
+			name: "unrelated subnet",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("unrelated", "10.0.0.0/8", ""),
+			},
+			prefix: "192.168.0.0/24",
+			want:   false,
+		}, {
+			name: "other IP family",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("ipv6", "2001:db2::/64", ""),
+			},
+			prefix: "192.168.0.0/24",
+			want:   false,
+		}, {
+			name: "secondary CIDR counts",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("dual", "192.168.0.0/24", "2001:db2::/64"),
+			},
+			prefix: "2001:db2::/96",
+			want:   true,
+		}, {
+			// The reason for this helper: a ServiceCIDR being deleted can not
+			// keep IP addresses alive, so it must not count as a parent.
+			name: "only a ServiceCIDR being deleted contains it",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				deleting(makeServiceCIDR("larger", "192.168.0.0/16", "")),
+			},
+			prefix: "192.168.0.0/24",
+			want:   false,
+		}, {
+			name: "one ServiceCIDR being deleted and one active contain it",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				deleting(makeServiceCIDR("larger", "192.168.0.0/16", "")),
+				makeServiceCIDR("active", "192.168.0.0/20", ""),
+			},
+			prefix: "192.168.0.0/24",
+			want:   true,
+		}, {
+			// Containment here is only about the subnets, so unlike
+			// anyServiceCIDRContainsAddress the network and broadcast
+			// addresses are not special.
+			name: "host prefix of a usable address",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			prefix: "192.168.0.1/32",
+			want:   true,
+		}, {
+			name: "host prefix of the network address",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			prefix: "192.168.0.0/32",
+			want:   true,
+		}, {
+			name: "host prefix of the broadcast address",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			prefix: "192.168.0.255/32",
+			want:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, controller := newController(tCtx, t, tt.cidrs, nil)
+			prefix, err := netip.ParsePrefix(tt.prefix)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := controller.anyServiceCIDRContainsPrefix(prefix); got != tt.want {
+				t.Errorf("Controller.anyServiceCIDRContainsPrefix(%s) = %v, want %v", tt.prefix, got, tt.want)
+			}
+		})
+	}
+
+	// canDeleteCIDR ignores the error from netip.ParsePrefix because the CIDRs
+	// are validated, so the zero netip.Prefix is the fallback if that ever
+	// stopped being true. It must not look like it has a parent.
+	t.Run("zero prefix", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		_, controller := newController(tCtx, t, []*networkingapiv1.ServiceCIDR{
+			makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+		}, nil)
+		if controller.anyServiceCIDRContainsPrefix(netip.Prefix{}) {
+			t.Error("Controller.anyServiceCIDRContainsPrefix(netip.Prefix{}) = true, want false")
+		}
+	})
+}
+
+func TestController_anyServiceCIDRContainsAddress(t *testing.T) {
+	tests := []struct {
+		name    string
+		cidrs   []*networkingapiv1.ServiceCIDR
+		address string
+		want    bool
+	}{
+		{
+			name:    "no ServiceCIDRs",
+			address: "192.168.0.1",
+			want:    false,
+		}, {
+			name: "contained",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			address: "192.168.0.1",
+			want:    true,
+		}, {
+			name: "not contained",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			address: "192.168.1.1",
+			want:    false,
+		}, {
+			name: "other IP family",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("ipv6", "2001:db2::/64", ""),
+			},
+			address: "192.168.0.1",
+			want:    false,
+		}, {
+			name: "IPv6 contained",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			address: "2001:db2::1",
+			want:    true,
+		}, {
+			// The network and broadcast addresses are the reason this is not
+			// anyServiceCIDRContainsPrefix with a /32 or /128: the allocator
+			// never hands them out, so a ServiceCIDR covering them does not
+			// keep an IPAddress with that name alive.
+			name: "IPv4 network address",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			address: "192.168.0.0",
+			want:    false,
+		}, {
+			name: "IPv4 broadcast address",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			address: "192.168.0.255",
+			want:    false,
+		}, {
+			name: "IPv6 network address",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			address: "2001:db2::",
+			want:    false,
+		}, {
+			// IPv6 has no broadcast address, so the last address is usable.
+			name: "IPv6 last address",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			},
+			address: "2001:db2::ffff:ffff:ffff:ffff",
+			want:    true,
+		}, {
+			name: "broadcast address of a smaller subnet, contained by a larger one",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("smaller", "192.168.0.0/26", ""),
+				makeServiceCIDR("larger", "192.168.0.0/24", ""),
+			},
+			address: "192.168.0.63",
+			want:    true,
+		}, {
+			name: "broadcast address of the only subnet",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("smaller", "192.168.0.0/26", ""),
+			},
+			address: "192.168.0.63",
+			want:    false,
+		}, {
+			// An IPv4 /31 holds only a network and a broadcast address.
+			name: "IPv4 /31 has no usable address",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR("tiny", "192.168.0.0/31", ""),
+			},
+			address: "192.168.0.1",
+			want:    false,
+		}, {
+			name: "only a ServiceCIDR being deleted contains it",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				deleting(makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64")),
+			},
+			address: "192.168.0.1",
+			want:    false,
+		}, {
+			name: "one ServiceCIDR being deleted and one active contain it",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				deleting(makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64")),
+				makeServiceCIDR("active", "192.168.0.0/16", ""),
+			},
+			address: "192.168.0.1",
+			want:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, controller := newController(tCtx, t, tt.cidrs, nil)
+			address, err := netip.ParseAddr(tt.address)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := controller.anyServiceCIDRContainsAddress(address); got != tt.want {
+				t.Errorf("Controller.anyServiceCIDRContainsAddress(%s) = %v, want %v", tt.address, got, tt.want)
+			}
+		})
+	}
+
+	// Same for the IPAddress name: the zero netip.Addr is the fallback if an
+	// invalid name ever reached here, and it must not look contained.
+	t.Run("zero address", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		_, controller := newController(tCtx, t, []*networkingapiv1.ServiceCIDR{
+			makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+		}, nil)
+		if controller.anyServiceCIDRContainsAddress(netip.Addr{}) {
+			t.Error("Controller.anyServiceCIDRContainsAddress(netip.Addr{}) = true, want false")
+		}
+	})
 }
 
 func TestController_ipToCidrs(t *testing.T) {
