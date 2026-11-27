@@ -622,9 +622,10 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 			config.DialEchoFromTestContainer(ctx, "udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, message)
 		})
 
-		// if the endpoints pods use hostNetwork, several tests can't run in parallel
-		// because the pods will try to acquire the same port in the host.
-		// We run the test in serial, to avoid port conflicts.
+		// The endpoint pods run with hostNetwork, so their listeners bind in the
+		// node's network namespace rather than one of their own. setEndpointPorts
+		// gives each parallel process its own endpoint ports, so this test can run
+		// alongside the others without them answering each other's dials.
 		ginkgo.It("should function for service endpoints using hostNetwork", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork, e2enetwork.EndpointsUseHostNetwork)
 
