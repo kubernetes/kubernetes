@@ -55,6 +55,9 @@ Why do we need this?
     based on the time it was created. The timestamp follows the format "20060102-150405".
     For example, a backup created on June 2, 2006, at 3:04:05 PM would include this timestamp.
     * `<file-extension>`: The original file’s extension (e.g., .log) remains unchanged.
+    * `.N`: A counter inserted before the extension when a backup with that name
+    already exists, which happens when the log rotates more than once within the
+    same second. For example, `app-20060102-150405.1.log`.
   This naming convention ensures easy organization and retrieval of rotated log files based on their creation time.
 
 - -log-file-age
@@ -97,6 +100,12 @@ The kube-log-runner then ensures that we run the
 `/usr/local/bin/kube-apiserver` with the specified parameters and redirect both
 stdout and stderr ONLY to the log file specified. It will always append to the
 log file.
+
+If writing to the log file fails, for example because the filesystem is full,
+kube-log-runner reports the failure once on its own stderr, drops the affected
+output and keeps the command running. Killing the command because its log file
+cannot be written would also stop it from doing the work that frees the
+filesystem.
 
 Possible invocations:
 ```bash
