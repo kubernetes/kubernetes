@@ -19,6 +19,7 @@ package podgc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -26,8 +27,10 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -647,6 +650,7 @@ func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "testPod",
+					UID:       "test-uid",
 				},
 				Spec: v1.PodSpec{
 					NodeName: "deletedNode",
@@ -665,6 +669,7 @@ func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "testPod",
+					UID:       "test-uid",
 				},
 				Spec: v1.PodSpec{
 					NodeName: "deletedNode",
@@ -686,8 +691,11 @@ func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 				},
 			},
 			expectedDeleteAction: &clienttesting.DeleteActionImpl{
-				Name:          "testPod",
-				DeleteOptions: metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)},
+				Name: "testPod",
+				DeleteOptions: metav1.DeleteOptions{
+					GracePeriodSeconds: ptr.To[int64](0),
+					Preconditions:      metav1.NewUIDPreconditions("test-uid"),
+				},
 			},
 		},
 	}
@@ -752,6 +760,38 @@ func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestGCDoesNotDeleteReplacementPod covers a pod that is replaced by a new pod
+// with the same name after PodGC read it from the informer cache, as happens
+// with StatefulSet pods.
+func TestGCDoesNotDeleteReplacementPod(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	cached := makePod("web-0", "deleted-node", v1.PodSucceeded)
+	cached.UID = "old-uid"
+	replacement := makePod("web-0", "node", v1.PodRunning)
+	replacement.UID = "new-uid"
+	client := setupNewSimpleClient(nil, []*v1.Pod{replacement})
+	// The fake object tracker ignores preconditions; enforce them the way the
+	// apiserver does.
+	client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		preconditions := action.(clienttesting.DeleteAction).GetDeleteOptions().Preconditions
+		if preconditions != nil && preconditions.UID != nil && *preconditions.UID != replacement.UID {
+			return true, nil, apierrors.NewConflict(action.GetResource().GroupResource(), replacement.Name, fmt.Errorf("UID precondition failed"))
+		}
+		return false, nil, nil
+	})
+
+	gcc, podInformer, _ := NewFromClient(ctx, client, -1)
+	gcc.quarantineTime = time.Duration(-1)
+	if err := podInformer.Informer().GetStore().Add(cached); err != nil {
+		t.Fatalf("Failed to add pod: %v", err)
+	}
+	gcc.gc(ctx)
+
+	if _, err := client.CoreV1().Pods(replacement.Namespace).Get(ctx, replacement.Name, metav1.GetOptions{}); err != nil {
+		t.Errorf("Replacement pod was deleted: %v", err)
 	}
 }
 
