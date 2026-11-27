@@ -77,6 +77,168 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
+// downwardAPISpec returns a downwardAPI volume spec projecting the pod name to
+// each of the given file paths.
+func downwardAPISpec(volName string, paths ...string) *v1.Volume {
+	mode := int32(0644)
+	var items []v1.DownwardAPIVolumeFile
+	for _, path := range paths {
+		items = append(items, v1.DownwardAPIVolumeFile{Path: path, FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.name"}})
+	}
+	return &v1.Volume{
+		Name: volName,
+		DownwardAPI: &v1.DownwardAPIVolumeSource{
+			DefaultMode: &mode,
+			Items:       items,
+		},
+	}
+}
+
+// TestSetUpWriteFailureDoesNotTearDownPopulatedVolume is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/113242. Once a volume has been
+// successfully populated, its directory is bind-mounted into the running
+// container; a subsequent SetUp that fails to write (e.g. a resync that cannot
+// write because the disk is full) must NOT tear that directory down, because
+// removing it breaks the bind mount and leaves the volume permanently empty with
+// no automatic recovery. Two failure points are exercised deterministically: an
+// invalid item path ("..evil"), which the atomic writer rejects before staging
+// anything, and a file/directory collision between item paths, which fails part
+// way through writing the new timestamp directory, as a full disk would.
+func TestSetUpWriteFailureDoesNotTearDownPopulatedVolume(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
+	tests := []struct {
+		name     string
+		badPaths []string
+	}{
+		{
+			name:     "invalid payload",
+			badPaths: []string{"..evil"},
+		},
+		{
+			// Either iteration order writes one entry before hitting the
+			// file/directory collision, leaving a partially written generation.
+			name:     "partial write",
+			badPaths: []string{"new", "new/child"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testVolumeName := "test_volume_name"
+			client := fake.NewSimpleClientset()
+			pluginMgr := volume.VolumePluginMgr{}
+			tempDir, host := newTestHost(t, client)
+			defer func() { _ = os.RemoveAll(tempDir) }()
+			if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+				t.Fatal(err)
+			}
+
+			plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+			if err != nil {
+				t.Fatal("Can't find the plugin by name")
+			}
+			pod := &v1.Pod{Name: testName, Namespace: testNamespace, UID: testPodUID}
+
+			// Populate the volume successfully so it becomes "already populated" (..data exists).
+			goodMounter, err := plugin.NewMounter(volume.NewSpecFromVolume(downwardAPISpec(testVolumeName, "name")), pod)
+			if err != nil {
+				t.Fatalf("Failed to make a new Mounter: %v", err)
+			}
+			volumePath := goodMounter.GetPath()
+			if err := goodMounter.SetUp(volume.MounterArgs{}); err != nil {
+				t.Fatalf("initial SetUp failed: %v", err)
+			}
+			if !util.IsTargetPopulated(volumePath) {
+				t.Fatalf("expected volume %q to be populated after initial SetUp", volumePath)
+			}
+			before := dirEntryNames(t, volumePath)
+
+			// A mounter for the same volume name targets the same directory; projecting the
+			// bad item paths forces writer.Write to fail on this already-populated volume.
+			badMounter, err := plugin.NewMounter(volume.NewSpecFromVolume(downwardAPISpec(testVolumeName, tc.badPaths...)), pod)
+			if err != nil {
+				t.Fatalf("Failed to make a new Mounter: %v", err)
+			}
+			if badMounter.GetPath() != volumePath {
+				t.Fatalf("expected same target dir, got %q vs %q", badMounter.GetPath(), volumePath)
+			}
+			if err := badMounter.SetUp(volume.MounterArgs{}); err == nil {
+				t.Fatal("expected SetUp to fail on bad item paths, but it succeeded")
+			}
+
+			// The failed resync must not have torn the volume down.
+			if _, err := os.Stat(volumePath); err != nil {
+				t.Fatalf("volume dir was removed after a failed resync (regression of #113242): %v", err)
+			}
+			if !util.IsTargetPopulated(volumePath) {
+				t.Fatal("volume data dir (..data) was removed after a failed resync (regression of #113242)")
+			}
+			// The original, valid content must still be present, and the failed
+			// write must not have left a partially written generation behind.
+			if _, err := os.Stat(filepath.Join(volumePath, "name")); err != nil {
+				t.Fatalf("original volume content was lost after a failed resync (regression of #113242): %v", err)
+			}
+			if after := dirEntryNames(t, volumePath); !reflect.DeepEqual(before, after) {
+				t.Fatalf("volume dir entries changed after a failed resync: before %v, after %v", before, after)
+			}
+		})
+	}
+}
+
+func dirEntryNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names
+}
+
+// TestSetUpFirstTimeWriteFailureCleansUp is the complement of the test above: it
+// pins the original cleanup behavior that must be preserved. When the *first* setup
+// of a volume fails (the volume was never populated, so nothing is bind-mounted into
+// a container yet), the half-created directory MUST be torn down. This guards against
+// an over-broad fix that suppresses cleanup unconditionally.
+func TestSetUpFirstTimeWriteFailureCleansUp(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
+	client := fake.NewSimpleClientset()
+	pluginMgr := volume.VolumePluginMgr{}
+	tempDir, host := newTestHost(t, client)
+	defer func() { _ = os.RemoveAll(tempDir) }()
+	if err := pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host); err != nil {
+		t.Fatal(err)
+	}
+
+	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
+	if err != nil {
+		t.Fatal("Can't find the plugin by name")
+	}
+	pod := &v1.Pod{Name: testName, Namespace: testNamespace, UID: testPodUID}
+
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(downwardAPISpec("test_volume_name", "..evil")), pod)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mounter: %v", err)
+	}
+	volumePath := mounter.GetPath()
+	if err := mounter.SetUp(volume.MounterArgs{}); err == nil {
+		t.Fatal("expected first-time SetUp to fail on invalid item path, but it succeeded")
+	}
+
+	// Never populated, so the failed first-time setup must have been cleaned up.
+	if _, err := os.Stat(volumePath); !os.IsNotExist(err) {
+		t.Fatalf("expected volume dir to be torn down after a failed first-time setup, stat err = %v", err)
+	}
+}
+
 func TestDownwardAPI(t *testing.T) {
 	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
 	if runtime.GOOS == "windows" {
