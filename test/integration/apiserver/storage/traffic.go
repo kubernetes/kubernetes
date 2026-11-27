@@ -610,7 +610,7 @@ func storageKey(key types.NamespacedName) string {
 }
 
 func randomUpdate(key types.NamespacedName, noOp, validateUpdate bool) storage.UpdateFunc {
-	version := strconv.Itoa(rand.Intn(10000))
+	version := strconv.Itoa(rand.Intn(2))
 	nodeName := nodeNames[rand.Intn(len(nodeNames))]
 	appLabel := appLabels[rand.Intn(len(appLabels))]
 	rejectedNode := nodeNames[rand.Intn(len(nodeNames))]
