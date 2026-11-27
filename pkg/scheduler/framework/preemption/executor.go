@@ -248,7 +248,8 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		}
 		victimPods = append(victimPods, victim)
 	}
-	if len(victimPods) == 0 {
+	// Nominations still need clearing even if every victim is already terminating.
+	if len(victimPods) == 0 && len(c.Nodes()) == 0 {
 		cancel()
 		return
 	}
@@ -291,13 +292,29 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result, operation).Inc()
 		}()
 		defer func() {
-			if result == metrics.GoroutineResultError || !willProduceDeletionEvent || needsActivation {
-				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
-				// Pods may get stuck in the unschedulable pod pool in the worst case. The same holds when
-				// PreEnqueue blocked the preemptor until AssumeVictim completed: the event which would have
-				// requeued the preemptor may have been consumed while it was blocked.
-				e.fh.Activate(logger, preemptor.Pods())
+			// When API call isn't successful or no victim deletion event will be produced, the preemptor's
+			// Pods may get stuck in the unschedulable pod pool in the worst case. The same holds when
+			// PreEnqueue blocked the preemptor until AssumeVictim completed: the event which would have
+			// requeued the preemptor may have been consumed while it was blocked.
+			if result != metrics.GoroutineResultError && willProduceDeletionEvent && !needsActivation {
+				return
 			}
+			if result != metrics.GoroutineResultError && !needsActivation && len(victimPods) == 0 {
+				// Compensate for deletion events missed during cleanup only if no victim
+				// remains to emit a deletion event after the preempting state is cleared.
+				for _, victim := range c.Victims().Pods {
+					pod, err := e.podLister.Pods(victim.Namespace).Get(victim.Name)
+					if err != nil && !apierrors.IsNotFound(err) {
+						utilruntime.HandleErrorWithContext(ctx, err, "Failed to check whether a terminating victim still exists", "victim", klog.KObj(victim))
+						result = metrics.GoroutineResultError
+						break
+					}
+					if err == nil && pod.UID == victim.UID {
+						return
+					}
+				}
+			}
+			e.fh.Activate(logger, preemptor.Pods())
 		}()
 		defer cancel()
 		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(preemptor), "node", c.Name(), "numVictims", len(c.Victims().Pods), "numVictimsToDelete", len(victimPods))
@@ -313,7 +330,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			// We do not return as this error is not critical.
 		}
 
-		preemptLastVictim := true
+		preemptLastVictim := len(victimPods) > 0
 		if len(victimPods) > 1 {
 			// In order to prevent requesting preemption of the same pod multiple times for the same preemptor,
 			// preemptor is marked as "waiting for preemption of a victim" (by adding it to preempting map).
@@ -438,16 +455,26 @@ func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandida
 
 // IsPodGroupWaitingForVictims returns true if previously preempted victims on the
 // pod group's nominated nodes are still terminating in the current snapshot.
-func (e *Executor) IsPodGroupWaitingForVictims(pgInfo fwk.PodGroupInfo) bool {
+// The nominations and scheduled members must also satisfy the scheduling policy
+// of the pod group and its children.
+func (e *Executor) IsPodGroupWaitingForVictims(ctx context.Context, pgInfo fwk.PodGroupInfo) bool {
 	nominatedNodes := sets.New[string]()
 	for _, pod := range pgInfo.GetAllUnscheduledPods() {
 		if len(pod.Status.NominatedNodeName) > 0 {
 			nominatedNodes.Insert(pod.Status.NominatedNodeName)
 		}
 	}
+	if len(nominatedNodes) == 0 {
+		return false
+	}
+
+	snapshot := e.fh.SnapshotSharedLister()
+	if !podGroupNominationsSatisfyMinCount(ctx, pgInfo, snapshot.PodGroupStates()) {
+		return false
+	}
 
 	preemptorPriority := pgInfo.GetPriority()
-	nodeLister := e.fh.SnapshotSharedLister().NodeInfos()
+	nodeLister := snapshot.NodeInfos()
 	for nomNodeName := range nominatedNodes {
 		nodeInfo, err := nodeLister.Get(nomNodeName)
 		if err != nil || nodeInfo == nil {
@@ -461,6 +488,34 @@ func (e *Executor) IsPodGroupWaitingForVictims(pgInfo fwk.PodGroupInfo) bool {
 	}
 
 	return false
+}
+
+func podGroupNominationsSatisfyMinCount(ctx context.Context, pgInfo fwk.PodGroupInfo, pgStates fwk.PodGroupStateLister) bool {
+	if pgInfo.GetType() == fwk.CompositePodGroupKeyType {
+		eligibleChildren := 0
+		for _, child := range pgInfo.GetChildren() {
+			if podGroupNominationsSatisfyMinCount(ctx, child, pgStates) {
+				eligibleChildren++
+			}
+		}
+		return eligibleChildren >= pgInfo.GetMinCount()
+	}
+
+	nominatedPods := 0
+	for _, pod := range pgInfo.GetAllUnscheduledPods() {
+		if len(pod.Status.NominatedNodeName) > 0 {
+			nominatedPods++
+		}
+	}
+	if nominatedPods >= pgInfo.GetMinCount() {
+		return true
+	}
+	pgState, err := pgStates.Get(pgInfo.GetNamespace(), pgInfo.GetName())
+	if err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to get pod group state while checking for terminating victims", "podGroup", klog.KRef(pgInfo.GetNamespace(), pgInfo.GetName()))
+		return false
+	}
+	return nominatedPods+pgState.ScheduledPodsCount() >= pgInfo.GetMinCount()
 }
 
 // IsPodRunningPreemption returns true if the pod is currently triggering preemption asynchronously.
