@@ -73808,8 +73808,16 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
 						},
 					},
+					"ConcurrentNodeLifecycleSyncs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConcurrentNodeLifecycleSyncs is the number of workers that concurrently reconcile the NoSchedule taints and the labels of nodes in NodeLifecycleController.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
-				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold", "NodeMonitorPeriod"},
+				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold", "NodeMonitorPeriod", "ConcurrentNodeLifecycleSyncs"},
 			},
 		},
 		Dependencies: []string{

@@ -42,4 +42,7 @@ type NodeLifecycleControllerConfiguration struct {
 	UnhealthyZoneThreshold float32
 	// NodeMonitorPeriod is the period for syncing NodeStatus in NodeLifecycleController.
 	NodeMonitorPeriod metav1.Duration
+	// ConcurrentNodeLifecycleSyncs is the number of workers that concurrently
+	// reconcile the NoSchedule taints and the labels of nodes in NodeLifecycleController.
+	ConcurrentNodeLifecycleSyncs int32
 }

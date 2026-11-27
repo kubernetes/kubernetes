@@ -2219,7 +2219,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyWithWorkerSize(t *testing.T) {
 	table := []struct {
 		workers int
 	}{
-		{workers: 0}, // will default to scheduler.UpdateWorkerSize
+		{workers: 0}, // will default to monitorNodeHealthWorkerSize
 		{workers: 1},
 	}
 
@@ -2246,7 +2246,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyWithWorkerSize(t *testing.T) {
 		nodeController.recorder = testutil.NewFakeRecorder()
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 		if item.workers != 0 {
-			nodeController.nodeUpdateWorkerSize = item.workers
+			nodeController.monitorNodeHealthWorkerSize = item.workers
 		}
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -4176,14 +4176,24 @@ func TestNewNodeLifecycleControllerValidation(t *testing.T) {
 	}
 
 	cases := []struct {
-		name    string
-		mutate  func(t *testing.T, ctx context.Context, opts *ControllerOptions, factory informers.SharedInformerFactory)
-		wantErr bool
+		name           string
+		mutate         func(t *testing.T, ctx context.Context, opts *ControllerOptions, factory informers.SharedInformerFactory)
+		wantErr        bool
+		wantWorkerSize int
 	}{
 		{
-			name:    "valid options",
-			mutate:  func(_ *testing.T, _ context.Context, _ *ControllerOptions, _ informers.SharedInformerFactory) {},
-			wantErr: false,
+			name:           "valid options default worker size",
+			mutate:         func(_ *testing.T, _ context.Context, _ *ControllerOptions, _ informers.SharedInformerFactory) {},
+			wantErr:        false,
+			wantWorkerSize: defaultNodeUpdateQueueWorkerSize,
+		},
+		{
+			name: "explicit NodeUpdateQueueWorkerSize",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.NodeUpdateQueueWorkerSize = 32
+			},
+			wantErr:        false,
+			wantWorkerSize: 32,
 		},
 		{
 			name: "nil LeaseInformer",
@@ -4214,6 +4224,13 @@ func TestNewNodeLifecycleControllerValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "negative NodeUpdateQueueWorkerSize",
+			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, _ informers.SharedInformerFactory) {
+				opts.NodeUpdateQueueWorkerSize = -1
+			},
+			wantErr: true,
+		},
+		{
 			name: "stopped pod informer without nodeName indexer",
 			mutate: func(_ *testing.T, _ context.Context, opts *ControllerOptions, factory informers.SharedInformerFactory) {
 				_ = opts.PodInformer.Informer()
@@ -4233,9 +4250,12 @@ func TestNewNodeLifecycleControllerValidation(t *testing.T) {
 			opts, factory := validOpts(kubeClient)
 			tc.mutate(t, tCtx, &opts, factory)
 
-			_, err := NewNodeLifecycleController(tCtx, opts)
+			nc, err := NewNodeLifecycleController(tCtx, opts)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("NewNodeLifecycleController() error = %v, wantErr %v", err, tc.wantErr)
+			}
+			if !tc.wantErr && tc.wantWorkerSize != 0 && nc.nodeUpdateQueueWorkerSize != tc.wantWorkerSize {
+				t.Fatalf("nodeUpdateQueueWorkerSize = %d, want %d", nc.nodeUpdateQueueWorkerSize, tc.wantWorkerSize)
 			}
 		})
 	}

@@ -186,6 +186,7 @@ func newNodeLifecycleController(ctx context.Context, controllerContext Controlle
 		SecondaryEvictionLimiterQPS: controllerContext.ComponentConfig.NodeLifecycleController.SecondaryNodeEvictionRate,
 		LargeClusterThreshold:       controllerContext.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,
 		UnhealthyZoneThreshold:      controllerContext.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
+		NodeUpdateQueueWorkerSize:   int(controllerContext.ComponentConfig.NodeLifecycleController.ConcurrentNodeLifecycleSyncs),
 	})
 	if err != nil {
 		return nil, err

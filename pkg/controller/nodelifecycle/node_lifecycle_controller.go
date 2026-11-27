@@ -134,8 +134,10 @@ const (
 	// podUpdateWorkerSizes assumes that in most cases pod will be handled by monitorNodeHealth pass.
 	// Pod update workers will only handle lagging cache pods. 4 workers should be enough.
 	podUpdateWorkerSize = 4
-	// nodeUpdateWorkerSize defines the size of workers for node update or/and pod update.
-	nodeUpdateWorkerSize = 8
+	// monitorNodeHealthWorkerSize is the number of workers monitorNodeHealth uses to update node health.
+	monitorNodeHealthWorkerSize = 8
+	// defaultNodeUpdateQueueWorkerSize is the default number of workers that process nodeUpdateQueue.
+	defaultNodeUpdateQueueWorkerSize = 8
 )
 
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
@@ -295,9 +297,10 @@ type Controller struct {
 	//    value takes longer for user to see up-to-date node health.
 	nodeMonitorGracePeriod time.Duration
 
-	// Number of workers Controller uses to process node monitor health updates.
-	// Defaults to scheduler.UpdateWorkerSize.
-	nodeUpdateWorkerSize int
+	// Number of workers monitorNodeHealth uses to update node health.
+	monitorNodeHealthWorkerSize int
+	// Number of workers that process nodeUpdateQueue (NoSchedule taints and labels).
+	nodeUpdateQueueWorkerSize int
 
 	evictionLimiterQPS          float32
 	secondaryEvictionLimiterQPS float32
@@ -322,6 +325,7 @@ type ControllerOptions struct {
 	SecondaryEvictionLimiterQPS float32
 	LargeClusterThreshold       int32
 	UnhealthyZoneThreshold      float32
+	NodeUpdateQueueWorkerSize   int
 }
 
 func (o *ControllerOptions) validate() error {
@@ -338,6 +342,9 @@ func (o *ControllerOptions) validate() error {
 	if o.DaemonSetInformer == nil {
 		errs = append(errs, errors.New("DaemonSetInformer cannot be nil"))
 	}
+	if o.NodeUpdateQueueWorkerSize < 0 {
+		errs = append(errs, fmt.Errorf("NodeUpdateQueueWorkerSize cannot be negative, got %d", o.NodeUpdateQueueWorkerSize))
+	}
 	return errors.Join(errs...)
 }
 
@@ -350,6 +357,11 @@ func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*C
 	}
 	if err := opts.validate(); err != nil {
 		return nil, err
+	}
+
+	nodeUpdateQueueWorkerSize := opts.NodeUpdateQueueWorkerSize
+	if nodeUpdateQueueWorkerSize == 0 {
+		nodeUpdateQueueWorkerSize = defaultNodeUpdateQueueWorkerSize
 	}
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
@@ -365,7 +377,8 @@ func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*C
 		nodeMonitorPeriod:           opts.NodeMonitorPeriod,
 		nodeStartupGracePeriod:      opts.NodeStartupGracePeriod,
 		nodeMonitorGracePeriod:      opts.NodeMonitorGracePeriod,
-		nodeUpdateWorkerSize:        nodeUpdateWorkerSize,
+		monitorNodeHealthWorkerSize: monitorNodeHealthWorkerSize,
+		nodeUpdateQueueWorkerSize:   nodeUpdateQueueWorkerSize,
 		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
 		nodesToRetry:                sync.Map{},
 		zoneStates:                  make(map[string]ZoneState),
@@ -486,7 +499,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	}
 
 	// Start workers to reconcile labels and/or update NoSchedule taint for nodes.
-	for i := 0; i < nodeUpdateWorkerSize; i++ {
+	for i := 0; i < nc.nodeUpdateQueueWorkerSize; i++ {
 		// Thanks to "workqueue", each worker just need to get item from queue, because
 		// the item is flagged when got from queue: if new event come, the new item will
 		// be re-queued until "Done", so no more than one worker handle the same item and
@@ -793,7 +806,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	// can take a while if we're processing each node serially as well. So we
 	// process them with bounded concurrency instead, since most of the time is
 	// spent waiting on io.
-	workqueue.ParallelizeUntil(ctx, nc.nodeUpdateWorkerSize, len(nodes), updateNodeFunc)
+	workqueue.ParallelizeUntil(ctx, nc.monitorNodeHealthWorkerSize, len(nodes), updateNodeFunc)
 
 	nc.handleDisruption(ctx, zoneToNodeConditions, nodes)
 
