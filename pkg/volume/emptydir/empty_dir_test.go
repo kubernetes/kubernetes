@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -1500,5 +1501,77 @@ func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
 
 	if fileinfo.Mode().Perm() != perm.Perm() {
 		t.Errorf("expected default permissions %v when feature gate is disabled, got %v", perm.Perm(), fileinfo.Mode().Perm())
+	}
+}
+
+func TestTearDownUnmountsNestedMounts(t *testing.T) {
+	testCases := []struct {
+		name          string
+		medium        v1.StorageMedium
+		symlinkedRoot bool
+	}{
+		{name: "default medium", medium: v1.StorageMediumDefault},
+		{name: "memory medium", medium: v1.StorageMediumMemory},
+		{name: "kubelet root dir is a symlink", medium: v1.StorageMediumDefault, symlinkedRoot: true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			realBase, err := filepath.EvalSymlinks(t.TempDir())
+			require.NoError(t, err)
+			pluginBase := realBase
+			if tc.symlinkedRoot {
+				pluginBase = filepath.Join(t.TempDir(), "kubelet")
+				require.NoError(t, os.Symlink(realBase, pluginBase))
+			}
+			plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", pluginBase)
+
+			// The mount table holds resolved paths. The workload created a FUSE
+			// mount, and a mount below it, inside the volume.
+			volDir := filepath.Join(realBase, "pods", "poduid", "volumes", "kubernetes.io~empty-dir", "test-volume")
+			fuseDir := filepath.Join(volDir, "fusemnt")
+			deepDir := filepath.Join(fuseDir, "deep")
+			otherDir := filepath.Join(realBase, "other")
+			for _, d := range []string{deepDir, otherDir} {
+				require.NoError(t, os.MkdirAll(d, 0750))
+			}
+			mountPoints := []mount.MountPoint{
+				{Device: "/src", Path: fuseDir, Type: "fuse"},
+				{Device: "/src2", Path: deepDir, Type: "fuse"},
+				{Device: "/unrelated", Path: otherDir, Type: "ext4"},
+			}
+			if tc.medium == v1.StorageMediumMemory {
+				mountPoints = append(mountPoints, mount.MountPoint{Device: "tmpfs", Path: volDir, Type: "tmpfs"})
+			}
+			fakeMounter := mount.NewFakeMounter(mountPoints)
+			// Like the kernel, refuse to unmount a mount point that still has mounts below it.
+			fakeMounter.UnmountFunc = func(target string) error {
+				for _, mp := range fakeMounter.MountPoints {
+					if strings.HasPrefix(mp.Path, target+string(filepath.Separator)) {
+						return fmt.Errorf("unmount %s: %w", target, syscall.EBUSY)
+					}
+				}
+				return nil
+			}
+			detector := &fakeMountDetector{medium: tc.medium, isMount: tc.medium == v1.StorageMediumMemory}
+
+			unmounter, err := plug.(*emptyDirPlugin).newUnmounterInternal("test-volume", types.UID("poduid"), fakeMounter, detector)
+			require.NoError(t, err)
+			require.NoError(t, unmounter.TearDown())
+
+			var unmounted []string
+			for _, a := range fakeMounter.GetLog() {
+				if a.Action == mount.FakeActionUnmount {
+					unmounted = append(unmounted, a.Target)
+				}
+			}
+			// Children go before their parents, and mounts outside the volume are left alone.
+			expected := []string{deepDir, fuseDir}
+			if tc.medium == v1.StorageMediumMemory {
+				expected = append(expected, volDir)
+			}
+			assert.Equal(t, expected, unmounted)
+			_, err = os.Stat(volDir)
+			assert.True(t, os.IsNotExist(err), "volume directory %s was not removed: %v", volDir, err)
+		})
 	}
 }

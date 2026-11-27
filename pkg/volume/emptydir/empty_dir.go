@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
@@ -551,6 +553,15 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 		return nil
 	}
 
+	// A privileged container can create mounts below the volume, for example a
+	// FUSE mount shared through Bidirectional mount propagation. They make
+	// os.RemoveAll fail on a disconnected FUSE mount (ENOTCONN) or delete the
+	// backing data of a live one, and make unmounting a tmpfs volume fail with
+	// EBUSY. Unmount them first.
+	if err := ed.unmountNestedMounts(dir); err != nil {
+		return err
+	}
+
 	// Figure out the medium.
 	medium, isMnt, _, err := ed.mountDetector.GetMountMedium(dir, ed.medium)
 	if err != nil {
@@ -584,6 +595,38 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
 	return os.RemoveAll(dir)
+}
+
+// unmountNestedMounts unmounts every mount point below dir, deepest first.
+func (ed *emptyDir) unmountNestedMounts(dir string) error {
+	if ed.mounter == nil {
+		return nil
+	}
+	mountPoints, err := ed.mounter.List()
+	if err != nil {
+		return fmt.Errorf("failed to list mount points: %w", err)
+	}
+	// The mount table holds resolved paths; the kubelet root dir may be a symlink.
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return fmt.Errorf("failed to resolve path %s: %w", dir, err)
+	}
+	prefix := filepath.Clean(resolved) + string(filepath.Separator)
+	var nested []string
+	for _, mp := range mountPoints {
+		if strings.HasPrefix(mp.Path, prefix) {
+			nested = append(nested, mp.Path)
+		}
+	}
+	// Deepest path first so a parent is never unmounted before its children.
+	sort.Slice(nested, func(i, j int) bool { return len(nested[i]) > len(nested[j]) })
+	for _, p := range nested {
+		klog.V(2).InfoS("Unmounting nested mount point before emptyDir teardown", "path", p)
+		if err := mount.CleanupMountPoint(p, ed.mounter, true); err != nil {
+			return fmt.Errorf("failed to clean up nested mount point %s: %w", p, err)
+		}
+	}
+	return nil
 }
 
 func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
