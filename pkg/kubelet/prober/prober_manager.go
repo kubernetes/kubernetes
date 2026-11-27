@@ -282,7 +282,7 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 	}
 }
 
-func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, containerStatus *v1.ContainerStatus) bool {
+func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, oldContainerStatuses []v1.ContainerStatus, containerStatus *v1.ContainerStatus) bool {
 	if containerStatus.State.Running == nil {
 		return false
 	}
@@ -291,8 +291,21 @@ func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, containerS
 		return result == results.Success
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) && containerStatus.Started != nil && *containerStatus.Started {
-		return true
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+		if containerStatus.Started != nil && *containerStatus.Started {
+			return true
+		}
+
+		// A static pod manifest has no status to preserve Started from, so check its mirror pod status.
+		if wasStartedBeforeRestart(oldContainerStatuses, containerStatus) {
+			return true
+		}
+
+		// SyncPod generates the pod status before it calls AddPod, so on the first sync after
+		// a kubelet restart the worker lookup below misses the startup probe of a container.
+		if containerSpec := kubecontainer.GetContainerSpec(pod, containerStatus.Name); containerSpec != nil && containerSpec.StartupProbe != nil {
+			return false
+		}
 	}
 
 	// if there is a startup probe which hasn't run yet, the container is not
@@ -351,7 +364,7 @@ func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool,
 func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, oldPodStatus, podStatus *v1.PodStatus) {
 	logger := klog.FromContext(ctx)
 	for i, c := range podStatus.ContainerStatuses {
-		started := m.isContainerStarted(logger, pod, &podStatus.ContainerStatuses[i])
+		started := m.isContainerStarted(logger, pod, oldPodStatus.ContainerStatuses, &podStatus.ContainerStatuses[i])
 		podStatus.ContainerStatuses[i].Started = &started
 
 		if !started {
@@ -400,7 +413,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, oldPodStatus
 	}
 
 	for i, c := range podStatus.InitContainerStatuses {
-		started := m.isContainerStarted(logger, pod, &podStatus.InitContainerStatuses[i])
+		started := m.isContainerStarted(logger, pod, oldPodStatus.InitContainerStatuses, &podStatus.InitContainerStatuses[i])
 		podStatus.InitContainerStatuses[i].Started = &started
 
 		initContainer, ok := kubeutil.GetContainerByIndex(pod.Spec.InitContainers, podStatus.InitContainerStatuses, i)
@@ -479,6 +492,16 @@ func (m *manager) workerCount() int {
 // status changes for containers that were previously ready.
 func kubeletRestartGracePeriod(start time.Time) time.Time {
 	return start.Add(-time.Second * 10)
+}
+
+// Unlike canInheritProbeState, this requires matching container IDs because a
+// replacement container must pass its own startup probe.
+func wasStartedBeforeRestart(oldContainerStatuses []v1.ContainerStatus, containerStatus *v1.ContainerStatus) bool {
+	oldStatus, ok := podutil.GetContainerStatus(oldContainerStatuses, containerStatus.Name)
+	if !ok || oldStatus.Started == nil || !*oldStatus.Started {
+		return false
+	}
+	return oldStatus.ContainerID != "" && oldStatus.ContainerID == containerStatus.ContainerID
 }
 
 // canInheritProbeState checks whether the container the API server last knew about with the given
