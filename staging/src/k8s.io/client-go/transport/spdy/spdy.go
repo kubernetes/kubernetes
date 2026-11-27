@@ -198,6 +198,19 @@ func (c *streamingConnectionAdapter) Close() error {
 	return c.delegate.Close()
 }
 
+// connectionPinger is implemented by connections whose transport can verify
+// the peer is still reachable with a protocol-level round trip.
+type connectionPinger interface {
+	Ping() (time.Duration, error)
+}
+
+func (c *streamingConnectionAdapter) Ping() (time.Duration, error) {
+	if p, ok := c.delegate.(connectionPinger); ok {
+		return p.Ping()
+	}
+	return 0, fmt.Errorf("connection %T does not support ping", c.delegate)
+}
+
 func (c *streamingConnectionAdapter) CloseChan() <-chan bool {
 	return c.delegate.CloseChan()
 }

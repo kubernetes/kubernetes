@@ -300,6 +300,75 @@ func (*fakeStream) Reset() error                { return nil }
 func (*fakeStream) Headers() http.Header        { return nil }
 func (f *fakeStream) Identifier() uint32        { return f.id }
 
+// The exported Ping must do a full frame round trip against a serving peer
+// (which echoes PING frames per the SPDY protocol) and unblock once the
+// connection closes.
+func TestConnectionPingRoundTrip(t *testing.T) {
+	listener, err := net.Listen("tcp4", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	srvErr := make(chan error, 1)
+	go func() {
+		defer close(srvErr)
+		srvConn, err := listener.Accept()
+		if err != nil {
+			srvErr <- fmt.Errorf("server: error accepting connection: %w", err)
+			return
+		}
+		defer func() { _ = srvConn.Close() }()
+		spdyConn, err := spdystream.NewConnection(srvConn, true)
+		if err != nil {
+			srvErr <- fmt.Errorf("server: error creating spdy connection: %w", err)
+			return
+		}
+		srvSPDYConn := newConnection(spdyConn, func(stream httpstream.Stream, replySent <-chan struct{}) error {
+			return nil
+		}, 0, nil)
+		defer func() { _ = srvSPDYConn.Close() }()
+		<-srvSPDYConn.CloseChan()
+	}()
+
+	clConn, err := net.Dial("tcp4", listener.Addr().String())
+	if err != nil {
+		t.Fatalf("client: error connecting to server: %v", err)
+	}
+	defer func() { _ = clConn.Close() }()
+	clSPDYConn, err := NewClientConnection(clConn)
+	if err != nil {
+		t.Fatalf("client: error creating spdy connection: %v", err)
+	}
+	defer func() { _ = clSPDYConn.Close() }()
+
+	pinger, ok := clSPDYConn.(*connection)
+	if !ok {
+		t.Fatalf("client: connection is %T, want *connection", clSPDYConn)
+	}
+	latency, err := pinger.Ping()
+	if err != nil {
+		t.Fatalf("client: error pinging server: %v", err)
+	}
+	if latency < 0 || latency > 30*time.Second {
+		t.Errorf("client: implausible ping latency %v", latency)
+	}
+
+	_ = clSPDYConn.Close()
+	if _, err := pinger.Ping(); err == nil {
+		t.Error("client: ping on closed connection should fail")
+	}
+
+	select {
+	case err, ok := <-srvErr:
+		if ok && err != nil {
+			t.Error(err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Errorf("timed out waiting for server to exit")
+	}
+}
+
 func TestConnectionRemoveStreams(t *testing.T) {
 	c := &connection{streams: make(map[uint32]httpstream.Stream)}
 	stream0 := &fakeStream{id: 0}
