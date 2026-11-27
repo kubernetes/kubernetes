@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,6 +103,63 @@ func TestDecoder(t *testing.T) {
 		<-done
 
 		decoder.Close()
+	}
+}
+
+func TestDecoder_Errors(t *testing.T) {
+	testCases := []struct {
+		name        string
+		input       string
+		expectedErr string
+	}{
+		{
+			name:        "wrong decoded type",
+			input:       `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo"}}`,
+			expectedErr: "unable to decode to metav1.WatchEvent",
+		},
+		{
+			name:        "invalid watch event type",
+			input:       `{"type":"INVALID","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo"}}}`,
+			expectedErr: "got invalid watch event type",
+		},
+		{
+			name:        "undecodable embedded object",
+			input:       `{"type":"ADDED","object":{"apiVersion":"v1","kind":"DoesNotExist"}}`,
+			expectedErr: "unable to decode watch event",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			out, in := io.Pipe()
+			decoder := NewDecoder(streaming.NewDecoder(out, getDecoder()), getDecoder())
+			defer decoder.Close()
+
+			go func() {
+				if _, err := in.Write([]byte(testCase.input + "\n")); err != nil {
+					t.Errorf("Unexpected error %v", err)
+				}
+				if err := in.Close(); err != nil {
+					t.Errorf("Unexpected error %v", err)
+				}
+			}()
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_, _, err := decoder.Decode()
+				if err == nil {
+					t.Errorf("Expected error containing %q, got nil", testCase.expectedErr)
+				} else if !strings.Contains(err.Error(), testCase.expectedErr) {
+					t.Errorf("Expected error containing %q, got %q", testCase.expectedErr, err.Error())
+				}
+			}()
+
+			select {
+			case <-done:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Error("Timeout")
+			}
+		})
 	}
 }
 
