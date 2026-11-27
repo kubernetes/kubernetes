@@ -112,6 +112,11 @@ type SignJWTResponse struct {
 	Header string `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
 	// The signature for the JWT.
 	// Already wrapped in URL-safe base64, exactly as it appears in the final segment of the JWT.
+	// For ECDSA algorithms (ES256, ES384, ES512), the signature bytes MUST be
+	// encoded per RFC 7518 section 3.4: the fixed-length concatenation of the
+	// R and S values (IEEE P1363 style, e.g. 64 bytes for P-256), NOT ASN.1 DER
+	// as produced by Go's crypto/ecdsa.SignASN1. DER-encoded signatures are
+	// silently rejected by JWT verifiers that enforce RFC 7518.
 	Signature     string `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
