@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -29,7 +30,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -254,8 +254,10 @@ func TestCSI_VolumeAll(t *testing.T) {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
 
-			factory.Start(wait.NeverStop)
-			factory.WaitForCacheSync(wait.NeverStop)
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			factory.Start(stopCh)
+			factory.WaitForCacheSync(stopCh)
 
 			attachDetachVolumeHost := volumetest.NewFakeAttachDetachVolumeHostWithCSINodeName(t,
 				tmpDir,
@@ -303,19 +305,37 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatal("csiTest.VolumeAll failed to create new attacher: ", err)
 				}
+				csiVolAttacher := getCsiAttacherFromVolumeAttacher(volAttacher, test.watchTimeout)
 
 				// creates VolumeAttachment and blocks until it is marked attached (done by external attacher)
+				attachDone := make(chan error, 1)
 				go func() {
-					attachID, err := volAttacher.Attach(volSpec, attachDetachVolumeHost.GetNodeName())
+					attachID, err := csiVolAttacher.Attach(volSpec, attachDetachVolumeHost.GetNodeName())
 					if err != nil {
-						t.Errorf("csiTest.VolumeAll attacher.Attach failed: %s", err)
+						attachDone <- fmt.Errorf("csiTest.VolumeAll attacher.Attach failed: %w", err)
 						return
 					}
 					t.Logf("csiTest.VolumeAll got attachID %s", attachID)
+					attachDone <- nil
 				}()
 
 				// Simulates external-attacher and marks VolumeAttachment.Status.Attached = true
 				markVolumeAttached(t, attachDetachVolumeHost.GetKubeClient(), nil, attachName, storage.VolumeAttachmentStatus{Attached: true})
+				attach, err := attachDetachVolumeHost.GetKubeClient().StorageV1().VolumeAttachments().Get(context.TODO(), attachName, meta.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := volumeAttachmentInformer.Informer().GetStore().Update(attach); err != nil {
+					t.Fatal(err)
+				}
+				select {
+				case err := <-attachDone:
+					if err != nil {
+						t.Fatal(err)
+					}
+				case <-time.After(csiVolAttacher.watchTimeout + time.Second):
+					t.Fatal("csiTest.VolumeAll timed out waiting for attacher.Attach")
+				}
 
 				// Observe attach on this node.
 				devicePath, err = volAttacher.WaitForAttach(volSpec, "", pod, 500*time.Millisecond)
@@ -573,6 +593,9 @@ func TestCSI_VolumeAll(t *testing.T) {
 				}
 				csiDetacher := getCsiAttacherFromVolumeDetacher(volDetacher, test.watchTimeout)
 				csiDetacher.csiClient = csiClient
+				if err := volumeAttachmentInformer.Informer().GetStore().Delete(&storage.VolumeAttachment{ObjectMeta: meta.ObjectMeta{Name: attachName}}); err != nil {
+					t.Fatal(err)
+				}
 				if err := csiDetacher.Detach(volName, attachDetachVolumeHost.GetNodeName()); err != nil {
 					t.Fatal("csiTest.VolumeAll detacher.Detach failed:", err)
 				}
