@@ -611,6 +611,7 @@ func (g *GenericPLEG) RequestRelist(logger klog.Logger, podUID types.UID) {
 	select {
 	case g.relistRequests <- relistRequest{podUID, time.Now()}:
 	default:
+		metrics.PLEGRelistRequestsDropped.Inc()
 		logger.Error(nil, "Relist request channel full; dropping relist request", "podUID", podUID)
 	}
 }
