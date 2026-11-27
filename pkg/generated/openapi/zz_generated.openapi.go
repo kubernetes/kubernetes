@@ -35705,6 +35705,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSet(ref common.ReferenceCallback)
 						},
 					},
 				},
+				Required: []string{"spec", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -36048,6 +36049,7 @@ func schema_k8sio_api_extensions_v1beta1_Deployment(ref common.ReferenceCallback
 						},
 					},
 				},
+				Required: []string{"spec", "status"},
 			},
 		},
 		Dependencies: []string{
@@ -36215,7 +36217,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentRollback(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"name", "rollbackTo"},
+				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
@@ -36454,6 +36456,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref common.ReferenceCa
 						},
 					},
 				},
+				Required: []string{"conditions"},
 			},
 		},
 		Dependencies: []string{
@@ -36518,7 +36521,6 @@ func schema_k8sio_api_extensions_v1beta1_HTTPIngressPath(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"backend"},
 			},
 		},
 		Dependencies: []string{
@@ -36644,6 +36646,7 @@ func schema_k8sio_api_extensions_v1beta1_Ingress(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -36959,6 +36962,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressSpec(ref common.ReferenceCallbac
 						},
 					},
 				},
+				Required: []string{"ingressClassName", "backend"},
 			},
 		},
 		Dependencies: []string{
@@ -37361,7 +37365,6 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"podSelector"},
 			},
 		},
 		Dependencies: []string{
@@ -37412,6 +37415,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSet(ref common.ReferenceCallback
 						},
 					},
 				},
+				Required: []string{"status"},
 			},
 		},
 		Dependencies: []string{
@@ -37762,6 +37766,7 @@ func schema_k8sio_api_extensions_v1beta1_Scale(ref common.ReferenceCallback) com
 						},
 					},
 				},
+				Required: []string{"status"},
 			},
 		},
 		Dependencies: []string{
