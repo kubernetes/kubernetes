@@ -45,7 +45,7 @@ const (
 	bestEffortPodName = "best-effort"
 )
 
-var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisruptive(), feature.CriticalPod, func() {
+var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisruptive(), framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when we need to admit a critical pod", func() {

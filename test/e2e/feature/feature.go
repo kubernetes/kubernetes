@@ -93,10 +93,6 @@ var (
 	CriProxy = framework.WithFeature(framework.ValidFeatures.Add("CriProxy"))
 
 	// OWNER: sig-node
-	// Testing critical pod admission
-	CriticalPod = framework.WithFeature(framework.ValidFeatures.Add("CriticalPod"))
-
-	// OWNER: sig-node
 	// Testing device managers
 	DeviceManager = framework.WithFeature(framework.ValidFeatures.Add("DeviceManager"))
 
