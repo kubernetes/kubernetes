@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -439,64 +440,6 @@ func TestValidateInvalidLabelValueInNodeSelectorOption(t *testing.T) {
 	}
 }
 
-func TestValidateAllowIndivisibleHugePagesValuesOption(t *testing.T) {
-	// 2^64 bytes overflows int64, so the divisibility check rejects it; validators
-	// that read it as zero accepted it, so a stored object can carry it and the
-	// option has to admit it.
-	hugePages := core.ResourceName(core.ResourceHugePagesPrefix + "2Mi")
-	indivisible := core.ResourceList{hugePages: resource.MustParse("18446744073709551616")}
-
-	testCases := []struct {
-		name       string
-		oldPodSpec *core.PodSpec
-		wantOption bool
-	}{
-		{
-			name:       "NoOldPodSpec",
-			oldPodSpec: nil,
-			wantOption: false,
-		},
-		{
-			name: "DivisibleContainerLimit",
-			oldPodSpec: &core.PodSpec{Containers: []core.Container{{Resources: core.ResourceRequirements{
-				Limits: core.ResourceList{hugePages: resource.MustParse("4Mi")},
-			}}}},
-			wantOption: false,
-		},
-		{
-			name: "ContainerLimit",
-			oldPodSpec: &core.PodSpec{Containers: []core.Container{{Resources: core.ResourceRequirements{
-				Limits: indivisible,
-			}}}},
-			wantOption: true,
-		},
-		{
-			name:       "PodLevelLimit",
-			oldPodSpec: &core.PodSpec{Resources: &core.ResourceRequirements{Limits: indivisible}},
-			wantOption: true,
-		},
-		{
-			name:       "PodLevelRequest",
-			oldPodSpec: &core.PodSpec{Resources: &core.ResourceRequirements{Requests: indivisible}},
-			wantOption: true,
-		},
-		{
-			name:       "Overhead",
-			oldPodSpec: &core.PodSpec{Overhead: indivisible},
-			wantOption: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&core.PodSpec{}, tc.oldPodSpec, nil, nil)
-			if tc.wantOption != gotOptions.AllowIndivisibleHugePagesValues {
-				t.Errorf("Got AllowIndivisibleHugePagesValues=%t, want %t", gotOptions.AllowIndivisibleHugePagesValues, tc.wantOption)
-			}
-		})
-	}
-}
-
 // A stored pod-level hugepage value that no longer passes the divisibility
 // check survives an update that leaves it unchanged, while a create rejects it.
 func TestPodLevelIndivisibleHugePagesValueSurvivesUpdate(t *testing.T) {
@@ -551,6 +494,132 @@ func TestPodLevelIndivisibleHugePagesValueSurvivesUpdate(t *testing.T) {
 	updated.Labels = map[string]string{"touched": "yes"}
 	opts := GetValidationOptionsFromPodSpecAndMeta(&updated.Spec, &stored.Spec, &updated.ObjectMeta, &stored.ObjectMeta)
 	opts.PodLevelResourcesEnabled = true
+	if errs := ValidatePodUpdate(updated, stored, opts); len(errs) != 0 {
+		t.Errorf("update that only changes a label: %v", errs)
+	}
+}
+
+// A brand-new indivisible hugepages value in one container must not survive an update just
+// because a different, unrelated container already carries an old indivisible one: the ratchet
+// only exempts the exact stored (location, resource, quantity) it saw, not every hugepages entry
+// in the pod.
+func TestCrossContainerIndivisibleHugePagesValueDoesNotSurviveUpdate(t *testing.T) {
+	stored := &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns", ResourceVersion: "1"},
+		Spec: core.PodSpec{
+			RestartPolicy:                 core.RestartPolicyAlways,
+			DNSPolicy:                     core.DNSClusterFirst,
+			TerminationGracePeriodSeconds: ptr.To[int64](30),
+			Containers: []core.Container{
+				{
+					Name:                     "a",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: core.TerminationMessageReadFile,
+					Resources: core.ResourceRequirements{
+						Limits: core.ResourceList{
+							core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+							core.ResourceMemory: resource.MustParse("64Mi"),
+						},
+						Requests: core.ResourceList{
+							core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
+							core.ResourceMemory: resource.MustParse("64Mi"),
+						},
+					},
+				},
+				{
+					Name:                     "b",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: core.TerminationMessageReadFile,
+					Resources: core.ResourceRequirements{
+						Limits:   core.ResourceList{core.ResourceMemory: resource.MustParse("64Mi")},
+						Requests: core.ResourceList{core.ResourceMemory: resource.MustParse("64Mi")},
+					},
+				},
+			},
+		},
+	}
+
+	updated := stored.DeepCopy()
+	// container a's hugepages-2Mi is left byte-for-byte unchanged. container b gets a brand-new
+	// hugepages-1Gi entry, never stored anywhere before and not itself a multiple of 1Gi.
+	updated.Spec.Containers[1].Resources.Limits[core.ResourceName(core.ResourceHugePagesPrefix+"1Gi")] = resource.MustParse("3Mi")
+	updated.Spec.Containers[1].Resources.Requests[core.ResourceName(core.ResourceHugePagesPrefix+"1Gi")] = resource.MustParse("3Mi")
+
+	opts := GetValidationOptionsFromPodSpecAndMeta(&updated.Spec, &stored.Spec, &updated.ObjectMeta, &stored.ObjectMeta)
+	errs := ValidatePodUpdate(updated, stored, opts)
+	// Exactly container b's new limit and request fail the divisibility check; container a's
+	// unchanged stored value passes. A pod update also forbids changing container resources at
+	// all, so the spec-level Forbidden error is expected too; the reachable way to add such a
+	// value next to a stored one is a pod template update, which the deployment strategy test
+	// covers with the same validation options.
+	want := sets.New(
+		"spec.containers[1].resources.limits[hugepages-1Gi]",
+		"spec.containers[1].resources.requests[hugepages-1Gi]",
+	)
+	got := sets.New[string]()
+	divisibility := 0
+	for _, err := range errs {
+		switch {
+		case strings.Contains(err.Error(), "not positive integer multiple"):
+			divisibility++
+			got.Insert(err.Field)
+		case err.Type == field.ErrorTypeForbidden && err.Field == "spec":
+		default:
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+	if divisibility != want.Len() || !got.Equal(want) {
+		t.Errorf("got errors on %v (%v), want exactly %v: a brand-new indivisible hugepages-1Gi value in container b must be rejected, and container a's unchanged stored hugepages-2Mi value must pass", sets.List(got), errs, sets.List(want))
+	}
+}
+
+// A stored indivisible hugepages value in spec.overhead survives an update that leaves it
+// unchanged, while a create rejects it: validateOverhead goes through the same per-value ratchet
+// as the containers and the pod-level resources.
+func TestOverheadIndivisibleHugePagesValueSurvivesUpdate(t *testing.T) {
+	hugePages := core.ResourceName(core.ResourceHugePagesPrefix + "2Mi")
+	pod := func(value string) *core.Pod {
+		return &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns", ResourceVersion: "1"},
+			Spec: core.PodSpec{
+				RestartPolicy:                 core.RestartPolicyAlways,
+				DNSPolicy:                     core.DNSClusterFirst,
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
+				Containers: []core.Container{{
+					Name:                     "ctr",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: core.TerminationMessageReadFile,
+				}},
+				Overhead: core.ResourceList{
+					hugePages:           resource.MustParse(value),
+					core.ResourceMemory: resource.MustParse("64Mi"),
+				},
+			},
+		}
+	}
+	createErrors := func(created *core.Pod) field.ErrorList {
+		opts := GetValidationOptionsFromPodSpecAndMeta(&created.Spec, nil, &created.ObjectMeta, nil)
+		return ValidatePodSpec(&created.Spec, &created.ObjectMeta, field.NewPath("spec"), opts)
+	}
+
+	// The fixture has to be valid apart from the hugepage value, or the empty
+	// error list below proves nothing.
+	if errs := createErrors(pod("4Mi")); len(errs) != 0 {
+		t.Fatalf("the fixture is not valid on its own: %v", errs)
+	}
+
+	errs := createErrors(pod("3Mi"))
+	if len(errs) != 1 || errs[0].Field != "spec.overhead.limits[hugepages-2Mi]" || !strings.Contains(errs[0].Error(), "not positive integer multiple") {
+		t.Errorf("create: got %v, want one divisibility error on spec.overhead.limits[hugepages-2Mi]", errs)
+	}
+
+	stored := pod("3Mi")
+	updated := stored.DeepCopy()
+	updated.Labels = map[string]string{"touched": "yes"}
+	opts := GetValidationOptionsFromPodSpecAndMeta(&updated.Spec, &stored.Spec, &updated.ObjectMeta, &stored.ObjectMeta)
 	if errs := ValidatePodUpdate(updated, stored, opts); len(errs) != 0 {
 		t.Errorf("update that only changes a label: %v", errs)
 	}
