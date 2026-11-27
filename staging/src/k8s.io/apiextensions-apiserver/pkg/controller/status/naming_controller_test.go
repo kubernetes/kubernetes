@@ -279,6 +279,22 @@ func TestSync(t *testing.T) {
 			expectedEstablishedCondition:  installingCondition,
 		},
 		{
+			name: "no conflicts on self, add shortName equal to own plural and singular",
+			in: newCRD("alfa.bravo.com").
+				SpecNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind", "alfa", "delta-singular").
+				StatusNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+				NewOrDie(),
+			existing: []*apiextensionsv1.CustomResourceDefinition{
+				newCRD("alfa.bravo.com").
+					SpecNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+					StatusNames("alfa", "delta-singular", "echo-kind", "foxtrot-listkind").
+					NewOrDie(),
+			},
+			expectedNames:                 names("alfa", "delta-singular", "echo-kind", "foxtrot-listkind", "alfa", "delta-singular"),
+			expectedNameConflictCondition: acceptedCondition,
+			expectedEstablishedCondition:  installingCondition,
+		},
+		{
 			name:     "installing before with true condition",
 			in:       newCRD("alfa.bravo.com").Condition(acceptedCondition).NewOrDie(),
 			existing: []*apiextensionsv1.CustomResourceDefinition{},

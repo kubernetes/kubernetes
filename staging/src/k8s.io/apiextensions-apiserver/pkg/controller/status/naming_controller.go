@@ -160,6 +160,11 @@ func (c *NamingConditionController) calculateNamesAndConditions(in *apiextension
 	if !reflect.DeepEqual(requestedNames.ShortNames, acceptedNames.ShortNames) {
 		errs := []error{}
 		existingShortNames := sets.NewString(acceptedNames.ShortNames...)
+		// A shortName equal to this CRD's own accepted plural or singular already
+		// resolves to this resource, so it is not a conflict with another CRD.
+		// Without this, such a shortName collides with the CRD's own accepted
+		// names in allResources and reconciliation never succeeds.
+		existingShortNames.Insert(acceptedNames.Plural, acceptedNames.Singular)
 		for _, shortName := range requestedNames.ShortNames {
 			// if the shortname is already ours, then we're fine
 			if existingShortNames.Has(shortName) {
