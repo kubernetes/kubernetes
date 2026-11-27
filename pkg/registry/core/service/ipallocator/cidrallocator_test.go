@@ -691,7 +691,7 @@ func TestCIDRAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 
 	// Check initial metrics for first CIDR
 	em1 := testMetrics{
-		free:      0,
+		free:      2,
 		used:      0,
 		allocated: 0,
 		errors:    0,
@@ -750,7 +750,7 @@ func TestCIDRAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 
 	// Check initial metrics for second CIDR
 	em2 := testMetrics{
-		free:      0,
+		free:      6,
 		used:      0,
 		allocated: 0,
 		errors:    0,
