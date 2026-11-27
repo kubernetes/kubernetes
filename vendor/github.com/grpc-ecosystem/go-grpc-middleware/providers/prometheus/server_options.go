@@ -9,8 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type exemplarFromCtxFn func(ctx context.Context) prometheus.Labels
-type labelsFromCtxFn func(metadata context.Context) prometheus.Labels
+type (
+	exemplarFromCtxFn func(ctx context.Context) prometheus.Labels
+	labelsFromCtxFn   func(metadata context.Context) prometheus.Labels
+)
 
 type serverMetricsConfig struct {
 	counterOpts counterOptions
