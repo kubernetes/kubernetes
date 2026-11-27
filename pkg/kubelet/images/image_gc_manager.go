@@ -245,6 +245,8 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	logger := klog.FromContext(ctx)
 	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
 	imagesInUse := sets.New[string]()
+	containerImageIDsInUse := sets.New[string]()
+	containerImageIDsWithUnknownHandler := sets.New[string]()
 
 	images, err := im.runtime.ListImages(ctx)
 	if err != nil {
@@ -269,6 +271,10 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 				imageKey := getImageTuple(container.ImageID, container.ImageRuntimeHandler)
 				logger.V(5).Info("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef, "imageKey", imageKey)
 				imagesInUse.Insert(imageKey)
+				containerImageIDsInUse.Insert(container.ImageID)
+				if container.ImageRuntimeHandler == "" {
+					containerImageIDsWithUnknownHandler.Insert(container.ImageID)
+				}
 			}
 		}
 	}
@@ -285,6 +291,10 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 		} else {
 			imageKey = getImageTuple(image.ID, image.Spec.RuntimeHandler)
 			logger.V(5).Info("Adding image ID with runtime class to currentImages", "imageKey", imageKey, "runtimeHandler", image.Spec.RuntimeHandler)
+			// An empty handler on either response leaves the in-use variant unknown.
+			if containerImageIDsWithUnknownHandler.Has(image.ID) || (image.Spec.RuntimeHandler == "" && containerImageIDsInUse.Has(image.ID)) {
+				imagesInUse.Insert(imageKey)
+			}
 		}
 
 		currentImages.Insert(imageKey)
@@ -338,7 +348,11 @@ func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUs
 		for _, image := range images {
 			if mount.Image != nil && mount.Image.Image == image.ID {
 				logger.V(5).Info("Container uses image as mount", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "imageID", image.ID)
-				imagesInUse.Insert(image.ID)
+				if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
+					imagesInUse.Insert(image.ID)
+				} else if mount.Image.RuntimeHandler == "" || image.Spec.RuntimeHandler == "" || mount.Image.RuntimeHandler == image.Spec.RuntimeHandler {
+					imagesInUse.Insert(getImageTuple(image.ID, image.Spec.RuntimeHandler))
+				}
 			}
 		}
 	}
