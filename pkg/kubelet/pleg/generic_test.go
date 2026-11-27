@@ -874,6 +874,22 @@ kubelet_running_pods 2
 	}
 }
 
+func TestRequestRelistQueueFullIncrementsDroppedMetric(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PLEGOnDemandRelist, true)
+	tCtx := ktesting.Init(t)
+	pleg := newTestGenericPLEG().pleg
+
+	for range cap(pleg.relistRequests) {
+		pleg.relistRequests <- relistRequest{}
+	}
+
+	before := testutil.ToFloat64(metrics.PLEGRelistRequestsDropped)
+	pleg.RequestRelist(tCtx.Logger(), types.UID("test-pod"))
+	after := testutil.ToFloat64(metrics.PLEGRelistRequestsDropped)
+
+	assert.Equal(t, before+1, after)
+}
+
 func TestWorkerLoop(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PLEGOnDemandRelist, true)
 	synctest.Test(t, func(t *testing.T) {
