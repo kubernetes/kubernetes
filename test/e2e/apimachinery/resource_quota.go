@@ -534,7 +534,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources = v1.ResourceList{}
 		usedResources[core.ClaimObjectCountName] = resource.MustParse("1")
 		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
-		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		// The test creates no further claims, so raising the claim count limit is harmless.
+		err = waitForResourceQuotaAfterCreate(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources, core.ClaimObjectCountName)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting a ResourceClaim")
@@ -2509,6 +2510,52 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 		framework.Logf("Got expected ResourceQuota:\n%s", format.Object(lastResourceQuota, 1))
 	}
 	return err
+}
+
+// waitForResourceQuotaAfterCreate is like waitForResourceQuota, but for use
+// right after creating an object that is tracked by the quota.
+//
+// ResourceQuota admission charges the object to the quota status when the
+// object is created. Independently, the resource quota controller periodically
+// recalculates the usage of every quota from its informer caches. If such a
+// recalculation runs while the object is being created, the controller does not
+// see the object yet and overwrites the charge. Creates do not trigger a
+// recalculation, so nothing corrects the usage until the next periodic one,
+// which can be a full sync period (5 minutes by default) later. See
+// https://github.com/kubernetes/kubernetes/issues/142324.
+//
+// If the expected usage does not show up within resourceQuotaTimeout, the
+// hard limit of recalcResource is incremented. Changing the quota spec makes
+// the controller recalculate the usage right away. Callers must pick a
+// resource whose hard limit does not matter for the rest of the test.
+func waitForResourceQuotaAfterCreate(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList, recalcResource v1.ResourceName) error {
+	var lastResourceQuota *v1.ResourceQuota
+	err := framework.Gomega().Eventually(ctx, framework.GetObject(c.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).WithTimeout(resourceQuotaTimeout).Should(haveUsedResources(used, &lastResourceQuota))
+	if err == nil {
+		framework.Logf("Got expected ResourceQuota:\n%s", format.Object(lastResourceQuota, 1))
+		return nil
+	}
+	if ctx.Err() != nil {
+		return err
+	}
+
+	framework.Logf("ResourceQuota %s/%s does not show the expected usage after %v, forcing a recalculation by incrementing spec.hard[%s]. Last ResourceQuota:\n%s",
+		ns, quotaName, resourceQuotaTimeout, recalcResource, format.Object(lastResourceQuota, 1))
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		hard := resourceQuota.Spec.Hard[recalcResource]
+		hard.Add(resource.MustParse("1"))
+		resourceQuota.Spec.Hard[recalcResource] = hard
+		_, err = c.CoreV1().ResourceQuotas(ns).Update(ctx, resourceQuota, metav1.UpdateOptions{})
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("update ResourceQuota %s/%s to force a usage recalculation: %w", ns, quotaName, err)
+	}
+	return waitForResourceQuota(ctx, c, ns, quotaName, used)
 }
 
 // Ensure that the resource quota status shows the expected used resources value and does not change.
