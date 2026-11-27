@@ -257,6 +257,7 @@ func (c *controller) processLoop(ctx context.Context) {
 				if errors.Is(err, ErrFIFOClosed) {
 					return
 				}
+				utilruntime.HandleErrorWithContext(ctx, err, "Failed to process informer queue item")
 			}
 		}
 	}
