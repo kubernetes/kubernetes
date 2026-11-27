@@ -2773,6 +2773,57 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 	addNotImplatedReaction(kubeClient)
 
+	notReadyTaint := v1.Taint{
+		Key:    v1.TaintNodeNotReady,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+	// Mark node with not-ready taints
+	kubelet.registerWithTaints = []v1.Taint{notReadyTaint}
+
+	// Reset kubelet status for each test.
+	kubelet.registrationCompleted = false
+
+	// Register node to apiserver.
+	kubelet.registerWithAPIServer(tCtx)
+
+	// Check the not-ready taint.
+	got := gotNode.(*v1.Node)
+
+	require.True(t,
+		taintutil.TaintExists(got.Spec.Taints, &notReadyTaint),
+		"test not-ready taint for TaintNodesByCondition")
+
+	// Ensure the node unschedulable spec is not set
+	require.False(t,
+		got.Spec.Unschedulable,
+		"test unschedulable spec for TaintNodesByCondition")
+}
+
+func TestRegisterWithApiServerWithTaintNodeUnschedulable(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
+	kubelet.setCachedMachineInfo(machineInfo)
+
+	var gotNode runtime.Object
+	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		createAction := action.(core.CreateAction)
+		gotNode = createAction.GetObject()
+		return true, gotNode, nil
+	})
+
+	addNotImplatedReaction(kubeClient)
+
 	unschedulableTaint := v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
@@ -2792,6 +2843,11 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	require.True(t,
 		taintutil.TaintExists(got.Spec.Taints, &unschedulableTaint),
 		"test unschedulable taint for TaintNodesByCondition")
+
+	// Ensure the node unschedulable spec is set
+	require.True(t,
+		got.Spec.Unschedulable,
+		"test unschedulable spec for TaintNodesByCondition")
 }
 
 func TestNodeStatusHasChanged(t *testing.T) {
