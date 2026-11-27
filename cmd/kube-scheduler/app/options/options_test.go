@@ -19,6 +19,7 @@ package options
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -28,18 +29,26 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	certutil "k8s.io/client-go/util/cert"
 	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/logs"
+	metricsfeatures "k8s.io/component-base/metrics/features"
+	"k8s.io/component-base/metrics/legacyregistry"
+	_ "k8s.io/component-base/metrics/prometheus/clientgo"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	v1 "k8s.io/kube-scheduler/config/v1"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -49,6 +58,115 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/utils/ptr"
 )
+
+func TestConfigNativeHistograms(t *testing.T) {
+	t.Cleanup(func() { metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate) })
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, metricsfeatures.NativeHistograms, false)
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	tempDir := t.TempDir()
+	caCert, _, err := certutil.GenerateSelfSignedCertKey("localhost", nil, nil)
+	if err != nil {
+		t.Fatalf("failed to generate client CA cert: %v", err)
+	}
+	clientCAFile := filepath.Join(tempDir, "client-ca.crt")
+	if err := os.WriteFile(clientCAFile, caCert, 0600); err != nil {
+		t.Fatalf("failed to write client CA file: %v", err)
+	}
+
+	kubeconfigFile := filepath.Join(tempDir, "kubeconfig")
+	if err := os.WriteFile(kubeconfigFile, []byte(fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+  name: default
+contexts:
+- context:
+    cluster: default
+    user: default
+  name: default
+current-context: default
+users:
+- name: default
+  user: {}
+`, server.URL)), 0600); err != nil {
+		t.Fatalf("failed to write kubeconfig file: %v", err)
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to listen on free port: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	o := NewOptions()
+	cfg, err := latest.Default()
+	if err != nil {
+		t.Fatalf("latest.Default failed: %v", err)
+	}
+	o.ComponentConfig = cfg
+	o.SecureServing.Listener = ln
+
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	for _, f := range o.Flags.FlagSets {
+		fs.AddFlagSet(f)
+	}
+	if err := fs.Parse([]string{
+		"--feature-gates=NativeHistograms=true",
+		"--kubeconfig=" + kubeconfigFile,
+		"--authentication-kubeconfig=" + kubeconfigFile,
+		"--authorization-kubeconfig=" + kubeconfigFile,
+		"--cert-dir=" + tempDir,
+		"--client-ca-file=" + clientCAFile,
+		"--authentication-skip-lookup=true",
+	}); err != nil {
+		t.Fatalf("fs.Parse failed: %v", err)
+	}
+	if err := o.ComponentGlobalsRegistry.Set(); err != nil {
+		t.Fatalf("ComponentGlobalsRegistry.Set failed: %v", err)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	appCfg, err := o.Config(ctx)
+	if err != nil {
+		t.Fatalf("o.Config failed: %v", err)
+	}
+	t.Cleanup(appCfg.EventBroadcaster.Shutdown)
+
+	// Trigger a REST client request so rest_client_request_duration_seconds is populated.
+	_, _ = appCfg.Client.Discovery().RESTClient().Get().AbsPath("/version").DoRaw(ctx)
+
+	mfs, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+	byName := make(map[string]*testutil.MetricFamily, len(mfs))
+	for _, mf := range mfs {
+		byName[mf.GetName()] = mf
+	}
+
+	for _, metricName := range []string{
+		"rest_client_request_duration_seconds",
+		"workqueue_queue_duration_seconds",
+		"workqueue_work_duration_seconds",
+		"apiserver_client_certificate_expiration_seconds",
+	} {
+		mf, ok := byName[metricName]
+		if !ok {
+			t.Fatalf("metric %q not found in gathered metrics", metricName)
+		}
+		testutil.AssertHasNativeHistogram(t, mf, nil)
+	}
+}
 
 func TestSchedulerOptions(t *testing.T) {
 	// temp dir
