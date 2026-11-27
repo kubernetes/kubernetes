@@ -61,7 +61,11 @@ func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.P
 		return nil
 	}
 
-	if corev1.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0], utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
+	tolerates, err := corev1.TolerationsTolerateTaint(pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0], utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+	if err != nil {
+		logger.V(4).Info("Taint value is not a valid integer for Gt/Lt comparison, treating taint as not tolerated", "warning", err)
+	}
+	if tolerates {
 		return nil
 	}
 	return fwk.NewStatus(fwk.Unschedulable)
