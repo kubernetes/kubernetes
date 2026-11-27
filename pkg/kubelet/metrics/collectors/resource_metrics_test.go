@@ -25,13 +25,25 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	summaryprovidertest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	"k8s.io/utils/ptr"
 )
 
+// pinBuildVersion makes metrics deprecated in earlier releases visible, independent of the build version.
+func pinBuildVersion(t *testing.T) {
+	orig := metrics.BuildVersion
+	t.Cleanup(func() { metrics.BuildVersion = orig })
+	metrics.BuildVersion = func() apimachineryversion.Info {
+		return apimachineryversion.Info{GitVersion: "v1.0.0"}
+	}
+}
+
 func TestCollectResourceMetrics(t *testing.T) {
+	pinBuildVersion(t)
 	// a static timestamp: 2021-06-23 05:11:18.302091597 +0800
 	staticTimestamp := time.Unix(0, 1624396278302091597)
 	swapTimestamp := staticTimestamp.Add(10 * time.Second)

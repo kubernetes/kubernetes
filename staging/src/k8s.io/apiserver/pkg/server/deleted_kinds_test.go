@@ -46,14 +46,9 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20)},
 		},
 		{
-			name:           "alpha .0",
-			currentVersion: "v1.20.0-alpha.0.62+a5d22854a2ac21",
-			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true, isAlphaZero: true},
-		},
-		{
-			name:           "alpha not .0",
+			name:           "alpha",
 			currentVersion: "v1.20.0-alpha.1.62+a5d22854a2ac21",
-			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true, isAlphaZero: false},
+			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true},
 		},
 
 		{
@@ -76,7 +71,6 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 				return
 			}
 
-			actual.(*resourceExpirationEvaluator).strictRemovedHandlingInAlpha = false
 			if !reflect.DeepEqual(tt.expected, *actual.(*resourceExpirationEvaluator)) {
 				t.Fatal(actual)
 			}
@@ -205,27 +199,6 @@ func Test_resourceExpirationEvaluator_isNotRemoved(t *testing.T) {
 			resourceExpirationEvaluator: resourceExpirationEvaluator{
 				currentVersion: apimachineryversion.MajorMinor(1, 20),
 				isAlpha:        true,
-			},
-			restStorage: storageRemovedIn(1, 20),
-			expected:    true,
-		},
-		{
-			name: "removed-in-curr-but-alpha-but-strict",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion:               apimachineryversion.MajorMinor(1, 20),
-				isAlpha:                      true,
-				strictRemovedHandlingInAlpha: true,
-			},
-			restStorage: storageRemovedIn(1, 20),
-			expected:    false,
-		},
-		{
-			name: "removed-in-curr-but-alpha-but-strict-and-alpha-zero",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion:               apimachineryversion.MajorMinor(1, 20),
-				isAlpha:                      true,
-				isAlphaZero:                  true,
-				strictRemovedHandlingInAlpha: true,
 			},
 			restStorage: storageRemovedIn(1, 20),
 			expected:    true,

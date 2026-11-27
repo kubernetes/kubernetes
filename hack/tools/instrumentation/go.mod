@@ -35,4 +35,6 @@ replace k8s.io/api => ../../../staging/src/k8s.io/api
 
 replace k8s.io/component-base => ../../../staging/src/k8s.io/component-base
 
+replace k8s.io/client-go => ../../../staging/src/k8s.io/client-go
+
 replace k8s.io/kubernetes => ../../../

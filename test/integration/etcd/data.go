@@ -275,7 +275,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/clustertrustbundles/example.com:signer:abc",
 			ExpectedGVK:       gvkP("certificates.k8s.io", "v1beta1", "ClusterTrustBundle"),
 			IntroducedVersion: "1.33",
-			RemovedVersion:    "1.39",
+			RemovedVersion:    "1.40",
 		},
 		gvr("certificates.k8s.io", "v1beta1", "podcertificaterequests"): {
 			Stub:              `{"metadata": {"name": "req-1"}, "spec": {"signerName":"example.com/signer", "podName":"pod-1", "podUID":"pod-uid-1", "serviceAccountName":"sa-1", "serviceAccountUID":"sa-uid-1", "nodeName":"node-1", "nodeUID":"node-uid-1", "maxExpirationSeconds":86400, "pkixPublicKey":"MCowBQYDK2VwAyEA5g+rk9q/hjojtc2nwHJ660RdX5w1f4AK0/kP391QyLY=", "proofOfPossession":"SuGHX7SMyPHuN5cD5wjKLXGNbhdlCYUnTH65JkTx17iWlLynQ/g9GiTYObftSHNzqRh0ofdgAGqK6a379O7RBw=="}}`,
@@ -284,7 +284,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			StatusStub:        `{"status": {"conditions": [{"type": "Denied", "status":"True", "lastTransitionTime": "2020-01-01T00:00:00Z", "reason": "TestReason", "message": "test message"}]}}`,
 			MutatedStatusStub: `{"status": {"conditions": [{"type": "Denied", "status":"False", "lastTransitionTime": "2020-01-01T00:00:00Z", "reason": "TestReason", "message": "test message"}]}}`,
 			IntroducedVersion: "1.35",
-			RemovedVersion:    "1.39",
+			RemovedVersion:    "1.40",
 		},
 		gvr("certificates.k8s.io", "v1", "podcertificaterequests"): {
 			Stub:              `{"metadata": {"name": "req-2"}, "spec": {"signerName":"example.com/signer", "podName":"pod-1", "podUID":"pod-uid-1", "serviceAccountName":"sa-1", "serviceAccountUID":"sa-uid-1", "nodeName":"node-1", "nodeUID":"node-uid-1", "maxExpirationSeconds":86400, "stubPKCS10Request":"MIGNMEECAQAwDjEMMAoGA1UEAxMDZm9vMCowBQYDK2VwAyEA33notc99UJwFQmOojmMx5+OHh3eSxnCXPD8y4+3fCOigADAFBgMrZXADQQB201a14Mlk73XPyT7Ff/Ln0SIDL/YO4MIqPDYnpO1pA2s3vyo0H8qkvxo9WMNLeY5MZa2uG3gqZzXjjyWV38QA"}}`,
