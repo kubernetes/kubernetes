@@ -29,7 +29,7 @@ import (
 func TestCorrectness(t *testing.T) {
 	versioner := &storage.APIObjectVersioner{}
 	newPod := func() runtime.Object { return &example.Pod{} }
-	initialState := NewEmptyModel("", newPod, func() runtime.Object { return &example.PodList{} }, versioner)
+	initialState := NewEmptyModel(newPod, func() runtime.Object { return &example.PodList{} }, versioner)
 	model := initialState.Clone()
 	steps := correctnessTestSteps()
 	history := make([]Operation, len(steps))

@@ -271,49 +271,45 @@ var (
 func TestCorrectness(t *testing.T) {
 	storages := []struct {
 		name                   string
-		setupStorage           func(tCtx ktesting.TContext) (storage.Interface, string)
+		setupStorage           func(tCtx ktesting.TContext) storage.Interface
 		validateFaultInjection func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation)
 	}{
 		{
 			name: "etcd3",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
 				return setupStore(tCtx, nil)
 			},
 		},
 		{
 			name: "etcd3 with prefix transformer",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
 				return setupStore(tCtx, prefixTransformer{})
 			},
 		},
 		{
 			name: "cacher",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx, nil)
-				return setupCacher(tCtx, store), prefix
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
+				return setupCacher(tCtx, setupStore(tCtx, nil))
 			},
 		},
 		{
 			name: "cacher with ConsistentGetFromCache",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
 				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
-				store, prefix := setupStore(tCtx, nil)
-				return setupCacher(tCtx, store), prefix
+				return setupCacher(tCtx, setupStore(tCtx, nil))
 			},
 		},
 		{
 			name: "cacher with prefix transformer",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx, prefixTransformer{})
-				return setupCacher(tCtx, store), prefix
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
+				return setupCacher(tCtx, setupStore(tCtx, prefixTransformer{}))
 			},
 		},
 		{
 			name: "cacher without WatchFromStorageWithoutPrevKV",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
 				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, false)
-				store, prefix := setupStore(tCtx, nil)
-				return setupCacher(tCtx, store), prefix
+				return setupCacher(tCtx, setupStore(tCtx, nil))
 			},
 		},
 		{
@@ -323,9 +319,9 @@ func TestCorrectness(t *testing.T) {
 			// - CacheDelegator fallback to etcd on Get and bounded unfiltered GetList when !cacher.Ready()
 			// - Cacher 429 TooManyRequests rejection on non-delegated GetList and Watch when !cacher.Ready()
 			name: "cacher with watch-breaking etcd",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx, nil)
-				return setupCacher(tCtx, &watchBreakingStore{Interface: store, expireAfter: 200 * time.Millisecond}), prefix
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
+				store := setupStore(tCtx, nil)
+				return setupCacher(tCtx, &watchBreakingStore{Interface: store, expireAfter: 200 * time.Millisecond})
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(tCtx, hasUnreadyListError(ops), "expected cacher.GetList to reject requests with 429 TooManyRequests while unready")
@@ -339,9 +335,9 @@ func TestCorrectness(t *testing.T) {
 			// - Cacher.GetList (non-consistent RVCached) and Cacher.Get returning TooLargeResourceVersionError
 			// - Cacher.Watch (SendInitialEvents=true) timing out in waitUntilWatchCacheFreshAndForceAllEvents and returning errWatcher
 			name: "cacher with watch-delaying etcd",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx, nil)
-				return setupCacher(tCtx, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond}), prefix
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
+				store := setupStore(tCtx, nil)
+				return setupCacher(tCtx, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond})
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(tCtx, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
@@ -354,9 +350,9 @@ func TestCorrectness(t *testing.T) {
 			// - Dropped progress bookmarks preventing watchCache.resourceVersion from advancing during an idle window (>3s),
 			//   causing waitUntilFreshLocked timeouts on GetList (falling back to etcd on consistent reads) and WatchList
 			name: "cacher with bookmark-dropping etcd",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx, nil)
-				return setupCacher(tCtx, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond}), prefix
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
+				store := setupStore(tCtx, nil)
+				return setupCacher(tCtx, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond})
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(tCtx, hasConsistentListFallback(ops) || hasUnaryTimeoutError(ops),
@@ -370,14 +366,13 @@ func TestCorrectness(t *testing.T) {
 			// - watchCacheHistory dynamic capacity resize (grow and shrink), event eviction, and B-tree snapshot compaction
 			// - watchCacheHistory.GetIntervalLocked returning 410 ResourceExpired when a watch requests an evicted RV
 			name: "cacher_small_history",
-			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+			setupStorage: func(tCtx ktesting.TContext) storage.Interface {
 				origFreshDuration := cacher.DefaultEventFreshDuration
 				cacher.DefaultEventFreshDuration = 10 * time.Millisecond
 				tCtx.Cleanup(func() {
 					cacher.DefaultEventFreshDuration = origFreshDuration
 				})
-				store, prefix := setupStore(tCtx, nil)
-				return setupCacher(tCtx, store), prefix
+				return setupCacher(tCtx, setupStore(tCtx, nil))
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, _ []correctness.Operation, watches []correctness.WatchOperation) {
 				require.True(tCtx, hasWatchEventReason(watches, metav1.StatusReasonExpired),
@@ -388,8 +383,8 @@ func TestCorrectness(t *testing.T) {
 	for _, s := range storages {
 		t.Run(s.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			store, storagePrefix := s.setupStorage(tCtx)
-			ops, watches := testCorrectness(t, store, storagePrefix)
+			store := s.setupStorage(tCtx)
+			ops, watches := testCorrectness(t, store)
 			if s.validateFaultInjection != nil {
 				s.validateFaultInjection(tCtx, ops, watches)
 			}
@@ -397,14 +392,14 @@ func TestCorrectness(t *testing.T) {
 	}
 }
 
-func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string) ([]correctness.Operation, []correctness.WatchOperation) {
+func testCorrectness(t *testing.T, store storage.Interface) ([]correctness.Operation, []correctness.WatchOperation) {
 	ctx := t.Context()
 	versioner := store.Versioner()
 
 	list := &api.PodList{}
 	err := store.GetList(ctx, "/pods", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, list)
 	require.NoError(t, err)
-	initialState, err := correctness.NewModelFromStorage(storagePrefix, list, func() runtime.Object { return &api.Pod{} }, func() runtime.Object { return &api.PodList{} }, cacheKeyFunc, versioner)
+	initialState, err := correctness.NewModelFromStorage(list, func() runtime.Object { return &api.Pod{} }, func() runtime.Object { return &api.PodList{} }, cacheKeyFunc, versioner)
 	require.NoError(t, err)
 
 	objects := []types.NamespacedName{
