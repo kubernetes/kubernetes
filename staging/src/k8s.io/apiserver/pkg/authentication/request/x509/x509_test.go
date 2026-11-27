@@ -39,6 +39,8 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 const (
@@ -1277,4 +1279,64 @@ func TestCertificateIdentifier(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClientCertificateExpirationSeconds(t *testing.T) {
+	clientCerts := getCerts(t, clientCNCert)
+	clientCert := clientCerts[0]
+
+	authenticator := New(getDefaultVerifyOptions(t), CommonNameUserConversion)
+
+	beforeSum, err := testutil.GetHistogramMetricValue(clientCertificateExpirationHistogram.ObserverMetric)
+	if err != nil {
+		t.Fatalf("unexpected error reading metric sum before auth: %v", err)
+	}
+	beforeCount, err := testutil.GetHistogramMetricCount(clientCertificateExpirationHistogram.ObserverMetric)
+	if err != nil {
+		t.Fatalf("unexpected error reading metric count before auth: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	req.TLS = &tls.ConnectionState{PeerCertificates: clientCerts}
+
+	if _, ok, err := authenticator.AuthenticateRequest(req); err != nil || !ok {
+		t.Fatalf("AuthenticateRequest() = ok=%v err=%v", ok, err)
+	}
+
+	afterSum, err := testutil.GetHistogramMetricValue(clientCertificateExpirationHistogram.ObserverMetric)
+	if err != nil {
+		t.Fatalf("unexpected error reading metric sum after auth: %v", err)
+	}
+	afterCount, err := testutil.GetHistogramMetricCount(clientCertificateExpirationHistogram.ObserverMetric)
+	if err != nil {
+		t.Fatalf("unexpected error reading metric count after auth: %v", err)
+	}
+	if afterCount != beforeCount+1 {
+		t.Fatalf("expected histogram count to increase by 1, before=%d after=%d", beforeCount, afterCount)
+	}
+
+	observedRemaining := afterSum - beforeSum
+	wantRemaining := time.Until(clientCert.NotAfter).Seconds()
+	const allowedDriftSeconds = 5.0
+	if observedRemaining < wantRemaining-allowedDriftSeconds || observedRemaining > wantRemaining+allowedDriftSeconds {
+		t.Fatalf("observed remaining lifetime %f, want within [%f, %f]", observedRemaining, wantRemaining-allowedDriftSeconds, wantRemaining+allowedDriftSeconds)
+	}
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("unexpected error gathering metrics: %v", err)
+	}
+	for _, mf := range metricFamilies {
+		if mf.GetName() != "apiserver_client_certificate_expiration_seconds" {
+			continue
+		}
+		if wantHelp := "[BETA] Distribution of the remaining lifetime on the certificate used to authenticate a request."; mf.GetHelp() != wantHelp {
+			t.Fatalf("unexpected help for apiserver_client_certificate_expiration_seconds: got %q, want %q", mf.GetHelp(), wantHelp)
+		}
+		return
+	}
+	t.Fatal("metric apiserver_client_certificate_expiration_seconds not found")
 }
