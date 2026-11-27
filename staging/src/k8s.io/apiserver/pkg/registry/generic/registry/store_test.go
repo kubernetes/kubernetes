@@ -1578,6 +1578,216 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 	}
 }
 
+// interceptWriteStorage calls beforeWrite when the object is ready to be
+// written. If beforeWrite returns an error, the storage does not write the
+// object and returns that error.
+type interceptWriteStorage struct {
+	storage.Interface
+	beforeWrite func(ctx context.Context, key string) error
+}
+
+func (s *interceptWriteStorage) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	if err := s.beforeWrite(ctx, key); err != nil {
+		return err
+	}
+	return s.Interface.Create(ctx, key, obj, out, ttl)
+}
+
+func (s *interceptWriteStorage) GuaranteedUpdate(
+	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	return s.Interface.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions,
+		func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			output, ttl, err := tryUpdate(input, res)
+			if err != nil {
+				return nil, nil, err
+			}
+			if err := s.beforeWrite(ctx, key); err != nil {
+				return nil, nil, err
+			}
+			return output, ttl, nil
+		}, cachedExistingObject)
+}
+
+// TestStoreHooksStorageWrite tests that the finish function of the Begin hooks
+// reports what happened in the storage: it must not report a success before
+// the object is persisted, and it must not report a failure if the object may
+// be persisted.
+func TestStoreHooksStorageWrite(t *testing.T) {
+	var milestones []string
+
+	mile := func(s string) {
+		milestones = append(milestones, s)
+	}
+
+	testCases := []struct {
+		name   string
+		update bool
+		// cancel ends the request after the Begin hook and before the write.
+		cancel bool
+		// beforeWrite is called with the storage that is not intercepted.
+		beforeWrite      func(ctx context.Context, s storage.Interface, key string, writes int) error
+		expectError      bool
+		expectMilestones []string
+	}{{
+		name: "create with unknown result",
+		beforeWrite: func(context.Context, storage.Interface, string, int) error {
+			return context.DeadlineExceeded
+		},
+		expectError:      true,
+		expectMilestones: []string{"BeginCreate", "StorageWrite"},
+	}, {
+		name: "create with a panic in the storage",
+		beforeWrite: func(context.Context, storage.Interface, string, int) error {
+			panic("in the storage")
+		},
+		expectError:      true,
+		expectMilestones: []string{"BeginCreate", "StorageWrite"},
+	}, {
+		name: "create not persisted",
+		beforeWrite: func(_ context.Context, _ storage.Interface, key string, _ int) error {
+			return storage.NewKeyExistsError(key, 0)
+		},
+		expectError:      true,
+		expectMilestones: []string{"BeginCreate", "StorageWrite", "FinishCreate(false)"},
+	}, {
+		name:             "create of a request that is over",
+		cancel:           true,
+		expectError:      true,
+		expectMilestones: []string{"BeginCreate", "FinishCreate(false)"},
+	}, {
+		name:             "update persisted",
+		update:           true,
+		expectMilestones: []string{"BeginUpdate", "StorageWrite", "FinishUpdate(true)", "AfterUpdate"},
+	}, {
+		name:   "update with unknown result",
+		update: true,
+		beforeWrite: func(context.Context, storage.Interface, string, int) error {
+			return context.DeadlineExceeded
+		},
+		expectError:      true,
+		expectMilestones: []string{"BeginUpdate", "StorageWrite"},
+	}, {
+		name:   "update not persisted",
+		update: true,
+		beforeWrite: func(_ context.Context, _ storage.Interface, key string, _ int) error {
+			return storage.NewResourceVersionConflictsError(key, 0)
+		},
+		expectError:      true,
+		expectMilestones: []string{"BeginUpdate", "StorageWrite", "FinishUpdate(false)"},
+	}, {
+		name:             "update of a request that is over",
+		update:           true,
+		cancel:           true,
+		expectError:      true,
+		expectMilestones: []string{"BeginUpdate", "FinishUpdate(false)"},
+	}, {
+		name:   "update not persisted and retried",
+		update: true,
+		beforeWrite: func(ctx context.Context, s storage.Interface, key string, writes int) error {
+			if writes > 1 {
+				return nil
+			}
+			// The object changes before the first write, so the storage
+			// does not persist it and has to compute the update again.
+			return s.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
+				storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+					obj.(*example.Pod).Labels = map[string]string{"concurrent": "update"}
+					return obj, nil
+				}), nil)
+		},
+		expectMilestones: []string{"BeginUpdate", "StorageWrite", "FinishUpdate(false)", "BeginUpdate", "StorageWrite", "FinishUpdate(true)", "AfterUpdate"},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+				Spec:       example.PodSpec{NodeName: "machine"},
+			}
+
+			testContext, cancel := context.WithCancel(genericapirequest.WithNamespace(genericapirequest.NewContext(), "test"))
+			defer cancel()
+			destroyFunc, registry := NewTestGenericStoreRegistry(t)
+			defer destroyFunc()
+			registry.BeginCreate = func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error) {
+				mile("BeginCreate")
+				return func(_ context.Context, success bool) {
+					mile(fmt.Sprintf("FinishCreate(%v)", success))
+				}, nil
+			}
+			registry.AfterCreate = func(runtime.Object, *metav1.CreateOptions) {
+				mile("AfterCreate")
+			}
+			registry.BeginUpdate = func(context.Context, runtime.Object, runtime.Object, *metav1.UpdateOptions) (FinishFunc, error) {
+				mile("BeginUpdate")
+				return func(_ context.Context, success bool) {
+					mile(fmt.Sprintf("FinishUpdate(%v)", success))
+				}, nil
+			}
+			registry.AfterUpdate = func(runtime.Object, *metav1.UpdateOptions) {
+				mile("AfterUpdate")
+			}
+
+			if tc.update {
+				if _, err := registry.Create(testContext, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				// The storage does not write an object that does not change.
+				pod.Labels = map[string]string{"updated": "true"}
+			}
+
+			writes := 0
+			s := registry.Storage.Storage
+			registry.Storage.Storage = &interceptWriteStorage{
+				Interface: s,
+				beforeWrite: func(ctx context.Context, key string) error {
+					mile("StorageWrite")
+					writes++
+					if tc.beforeWrite == nil {
+						return nil
+					}
+					return tc.beforeWrite(ctx, s, key, writes)
+				},
+			}
+
+			// The validation runs after the Begin hook and before the write.
+			validate := func(context.Context, runtime.Object) error {
+				if tc.cancel {
+					cancel()
+				}
+				return nil
+			}
+
+			milestones = nil
+			err := func() (err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						err = fmt.Errorf("panic: %v", r)
+					}
+				}()
+				if tc.update {
+					_, _, err = registry.Update(testContext, pod.Name, rest.DefaultUpdatedObjectInfo(pod), validate,
+						func(ctx context.Context, obj, _ runtime.Object) error { return validate(ctx, obj) }, false, &metav1.UpdateOptions{})
+				} else {
+					_, err = registry.Create(testContext, pod, validate, &metav1.CreateOptions{})
+				}
+				return err
+			}()
+			if err != nil && !tc.expectError {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if err == nil && tc.expectError {
+				t.Fatalf("Unexpected success")
+			}
+
+			if !reflect.DeepEqual(milestones, tc.expectMilestones) {
+				t.Errorf("Unexpected milestones: wanted %v, got %v", tc.expectMilestones, milestones)
+			}
+		})
+	}
+}
+
 func TestStoreGet(t *testing.T) {
 	podA := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},

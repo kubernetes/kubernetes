@@ -18,6 +18,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -58,6 +59,11 @@ import (
 )
 
 // FinishFunc is a function returned by Begin hooks to complete an operation.
+// It is called with success=true after the object is persisted, and with
+// success=false if the object was not persisted. It is not called if it is
+// not known whether the object was persisted, for example because the request
+// to the storage timed out: a hook that reverts would undo what a persisted
+// object uses.
 type FinishFunc func(ctx context.Context, success bool)
 
 // AfterDeleteFunc is the type used for the Store.AfterDelete hook.
@@ -182,7 +188,9 @@ type Store struct {
 	// commit/revert function which will be called at the end of the operation,
 	// but before AfterCreate, indicating via the argument
 	// whether the operation succeeded.  If this returns an error, the function
-	// is not called.  Almost nobody should use this hook.
+	// is not called.  The function is also not called if it is not known
+	// whether the operation succeeded, for example if the request to the
+	// storage timed out.  Almost nobody should use this hook.
 	BeginCreate BeginCreateFunc
 	// AfterCreate implements a further operation to run after a resource is
 	// created, optional.
@@ -194,7 +202,9 @@ type Store struct {
 	// commit/revert function which will be called at the end of the operation,
 	// but before AfterUpdate, indicating via the argument
 	// whether the operation succeeded.  If this returns an error, the function
-	// is not called.  Almost nobody should use this hook.
+	// is not called.  The function is also not called if it is not known
+	// whether the operation succeeded, for example if the request to the
+	// storage timed out.  Almost nobody should use this hook.
 	BeginUpdate BeginUpdateFunc
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated, optional.
@@ -545,6 +555,17 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 // finishNothing is a do-nothing FinishFunc.
 func finishNothing(context.Context, bool) {}
 
+// isNotPersistedError returns true if the answer of the storage to a write
+// means that it did not persist the object. Any other error, for example a
+// timeout, does not tell what the storage did.
+func isNotPersistedError(err error) bool {
+	return storage.IsExist(err) ||
+		storage.IsNotFound(err) ||
+		storage.IsConflict(err) ||
+		storage.IsInvalidObj(err) ||
+		errors.Is(err, storage.ErrResourceVersionSetOnCreate)
+}
+
 // maxNameGenerationCreateAttempts is the maximum number of
 // times create will be attempted when generateName is used
 // and create attempts fails due to name conflict errors.
@@ -611,6 +632,9 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 			return nil, err
 		}
 		finishCreate = fn
+		// Revert if this function returns before the write to the storage.
+		// The defer calls the function that finishCreate holds at that time,
+		// so it does nothing after finishCreate is set to finishNothing.
 		defer func() {
 			finishCreate(ctx, false)
 		}()
@@ -641,7 +665,22 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, err
 	}
 	out := e.NewFunc()
+	// Do not send to the storage a request that is already terminated: the
+	// error of the storage does not tell if it got the request, and a client
+	// can set a timeout that always expires.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// From here the answer of the storage decides the result, so turn off
+	// the defer and call fn when the answer is known.
+	fn := finishCreate
+	finishCreate = finishNothing
 	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {
+		// Revert only if the storage did not persist the object. After any
+		// other error the object can be persisted, so fn is not called.
+		if isNotPersistedError(err) {
+			fn(ctx, false)
+		}
 		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 		err = rest.CheckGeneratedNameError(ctx, e.CreateStrategy, err, obj)
 		if !apierrors.IsAlreadyExists(err) {
@@ -660,10 +699,7 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 		}
 		return nil, err
 	}
-	// The operation has succeeded.  Call the finish function if there is one,
-	// and then make sure the defer doesn't call it again.
-	fn := finishCreate
-	finishCreate = finishNothing
+	// The operation has succeeded.  Call the finish function if there is one.
 	fn(ctx, true)
 
 	if e.AfterCreate != nil {
@@ -779,7 +815,17 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	ignoreNotFound := e.UpdateStrategy.AllowCreateOnUpdate(ctx) || forceAllowCreate
 	// deleteObj is only used in case a deletion is carried out
 	var deleteObj runtime.Object
+	// The function passed to GuaranteedUpdate only computes the new object,
+	// and the storage writes it after that function returns. finishPending
+	// keeps the finish function of the last attempt until the result of the
+	// write is known.
+	var finishPending FinishFunc = finishNothing
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, ignoreNotFound, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		// The storage calls this function again only if it did not persist
+		// the result of the previous call, so revert the previous attempt.
+		finishPending(ctx, false)
+		finishPending = finishNothing
+
 		existingResourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, nil, err
@@ -826,6 +872,9 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 					return nil, nil, err
 				}
 				finishCreate = fn
+				// Revert if this attempt returns before the object is ready.
+				// The defer does nothing after finishCreate is set to
+				// finishNothing.
 				defer func() {
 					finishCreate(ctx, false)
 				}()
@@ -847,12 +896,17 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			if err != nil {
 				return nil, nil, err
 			}
+			// Do not send to the storage a request that is already
+			// terminated: the error of the storage does not tell if it got
+			// the request.
+			if err := ctx.Err(); err != nil {
+				return nil, nil, err
+			}
 
-			// The operation has succeeded.  Call the finish function if there is one,
-			// and then make sure the defer doesn't call it again.
-			fn := finishCreate
-			finishCreate = finishNothing
-			fn(ctx, true)
+			// The object is ready, but it is not persisted yet.  Move the
+			// finish function to finishPending, which is called when the
+			// storage returns, and turn off the defer.
+			finishPending, finishCreate = finishCreate, finishNothing
 
 			return obj, &ttl, nil
 		}
@@ -890,6 +944,9 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 				return nil, nil, err
 			}
 			finishUpdate = fn
+			// Revert if this attempt returns before the object is ready.
+			// The defer does nothing after finishUpdate is set to
+			// finishNothing.
 			defer func() {
 				finishUpdate(ctx, false)
 			}()
@@ -924,12 +981,16 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		if err != nil {
 			return nil, nil, err
 		}
+		// Do not send to the storage a request that is already terminated:
+		// the error of the storage does not tell if it got the request.
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 
-		// The operation has succeeded.  Call the finish function if there is one,
-		// and then make sure the defer doesn't call it again.
-		fn := finishUpdate
-		finishUpdate = finishNothing
-		fn(ctx, true)
+		// The object is ready, but it is not persisted yet.  Move the finish
+		// function to finishPending, which is called when the storage
+		// returns, and turn off the defer.
+		finishPending, finishUpdate = finishUpdate, finishNothing
 
 		if int64(ttl) != res.TTL {
 			return obj, &ttl, nil
@@ -942,6 +1003,12 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		if err == errEmptiedFinalizers {
 			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions, newDeleteOptionsFromUpdateOptions(options))
 		}
+		// Revert only if the storage did not persist the object. After any
+		// other error the object can be persisted, so finishPending is not
+		// called.
+		if isNotPersistedError(err) {
+			finishPending(ctx, false)
+		}
 		if creating {
 			err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 			err = rest.CheckGeneratedNameError(ctx, e.CreateStrategy, err, creatingObj)
@@ -950,6 +1017,9 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		}
 		return nil, false, err
 	}
+
+	// The operation has succeeded.  Call the finish function if there is one.
+	finishPending(ctx, true)
 
 	if creating {
 		if e.AfterCreate != nil {
