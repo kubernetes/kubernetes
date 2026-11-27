@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -28,7 +29,9 @@ import (
 	"github.com/onsi/gomega"
 
 	"k8s.io/klog/v2"
+	ktestingklog "k8s.io/klog/v2/ktesting"
 	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 )
 
 func TestCancelManual(t *testing.T) {
@@ -264,4 +267,110 @@ func TestWithTimeout(t *testing.T) {
 		tCtx.Expect(context.Cause(tCtx)).To(gomega.MatchError(context.DeadlineExceeded), "cause")
 		tCtx.Expect(tCtx.Err()).To(gomega.MatchError(context.DeadlineExceeded), "err")
 	})
+}
+
+// TestVerbosityConcurrentIsolation verifies that initoption.Verbosity
+// overrides the verbosity threshold only for the TContext it is passed to,
+// without leaking into other TContexts that are created concurrently and use a
+// different override.
+func TestVerbosityConcurrentIsolation(t *testing.T) {
+	const (
+		lowVerbosity  = 2
+		highVerbosity = 10
+		maxLevel      = highVerbosity + 3 // Check a bit beyond the highest requested level.
+	)
+
+	var ready, checked, done sync.WaitGroup
+	ready.Add(2)
+	checked.Add(2)
+
+	check := func(t *testing.T, verbosity int) {
+		tCtx := ktesting.Init(t, initoption.Verbosity(verbosity))
+		ready.Done()
+		ready.Wait() // Both Init calls must complete before either test checks its verbosity.
+
+		for level := range maxLevel {
+			enabled := tCtx.Logger().V(level).Enabled()
+			expected := level <= verbosity
+			tCtx.Expect(enabled).To(gomega.Equal(expected), "V(%d).Enabled()", level)
+		}
+
+		checked.Done()
+		checked.Wait() // Both tests must finish checking before either returns.
+	}
+
+	done.Go(func() { check(t, lowVerbosity) })
+	done.Go(func() { check(t, highVerbosity) })
+	done.Wait()
+}
+
+func TestSubTestLoggerOptions(t *testing.T) {
+	const parentVerbosity = 10
+
+	isPerTest := func(tCtx ktesting.TContext) bool {
+		_, ok := tCtx.Logger().GetSink().(ktestingklog.Underlier)
+		return ok
+	}
+	hasBuffer := func(tCtx ktesting.TContext) bool {
+		underlier, ok := tCtx.Logger().GetSink().(ktestingklog.Underlier)
+		if !ok {
+			return false
+		}
+		tCtx.Logger().Info("probe")
+		return strings.Contains(underlier.GetBuffer().String(), "probe")
+	}
+
+	// verbosity returns the highest level for which logging is enabled.
+	verbosity := func(tCtx ktesting.TContext) int {
+		level := 0
+		for tCtx.Logger().V(level + 1).Enabled() {
+			level++
+		}
+		return level
+	}
+
+	testcases := map[string]struct {
+		opts                 []initoption.InitOption
+		expectParentPerTest  bool
+		expectSubPerTest     bool
+		expectParentBuffered bool
+		expectSubBuffered    bool
+		expectParentVerbose  int
+		expectSubVerbose     int
+	}{
+		"default": {
+			expectParentPerTest: true,
+			expectSubPerTest:    true,
+		},
+		"per-test-output-disabled": {
+			opts: []initoption.InitOption{initoption.PerTestOutput(false)},
+		},
+		"buffer-logs": {
+			opts:                 []initoption.InitOption{initoption.BufferLogs(true)},
+			expectParentPerTest:  true,
+			expectSubPerTest:     true,
+			expectParentBuffered: true,
+		},
+		"verbosity": {
+			opts:                []initoption.InitOption{initoption.Verbosity(parentVerbosity)},
+			expectParentPerTest: true,
+			expectSubPerTest:    true,
+			expectParentVerbose: parentVerbosity,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t, tc.opts...)
+			tCtx.Expect(isPerTest(tCtx)).To(gomega.Equal(tc.expectParentPerTest), "parent per-test logger")
+			tCtx.Expect(hasBuffer(tCtx)).To(gomega.Equal(tc.expectParentBuffered), "parent buffered")
+			tCtx.Expect(verbosity(tCtx)).To(gomega.Equal(tc.expectParentVerbose), "parent verbosity")
+
+			tCtx.Run("sub", func(tCtx ktesting.TContext) {
+				tCtx.Expect(isPerTest(tCtx)).To(gomega.Equal(tc.expectSubPerTest), "sub-test per-test logger")
+				tCtx.Expect(hasBuffer(tCtx)).To(gomega.Equal(tc.expectSubBuffered), "sub-test buffered")
+				tCtx.Expect(verbosity(tCtx)).To(gomega.Equal(tc.expectSubVerbose), "sub-test verbosity")
+			})
+		})
+	}
 }
