@@ -27,6 +27,7 @@ import (
 	v1beta1 "k8s.io/api/coordination/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -55,6 +56,8 @@ func TestSingleLeaseCandidate(t *testing.T) {
 			expectedHolderIdentity: ptr.To("foo1"),
 		},
 	}
+	// v1beta1 LeaseCandidate is no longer served after 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 38))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
@@ -94,6 +97,8 @@ func TestSingleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 			expectedHolderIdentity: nil,
 		},
 	}
+	// v1beta1 LeaseCandidate is no longer served after 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 38))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
@@ -130,6 +135,8 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 			expectedHolderIdentity: ptr.To("baz3"),
 		},
 	}
+	// v1beta1 LeaseCandidate is no longer served after 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 38))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
@@ -172,6 +179,8 @@ func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 			expectedHolderIdentity: nil,
 		},
 	}
+	// v1beta1 LeaseCandidate is no longer served after 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 38))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 
@@ -200,6 +209,8 @@ func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 
 func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	// v1beta1 LeaseCandidate is no longer served after 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 38))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
@@ -222,6 +233,8 @@ func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 // TestUpgradeSkew tests that a legacy client and a CLE aware client operating on the same lease do not cause errors
 func TestUpgradeSkew(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	// v1beta1 LeaseCandidate is no longer served after 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 38))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
@@ -245,6 +258,8 @@ func TestUpgradeSkew(t *testing.T) {
 }
 
 func TestLeaseCandidateCleanup(t *testing.T) {
+	// v1beta1 LeaseCandidate is no longer served after 1.38.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 38))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 	apiserver.LeaseCandidateGCPeriod = 1 * time.Second
 

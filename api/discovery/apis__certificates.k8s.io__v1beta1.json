@@ -8,7 +8,7 @@
       "name": "clustertrustbundles",
       "namespaced": false,
       "singularName": "clustertrustbundle",
-      "storageVersionHash": "v5yhuVertL4=",
+      "storageVersionHash": "R/wbJqMRFu8=",
       "verbs": [
         "create",
         "delete",
@@ -25,7 +25,7 @@
       "name": "podcertificaterequests",
       "namespaced": true,
       "singularName": "podcertificaterequest",
-      "storageVersionHash": "wYA9yXQH8fg=",
+      "storageVersionHash": "y6DwA8NQC8M=",
       "verbs": [
         "create",
         "delete",

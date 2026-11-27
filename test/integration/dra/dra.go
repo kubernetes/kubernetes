@@ -148,7 +148,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "Pod", testPod)
 				runSubTest(tCtx, "ListTypeAttributes", testListTypeAttributes)
 				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, false) })
-				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, false) })
+				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, true) })
 				runSubTest(tCtx, "OptionalNodeOperations", func(tCtx ktesting.TContext) { testOptionalNodeOperations(tCtx, true) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceCompatibilityGroups)
@@ -213,6 +213,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
 				runSubTest(tCtx, "WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, false, false) })
+				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, false) })
 			},
 		},
 		"GA-1.36": {
@@ -228,6 +229,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
 				})
+				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, false) })
 			},
 		},
 		"GA-1.35": {
@@ -243,6 +245,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions, features.DRAOptionalNodeOperations)
 				})
+				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, false) })
 			},
 		},
 		"GA-opt-out-1.36": {
@@ -257,21 +260,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
-			},
-		},
-		"v1beta2": {
-			apis: map[schema.GroupVersion]bool{
-				resourceapi.SchemeGroupVersion:     false,
-				resourcev1beta2.SchemeGroupVersion: true,
-			},
-			features: map[featuregate.Feature]bool{
-				features.DRADeviceTaintRules:          true,
-				features.DRADeviceCompatibilityGroups: true,
-			},
-			f: func(tCtx ktesting.TContext) {
-				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false)
-				})
+				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, false) })
 			},
 		},
 		// Preemption tests step through pod termination and claim deallocation
@@ -322,7 +311,6 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				// These tests must run in parallel as much as possible to keep overall runtime low!
 
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
-				runSubTest(tCtx, "Convert", testConvert)
 				runSubTest(tCtx, "OpaqueParametersMetadataUpdates", testOpaqueParametersMetadataUpdates)
 				runSubTest(tCtx, "ControllerManagerMetrics", testControllerManagerMetrics)
 				runSubTest(tCtx, "ResourceSliceFieldSelectors", testResourceSliceFieldSelectors)
