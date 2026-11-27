@@ -68,6 +68,8 @@ const (
 	offsetAcceleratorDutyCycle
 	offsetMemSwapUsageBytes
 	offsetPSIDataTotal
+	offsetMemHighEvents
+	offsetMemMaxEvents
 )
 
 var (
@@ -297,6 +299,10 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 			},
 			Swap: uint64(seed + offsetMemSwapUsageBytes),
 			PSI:  getTestPSIStats(seed),
+			Events: cadvisorapiv1.MemoryEvents{
+				High: uint64(seed + offsetMemHighEvents),
+				Max:  uint64(seed + offsetMemMaxEvents),
+			},
 		},
 		Network: &cadvisorapi.NetworkStats{
 			Interfaces: []cadvisorapi.InterfaceStats{{
@@ -516,6 +522,8 @@ func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapi.Con
 		assert.EqualValues(t, expected, *stats.AvailableBytes, label+".Mem.AvailableBytes")
 	}
 	checkPSIStats(t, label+".Mem", seed, stats.PSI)
+	assert.EqualValues(t, seed+offsetMemHighEvents, *stats.HighEvents, label+".Mem.HighEvents")
+	assert.EqualValues(t, seed+offsetMemMaxEvents, *stats.MaxEvents, label+".Mem.MaxEvents")
 }
 
 func checkIOStats(t *testing.T, label string, seed int, info cadvisorapi.ContainerInfo, stats *statsapi.IOStats) {
