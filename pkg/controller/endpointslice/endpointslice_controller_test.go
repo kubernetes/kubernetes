@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -40,8 +42,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/endpointslice/topologycache"
 	endpointsliceutil "k8s.io/endpointslice/util"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointslicepkg "k8s.io/kubernetes/pkg/controller/util/endpointslice"
@@ -61,7 +65,7 @@ type endpointSliceController struct {
 	serviceStore       cache.Store
 }
 
-func newController(t *testing.T, nodeNames []string, batchPeriod time.Duration) (*fake.Clientset, *endpointSliceController) {
+func newController(t testing.TB, nodeNames []string, batchPeriod time.Duration) (*fake.Clientset, *endpointSliceController) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
@@ -94,6 +98,14 @@ func newController(t *testing.T, nodeNames []string, batchPeriod time.Duration) 
 		esIndexer.Update(endpointSlice)
 
 		return false, endpointSlice, nil
+	}))
+	client.PrependReactor("delete", "endpointslices", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		key := action.GetNamespace() + "/" + action.(k8stesting.DeleteAction).GetName()
+		if endpointSlice, exists, _ := esIndexer.GetByKey(key); exists {
+			return false, nil, esIndexer.Delete(endpointSlice)
+		}
+
+		return false, nil, nil
 	}))
 
 	_, ctx := ktesting.NewTestContext(t)
@@ -381,7 +393,7 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
-	service := createService(t, esController, ns, serviceName)
+	service := createService(t, esController, ns, serviceName, map[string]string{"foo": "bar"})
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 	require.NoError(t, err, "Expected no error syncing service")
@@ -429,7 +441,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
-	service := createService(t, esController, ns, serviceName)
+	service := createService(t, esController, ns, serviceName, map[string]string{"foo": "bar"})
 
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
 	ownerRef := metav1.NewControllerRef(service, gvk)
@@ -2046,14 +2058,14 @@ func addPods(t *testing.T, esController *endpointSliceController, namespace stri
 
 func standardSyncService(t *testing.T, esController *endpointSliceController, namespace, serviceName string) {
 	t.Helper()
-	createService(t, esController, namespace, serviceName)
+	createService(t, esController, namespace, serviceName, map[string]string{"foo": "bar"})
 
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
 	require.NoError(t, err, "Expected no error syncing service")
 }
 
-func createService(t *testing.T, esController *endpointSliceController, namespace, serviceName string) *v1.Service {
+func createService(t testing.TB, esController *endpointSliceController, namespace, serviceName string, selector map[string]string) *v1.Service {
 	t.Helper()
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2064,7 +2076,7 @@ func createService(t *testing.T, esController *endpointSliceController, namespac
 		},
 		Spec: v1.ServiceSpec{
 			Ports:      []v1.ServicePort{{TargetPort: intstr.FromInt32(80)}},
-			Selector:   map[string]string{"foo": "bar"},
+			Selector:   selector,
 			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	}
@@ -2225,4 +2237,142 @@ func TestSyncServiceServiceRecreated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error syncing recreated service, got: %v", err)
 	}
+}
+
+// Pod events that resolve to the same services must collapse in podQueue.
+func TestPodQueueDeduplicates(t *testing.T) {
+	_, esController := newController(t, []string{"node-1"}, 0)
+	t.Cleanup(func() {
+		esController.serviceQueue.ShutDown()
+		esController.podQueue.ShutDown()
+		esController.topologyQueue.ShutDown()
+		esController.eventBroadcaster.Shutdown()
+	})
+
+	ns := metav1.NamespaceDefault
+	const replicas = 50
+	for i := range replicas {
+		pod := newPod(i, ns, true, 0, false)
+		pod.Labels = map[string]string{"app": "web", "pod-template-hash": "abc"}
+		esController.onPodUpdate(nil, pod)
+
+		updated := pod.DeepCopy()
+		updated.ResourceVersion = pod.ResourceVersion + "-updated"
+		updated.Status.PodIPs = []v1.PodIP{{IP: fmt.Sprintf("10.200.0.%d", i)}}
+		if _, ok := endpointsliceutil.GetPodUpdateProjectionKey(pod, updated); !ok {
+			t.Fatal("expected the pod IP change to produce a projection key")
+		}
+		esController.onPodUpdate(pod, updated)
+		esController.onPodUpdate(updated, nil)
+	}
+	if got := esController.podQueue.Len(); got != 1 {
+		t.Fatalf("expected %d pod events with identical labels to collapse into 1 queue item, got %d", 3*replicas, got)
+	}
+
+	other := newPod(replicas, ns, true, 0, false)
+	other.Labels = map[string]string{"app": "db"}
+	esController.onPodUpdate(nil, other)
+	if got := esController.podQueue.Len(); got != 2 {
+		t.Fatalf("expected a pod with different labels to add a queue item, got %d", got)
+	}
+}
+
+// instrumentedQueue counts the items handed out to workers, i.e. the syncs.
+type instrumentedQueue[T comparable] struct {
+	workqueue.TypedRateLimitingInterface[T]
+	getCount atomic.Int64
+}
+
+func (q *instrumentedQueue[T]) Get() (T, bool) {
+	item, shutdown := q.TypedRateLimitingInterface.Get()
+	if !shutdown {
+		q.getCount.Add(1)
+	}
+	return item, shutdown
+}
+
+func instrumentQueue[T comparable](queue *workqueue.TypedRateLimitingInterface[T]) *atomic.Int64 {
+	instrumented := &instrumentedQueue[T]{TypedRateLimitingInterface: *queue}
+	*queue = instrumented
+	return &instrumented.getCount
+}
+
+// BenchmarkScaleLargeService runs the whole controller against the fake
+// client and quickly scales a large service down and back up.
+func BenchmarkScaleLargeService(b *testing.B) {
+	for _, services := range []int{1, 100, 1000, 5000, 10000, 20000} {
+		b.Run(fmt.Sprintf("services=%d", services), func(b *testing.B) {
+			benchmarkScaleLargeService(b, services)
+		})
+	}
+}
+
+func benchmarkScaleLargeService(b *testing.B, services int) {
+	const (
+		ns             = metav1.NamespaceDefault
+		totalPods      = 5000
+		scaledDownPods = 1000
+		batchPeriod    = 100 * time.Millisecond
+		workers        = 5
+	)
+
+	client, esController := newController(b, []string{"node-1"}, batchPeriod)
+	podSyncs := instrumentQueue(&esController.podQueue)
+
+	// At the default test verbosity every pod sync logs a line, which would dominate the measurement.
+	ctx, cancel := context.WithCancel(klog.NewContext(context.Background(), klog.Logger{}))
+
+	waitEventsProcessed := func() {
+		b.Helper()
+		err := wait.PollUntilContextTimeout(ctx, time.Millisecond, time.Minute, true, func(context.Context) (bool, error) {
+			return esController.podQueue.Len() == 0 && esController.serviceQueue.Len() == 0, nil
+		})
+		require.NoError(b, err)
+	}
+
+	pods := make([]*v1.Pod, totalPods)
+	for i := range pods {
+		pods[i] = newPod(i, ns, true, 0, false)
+		require.NoError(b, esController.podStore.Add(pods[i]))
+	}
+
+	for i := range services {
+		name := fmt.Sprintf("svc-%d", i)
+
+		selector := map[string]string{"foo": "unrelated"}
+		if i == 0 {
+			selector = map[string]string{"foo": "bar"}
+		}
+
+		service := createService(b, esController, ns, name, selector)
+		esController.onServiceUpdate(service)
+	}
+
+	var wg sync.WaitGroup
+	wg.Go(func() { esController.Run(ctx, workers) })
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
+
+	waitEventsProcessed()
+
+	startPodSyncs := podSyncs.Load()
+	for b.Loop() {
+		for _, pod := range pods[scaledDownPods:] {
+			require.NoError(b, esController.podStore.Delete(pod))
+			esController.onPodUpdate(pod, nil)
+		}
+
+		for _, pod := range pods[scaledDownPods:] {
+			require.NoError(b, esController.podStore.Add(pod))
+			esController.onPodUpdate(nil, pod)
+		}
+
+		waitEventsProcessed()
+
+		client.ClearActions()
+	}
+
+	b.ReportMetric(float64(podSyncs.Load()-startPodSyncs)/float64(b.N), "pod-queue-syncs/op")
 }
