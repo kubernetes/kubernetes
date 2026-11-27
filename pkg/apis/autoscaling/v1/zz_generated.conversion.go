@@ -432,6 +432,7 @@ func autoConvert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAuto
 	out.MinReplicas = (*int32)(unsafe.Pointer(in.MinReplicas))
 	out.MaxReplicas = in.MaxReplicas
 	// WARNING: in.TargetCPUUtilizationPercentage requires manual conversion: does not exist in peer-type
+	out.SyncPeriodSeconds = (*int32)(unsafe.Pointer(in.SyncPeriodSeconds))
 	return nil
 }
 
@@ -443,6 +444,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 	out.MaxReplicas = in.MaxReplicas
 	// WARNING: in.Metrics requires manual conversion: does not exist in peer-type
 	// WARNING: in.Behavior requires manual conversion: does not exist in peer-type
+	out.SyncPeriodSeconds = (*int32)(unsafe.Pointer(in.SyncPeriodSeconds))
 	return nil
 }
 

@@ -105,3 +105,49 @@ func TestObjectMetricAverageValue_RoundTripV2V1(t *testing.T) {
 	validationErrors = validation.ValidateHorizontalPodAutoscaler(hpaInternalFromV1, validation.HorizontalPodAutoscalerSpecValidationOptions{})
 	assert.Zero(t, len(validationErrors), "Validation should not produce errors")
 }
+
+func TestSyncPeriodSeconds_RoundTripV2V1(t *testing.T) {
+	tests := []struct {
+		name              string
+		syncPeriodSeconds *int32
+	}{
+		{name: "unset"},
+		{name: "minimum", syncPeriodSeconds: ptr.To[int32](3)},
+		{name: "maximum", syncPeriodSeconds: ptr.To[int32](3600)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hpaV2 := &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-hpa", Namespace: "default"},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						Kind:       "Deployment",
+						Name:       "my-deployment",
+						APIVersion: "apps/v1",
+					},
+					MinReplicas:       ptr.To[int32](1),
+					MaxReplicas:       3,
+					SyncPeriodSeconds: tt.syncPeriodSeconds,
+				},
+			}
+
+			hpaInternal := &autoscaling.HorizontalPodAutoscaler{}
+			assert.NoError(t, Convert_v2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(hpaV2, hpaInternal, nil))
+			hpaV1 := &autoscalingv1.HorizontalPodAutoscaler{}
+			assert.NoError(t, v1.Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(hpaInternal, hpaV1, nil))
+
+			jsonData, err := json.Marshal(hpaV1)
+			assert.NoError(t, err)
+			var hpaV1FromJSON autoscalingv1.HorizontalPodAutoscaler
+			assert.NoError(t, json.Unmarshal(jsonData, &hpaV1FromJSON))
+
+			hpaInternalFromV1 := &autoscaling.HorizontalPodAutoscaler{}
+			assert.NoError(t, v1.Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(&hpaV1FromJSON, hpaInternalFromV1, nil))
+			finalV2 := &autoscalingv2.HorizontalPodAutoscaler{}
+			assert.NoError(t, Convert_autoscaling_HorizontalPodAutoscaler_To_v2_HorizontalPodAutoscaler(hpaInternalFromV1, finalV2, nil))
+
+			assert.Equal(t, tt.syncPeriodSeconds, hpaV1FromJSON.Spec.SyncPeriodSeconds, "autoscaling/v1")
+			assert.Equal(t, tt.syncPeriodSeconds, finalV2.Spec.SyncPeriodSeconds, "autoscaling/v2 after a round trip through autoscaling/v1")
+		})
+	}
+}
