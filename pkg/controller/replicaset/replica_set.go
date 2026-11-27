@@ -1007,21 +1007,44 @@ func getPodsToDelete(filteredPods, relatedPods []*v1.Pod, diff int) []*v1.Pod {
 }
 
 func reportSortingDeletionAgeRatioMetric(filteredPods []*v1.Pod, diff int) {
-	now := time.Now()
+	reportSortingDeletionAgeRatioMetricAt(filteredPods, diff, time.Now())
+}
+
+func reportSortingDeletionAgeRatioMetricAt(filteredPods []*v1.Pod, diff int, now time.Time) {
+	if diff <= 0 || len(filteredPods) == 0 {
+		return
+	}
+	if diff > len(filteredPods) {
+		diff = len(filteredPods)
+	}
+
 	youngestTime := time.Time{}
-	// first we need to check all of the ready pods to get the youngest, as they may not necessarily be sorted by timestamp alone
+	// First check all of the ready pods to get the youngest, as they may not necessarily be sorted by timestamp alone.
 	for _, pod := range filteredPods {
-		if pod.CreationTimestamp.Time.After(youngestTime) && podutil.IsPodReady(pod) {
+		if podutil.IsPodReady(pod) && !pod.CreationTimestamp.IsZero() && pod.CreationTimestamp.Time.After(youngestTime) {
 			youngestTime = pod.CreationTimestamp.Time
 		}
 	}
+	if youngestTime.IsZero() {
+		return
+	}
 
-	// for each pod chosen for deletion, report the ratio of its age to the youngest pod's age
+	youngestAge := now.Sub(youngestTime)
+	// Skip reporting if the youngest pod has zero or negative age (e.g., created at `now`
+	// or future timestamp from clock skew) to prevent division by zero (+Inf/NaN) or negative ratios.
+	if youngestAge <= 0 {
+		return
+	}
+
+	// For each pod chosen for deletion, report the ratio of its age to the youngest pod's age.
 	for _, pod := range filteredPods[:diff] {
-		if !podutil.IsPodReady(pod) {
+		if !podutil.IsPodReady(pod) || pod.CreationTimestamp.IsZero() {
 			continue
 		}
-		ratio := float64(now.Sub(pod.CreationTimestamp.Time).Milliseconds() / now.Sub(youngestTime).Milliseconds())
+		podAge := now.Sub(pod.CreationTimestamp.Time)
+		// Compute in float64 using nanosecond time.Duration precision rather than integer
+		// milliseconds so fractional ratios and sub-millisecond durations are preserved.
+		ratio := float64(podAge) / float64(youngestAge)
 		metrics.SortingDeletionAgeRatio.Observe(ratio)
 	}
 }
