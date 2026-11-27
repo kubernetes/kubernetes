@@ -136,11 +136,13 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if wasMatched {
-		logger.V(5).Info("node updated, but the pod's NodeAffinity hasn't changed", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	// Filter also rejects nodes that don't match the scheduler-enforced affinity,
+	// so the old node only counts as matched if it passed that check too.
+	if wasMatched && (pl.addedNodeSelector == nil || pl.addedNodeSelector.Match(originalNode)) {
+		logger.V(5).Info("node was updated, but it already matched the pod's NodeAffinity and scheduler-enforced node affinity, so this event won't make the Pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 		return fwk.QueueSkip, nil
 	}
-	logger.V(5).Info("node was updated and the pod's NodeAffinity changed to matched", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	logger.V(5).Info("node was updated and now matches the pod's NodeAffinity and scheduler-enforced node affinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
 	return fwk.Queue, nil
 }
 
