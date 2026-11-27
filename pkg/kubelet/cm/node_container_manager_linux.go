@@ -107,7 +107,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger
 	if len(cm.cgroupRoot) > 0 {
 		go func() {
 			for {
-				err := cm.cgroupManager.Update(logger, cgroupConfig)
+				err := cm.updateNodeAllocatableCgroup(logger, cgroupConfig)
 				if err == nil {
 					cm.recorder.Event(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
 					return
@@ -158,6 +158,65 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger
 		cm.recorder.Eventf(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated limits on kube reserved cgroup %v", nc.KubeReservedCgroupName)
 	}
 	return nil
+}
+
+// updateNodeAllocatableCgroup avoids lowering a cgroup v2 memory limit to or
+// below current usage. cgroup v2 may reclaim memory and invoke the memcg OOM
+// killer when memory.max is lowered below usage instead of rejecting the update.
+//
+// When the requested memory limit cannot be applied yet, the remaining resource
+// settings (CPU shares, pids limit, cpuset, unified settings) are still applied
+// on their own while memory.max is left untouched, and an error is returned so
+// the caller keeps retrying until usage drops below the requested limit.
+//
+// The check is best-effort because usage may change before the cgroup update.
+func (cm *containerManagerImpl) updateNodeAllocatableCgroup(logger klog.Logger, config *CgroupConfig) error {
+	if cm.cgroupManager.Version() != 2 || config.ResourceParameters == nil {
+		return cm.cgroupManager.Update(logger, config)
+	}
+
+	memory := config.ResourceParameters.Memory
+	// Both cgroup v2 backends treat zero as "unset": the cgroupfs conversion
+	// writes an empty value and systemd only adds MemoryMax for a nonzero value.
+	// Negative values are already rejected by validateNodeAllocatable. Neither
+	// reaches memory.max, so there is nothing to guard against.
+	if memory == nil || *memory <= 0 {
+		return cm.cgroupManager.Update(logger, config)
+	}
+
+	usage, err := cm.cgroupManager.MemoryUsage(config.Name)
+	if err != nil {
+		// Apply everything except memory so an unrelated read failure does not
+		// hold back independent settings such as the CPU share correction.
+		if applyErr := cm.cgroupManager.Update(logger, configWithoutMemory(config)); applyErr != nil {
+			logger.Error(applyErr, "Failed to update Node Allocatable cgroup without memory", "cgroupName", config.Name)
+		}
+		return fmt.Errorf("failed to read current Node Allocatable memory usage for cgroup %q: %w", config.Name, err)
+	}
+
+	if usage < *memory {
+		return cm.cgroupManager.Update(logger, config)
+	}
+
+	// Usage is already at or above the target. Lowering memory.max now could
+	// trigger synchronous reclaim and memcg OOM kills, so apply all other
+	// settings and defer the memory limit update for a later retry.
+	if applyErr := cm.cgroupManager.Update(logger, configWithoutMemory(config)); applyErr != nil {
+		logger.Error(applyErr, "Failed to update Node Allocatable cgroup without memory", "cgroupName", config.Name)
+	}
+	return fmt.Errorf("current memory usage %d is at or above requested limit %d for cgroup %q", usage, *memory, config.Name)
+}
+
+// configWithoutMemory returns a copy of config whose resource parameters carry no
+// memory limit, leaving memory.max untouched. The caller's configuration is never
+// mutated, so the retry loop keeps retrying the original target.
+func configWithoutMemory(config *CgroupConfig) *CgroupConfig {
+	params := *config.ResourceParameters
+	params.Memory = nil
+
+	copied := *config
+	copied.ResourceParameters = &params
+	return &copied
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
