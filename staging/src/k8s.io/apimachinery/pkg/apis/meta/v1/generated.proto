@@ -927,6 +927,8 @@ message ObjectMeta {
   // +optional
   // +patchStrategy=merge
   // +listType=set
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:eachVal=+k8s:format=k8s-label-key
   repeated string finalizers = 14;
 
   // ManagedFields maps workflow-id and version to the set of fields
