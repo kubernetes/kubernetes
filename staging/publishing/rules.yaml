@@ -1806,8 +1806,6 @@ rules:
       branch: master
     - repository: component-helpers
       branch: master
-    - repository: kms
-      branch: master
     source:
       branch: master
       dirs:
