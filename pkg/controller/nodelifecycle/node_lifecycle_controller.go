@@ -555,7 +555,11 @@ func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName str
 
 	// Map node's condition to Taints.
 	var taints []v1.Taint
+	hasReadyCondition := false
 	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady {
+			hasReadyCondition = true
+		}
 		if taintMap, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
 			if taintKey, found := taintMap[condition.Status]; found {
 				taints = append(taints, v1.Taint{
@@ -564,6 +568,14 @@ func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName str
 				})
 			}
 		}
+	}
+	if !hasReadyCondition {
+		// A node without a Ready condition is not ready. Keep the taint that the
+		// TaintNodesByCondition admission plugin added at creation.
+		taints = append(taints, v1.Taint{
+			Key:    v1.TaintNodeNotReady,
+			Effect: v1.TaintEffectNoSchedule,
+		})
 	}
 	if node.Spec.Unschedulable {
 		// If unschedulable, append related taint.
