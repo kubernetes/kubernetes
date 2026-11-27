@@ -23,8 +23,42 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 )
+
+func TestWithAuditInitGeneratesValidUUIDv4(t *testing.T) {
+	var auditIDGot string
+	handler := WithAuditInit(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		id, ok := audit.AuditIDFrom(req.Context())
+		if !ok {
+			t.Fatal("expected an audit ID in the request context")
+		}
+		auditIDGot = string(id)
+	}))
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/namespaces", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	id, err := uuid.Parse(auditIDGot)
+	if err != nil {
+		t.Fatalf("generated audit ID %q is not a valid UUID: %v", auditIDGot, err)
+	}
+	if id.String() != auditIDGot || id.Version() != 4 || id.Variant() != uuid.RFC4122 {
+		t.Errorf("generated audit ID %q is not a canonical UUIDv4", auditIDGot)
+	}
+	if echoed := w.Header().Get(auditinternal.HeaderAuditID); echoed != auditIDGot {
+		t.Errorf("Audit-ID response header %q doesn't match context value %q", echoed, auditIDGot)
+	}
+}
+
+func BenchmarkNewAuditID(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		newAuditID()
+	}
+}
 
 func TestWithAuditID(t *testing.T) {
 	largeAuditID := fmt.Sprintf("%s-%s", uuid.New().String(), uuid.New().String())
