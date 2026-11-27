@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
@@ -147,6 +148,46 @@ var _ = SIGDescribe("SecurityProfileOCI", feature.SecurityProfileOCI, framework.
 		framework.ExpectNoError(err)
 		gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodPending))
 	})
+
+	// A started pod pulls the profile of a container right before it
+	// creates the container, so ephemeral containers take the per-container
+	// path of the kubelet.
+	ginkgo.It("should apply a profile pulled for an ephemeral container", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, newSecurityProfileOCIRunningPod())
+		ec := newSecurityProfileOCIEphemeralContainer(denyChmodProfile,
+			"touch /tmp/file && if chmod 600 /tmp/file; then echo allowed; else echo denied; fi; sleep 1d")
+		framework.ExpectNoError(podClient.AddEphemeralContainerSync(ctx, pod, ec, 2*time.Minute))
+
+		gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, ec.Name)
+		}).WithTimeout(time.Minute).Should(gomega.ContainSubstring("denied"))
+		expectSecurityProfileOCIPodRunning(ctx, f, pod.Name)
+	})
+
+	ginkgo.It("should hold back an ephemeral container whose profile cannot be pulled", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, newSecurityProfileOCIRunningPod())
+		ec := newSecurityProfileOCIEphemeralContainer(missingProfile, "true")
+		addSecurityProfileOCIEphemeralContainer(ctx, f, pod, ec)
+
+		// Between pulls, the reason is the backoff.
+		waitForSecurityProfileOCIEphemeralContainerReason(ctx, f, pod.Name, ec.Name,
+			images.ErrSecurityProfilePull.Error(), images.ErrSecurityProfilePullBackOff.Error())
+		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(ctx, f.ClientSet, f.Namespace.Name,
+			securityProfileEventSelector(f, pod.Name, kubeletevents.FailedToPullSecurityProfile), "", 2*time.Minute))
+		expectSecurityProfileOCIPodRunning(ctx, f, pod.Name)
+	})
+
+	ginkgo.It("should hold back an ephemeral container for an artifact that is not a seccomp profile without failing the pod", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, newSecurityProfileOCIRunningPod())
+		ec := newSecurityProfileOCIEphemeralContainer(invalidProfile, "true")
+		addSecurityProfileOCIEphemeralContainer(ctx, f, pod, ec)
+
+		waitForSecurityProfileOCIEphemeralContainerReason(ctx, f, pod.Name, ec.Name, images.ErrSecurityProfileRejected.Error())
+		expectSecurityProfileOCIPodRunning(ctx, f, pod.Name)
+	})
 })
 
 var _ = SIGDescribe("SecurityProfileOCI", feature.SecurityProfileOCI, feature.CriProxy, framework.WithFeatureGate(features.SecurityProfileOCI), framework.WithSerial(), "[LinuxOnly]", func() {
@@ -251,6 +292,85 @@ func newSecurityProfileOCIPod(ref, command string) *v1.Pod {
 			}},
 		},
 	}
+}
+
+// newSecurityProfileOCIRunningPod returns a pod without an OCI profile that
+// keeps running, for ephemeral containers to be added to.
+func newSecurityProfileOCIRunningPod() *v1.Pod {
+	name := "security-profile-oci-" + string(uuid.NewUUID())
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{{
+				Name:    name,
+				Image:   busyboxImage,
+				Command: []string{"sleep", "1d"},
+			}},
+		},
+	}
+}
+
+func newSecurityProfileOCIEphemeralContainer(ref, command string) *v1.EphemeralContainer {
+	return &v1.EphemeralContainer{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon{
+			Name:    "debugger",
+			Image:   busyboxImage,
+			Command: []string{"sh", "-c", command},
+			SecurityContext: &v1.SecurityContext{
+				SeccompProfile: &v1.SeccompProfile{
+					Type: v1.SeccompProfileTypeOCI,
+					OCI:  &v1.SecurityProfileOCI{Ref: ref},
+				},
+			},
+		},
+	}
+}
+
+// addSecurityProfileOCIEphemeralContainer adds an ephemeral container without
+// waiting for it to run.
+func addSecurityProfileOCIEphemeralContainer(ctx context.Context, f *framework.Framework, pod *v1.Pod, ec *v1.EphemeralContainer) {
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, *ec)
+	_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateEphemeralContainers(ctx, pod.Name, pod, metav1.UpdateOptions{})
+	framework.ExpectNoError(err)
+}
+
+// waitForSecurityProfileOCIEphemeralContainerReason waits until the ephemeral
+// container waits with one of the reasons. Any other state is reported as is,
+// so that a failure shows what the container did instead.
+func waitForSecurityProfileOCIEphemeralContainerReason(ctx context.Context, f *framework.Framework, podName, containerName string, reasons ...string) {
+	gomega.Eventually(ctx, func(ctx context.Context) (string, error) {
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		for _, status := range pod.Status.EphemeralContainerStatuses {
+			if status.Name != containerName {
+				continue
+			}
+			switch {
+			case status.State.Waiting != nil:
+				return status.State.Waiting.Reason, nil
+			case status.State.Running != nil:
+				return "running", nil
+			case status.State.Terminated != nil:
+				return "terminated: " + status.State.Terminated.Reason, nil
+			}
+		}
+		return "no status", nil
+	}).WithTimeout(2 * time.Minute).WithPolling(time.Second).Should(gomega.BeElementOf(reasons))
+}
+
+// expectSecurityProfileOCIPodRunning checks that a failing ephemeral container
+// did not stop the rest of the pod.
+func expectSecurityProfileOCIPodRunning(ctx context.Context, f *framework.Framework, podName string) {
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
+	gomega.Expect(pod.Status.ContainerStatuses).To(gomega.HaveLen(1))
+	gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(gomega.BeNil(), "the regular container should keep running")
 }
 
 // cachedSecurityProfilePulls returns the number of profile pulls the runtime
