@@ -58,7 +58,7 @@ var (
 	defaultMaxWatchTimeout = 2 * defaultMinWatchTimeout
 	// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 	// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
-	// 0.22 QPS.
+	// ~0.022 QPS.
 	defaultBackoffInit = 800 * time.Millisecond
 	defaultBackoffMax  = 30 * time.Second
 	// If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
@@ -280,7 +280,7 @@ type ReflectorOptions struct {
 
 	// Backoff is an optional custom backoff configuration.
 	// If set, it will be used instead of the default exponential backoff.
-	// DelayWithReset(clock, resetDuration) will be called on it to create the delay function.
+	// The delays restart from Duration when more than 2 minutes pass between two consecutive backoffs.
 	// TODO(#136943): Expose this configuration through SharedInformerFactory.
 	Backoff *wait.Backoff
 }
@@ -335,7 +335,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		typeDescription:   options.TypeDescription,
 		listerWatcher:     ToListerWatcherWithContext(lw),
 		store:             store,
-		delayHandler:      backoff.DelayWithReset(reflectorClock, defaultBackoffReset),
+		delayHandler:      delayWithIdleReset(*backoff, reflectorClock, defaultBackoffReset),
 		clock:             reflectorClock,
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 		expectedType:      reflect.TypeOf(expectedType),
@@ -406,6 +406,23 @@ func getExpectedGVKFromObject(expectedType interface{}) *schema.GroupVersionKind
 	return &gvk
 }
 
+// delayWithIdleReset returns a DelayFunc that restarts b from its initial state once it
+// has not been called for resetInterval. Unlike b.DelayWithReset, which resets every
+// resetInterval even while calls continue, it keeps a continuously failing reflector at
+// the cap instead of returning to the initial delay every resetInterval.
+func delayWithIdleReset(b wait.Backoff, c clock.Clock, resetInterval time.Duration) wait.DelayFunc {
+	last := c.Now()
+	next := b.DelayFunc()
+	return wait.DelayFunc(func() time.Duration {
+		now := c.Now()
+		if now.Sub(last) > resetInterval {
+			next = b.DelayFunc()
+		}
+		last = now
+		return next()
+	}).Concurrent()
+}
+
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
 // call chains to NewReflector, so they'd be low entropy names for reflectors
 var internalPackages = []string{"client-go/tools/cache/"}
@@ -425,8 +442,8 @@ func (r *Reflector) Run(stopCh <-chan struct{}) {
 func (r *Reflector) RunWithContext(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Starting reflector", "type", r.typeDescription, "resyncPeriod", r.resyncPeriod, "reflector", r.name)
-	// Until runs the loop immediately (immediate=true) and resets the backoff timer after each
-	// successful iteration (sliding=true). See backoff constants at top of file for generalized QPS targets (~0.22 QPS).
+	// Until runs the loop immediately (immediate=true) and starts each delay after ListAndWatch
+	// returns (sliding=true). See backoff constants at top of file for generalized QPS targets (~0.022 QPS).
 	_ = r.delayHandler.Until(ctx, true, true, func(ctx context.Context) (bool, error) {
 		if err := r.ListAndWatchWithContext(ctx); err != nil {
 			r.watchErrorHandler(ctx, r, err)

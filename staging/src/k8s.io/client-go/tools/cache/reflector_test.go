@@ -753,7 +753,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 					Factor:   2.0,
 					Jitter:   1.0,
 				}
-				delayFn := backoff.DelayWithReset(fakeClock, 100*time.Millisecond)
+				delayFn := delayWithIdleReset(backoff, fakeClock, 100*time.Millisecond)
 				done := make(chan struct{})
 				defer close(done)
 				go func() {
@@ -886,6 +886,55 @@ func TestNewReflectorWithCustomBackoff(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReflectorBackoffReset(t *testing.T) {
+	newReflector := func(c clock.Clock) *Reflector {
+		return NewReflectorWithOptions(&ListWatch{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), ReflectorOptions{
+			Clock: c,
+			Backoff: &wait.Backoff{
+				Duration: 800 * time.Millisecond,
+				Cap:      30 * time.Second,
+				Steps:    100,
+				Factor:   2.0,
+				Jitter:   0,
+			},
+		})
+	}
+
+	t.Run("continuous failures stay at the cap", func(t *testing.T) {
+		fakeClock := testingclock.NewFakeClock(time.Unix(0, 0))
+		r := newReflector(fakeClock)
+
+		// Every retry fails right after the previous delay, for longer than defaultBackoffReset.
+		start := fakeClock.Now()
+		var got []time.Duration
+		var lastCallAt time.Duration
+		for range 10 {
+			lastCallAt = fakeClock.Since(start)
+			d := r.delayHandler()
+			got = append(got, d)
+			fakeClock.Step(d)
+		}
+
+		require.Greater(t, lastCallAt, defaultBackoffReset, "failures must continue past the reset interval")
+		want := []time.Duration{
+			800 * time.Millisecond, 1600 * time.Millisecond, 3200 * time.Millisecond, 6400 * time.Millisecond,
+			12800 * time.Millisecond, 25600 * time.Millisecond, 30 * time.Second, 30 * time.Second, 30 * time.Second, 30 * time.Second,
+		}
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("quiet period longer than the reset interval restarts the backoff", func(t *testing.T) {
+		fakeClock := testingclock.NewFakeClock(time.Unix(0, 0))
+		r := newReflector(fakeClock)
+		for range 3 {
+			r.delayHandler()
+		}
+
+		fakeClock.Step(defaultBackoffReset + time.Nanosecond)
+		assert.Equal(t, 800*time.Millisecond, r.delayHandler())
+	})
 }
 
 type fakeDelayFunc struct {
