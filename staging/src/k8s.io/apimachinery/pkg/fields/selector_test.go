@@ -395,3 +395,46 @@ func TestTransform(t *testing.T) {
 	}
 
 }
+
+// TestSelectorStringIsIdempotent verifies that serializing a parsed selector
+// produces a canonical form: re-parsing that form and serializing it again must
+// return the same string. Terms used to be ordered by the raw input text, which
+// differs from the emitted text ("==" is emitted as "=", values are re-escaped),
+// so two terms could keep swapping places on every round trip.
+func TestSelectorStringIsIdempotent(t *testing.T) {
+	testCases := []string{
+		"",
+		"a=b",
+		"a=b,c=d",
+		"c=d,a=b",
+		"a!=b,a=c",
+		"metadata.name==,metadata.name=0",
+		"spec.nodeName==,spec.nodeName=0",
+		"a==b,a=0",
+		`a=b\,c,a=d`,
+		`a=b\\,a=c`,
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc, func(t *testing.T) {
+			parsed, err := ParseSelector(tc)
+			if err != nil {
+				t.Fatalf("unexpected parse error: %v", err)
+			}
+			first := parsed.String()
+
+			reparsed, err := ParseSelector(first)
+			if err != nil {
+				t.Fatalf("serialized form %q does not parse: %v", first, err)
+			}
+			if second := reparsed.String(); second != first {
+				t.Errorf("String() is not idempotent: %q serialized to %q, which serialized to %q", tc, first, second)
+			}
+
+			// The round trip must also preserve the terms themselves.
+			if !reflect.DeepEqual(parsed.Requirements(), reparsed.Requirements()) {
+				t.Errorf("round trip changed the requirements: %v became %v", parsed.Requirements(), reparsed.Requirements())
+			}
+		})
+	}
+}
