@@ -296,7 +296,7 @@ func TestStartContainerSecurityProfile(t *testing.T) {
 			fakeRuntime.Called = nil
 
 			for range tc.starts {
-				_, err = m.startContainer(tCtx, sandbox.Id, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "", nil, nil)
+				_, err = m.startContainer(tCtx, sandbox.Id, sandboxConfig, "", containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "", nil, nil)
 			}
 			if tc.expectedErr != nil {
 				// The error is a sentinel so that the container's waiting

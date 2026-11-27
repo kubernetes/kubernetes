@@ -101,7 +101,7 @@ func TestStartContainerStartsProbes(t *testing.T) {
 	}
 
 	before := time.Now()
-	if _, err := m.startContainer(tCtx, sandbox.Id, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "10.0.0.1", []string{"10.0.0.1"}, nil); err != nil {
+	if _, err := m.startContainer(tCtx, sandbox.Id, sandboxConfig, "", containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "10.0.0.1", []string{"10.0.0.1"}, nil); err != nil {
 		t.Fatalf("startContainer: %v", err)
 	}
 
@@ -141,7 +141,7 @@ func TestStartContainerFailureDoesNotStartProbes(t *testing.T) {
 
 	fakeRuntime.InjectError("StartContainer", errors.New("start failed"))
 
-	if _, err := m.startContainer(tCtx, sandbox.Id, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "10.0.0.1", []string{"10.0.0.1"}, nil); err == nil {
+	if _, err := m.startContainer(tCtx, sandbox.Id, sandboxConfig, "", containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "10.0.0.1", []string{"10.0.0.1"}, nil); err == nil {
 		t.Fatal("startContainer succeeded, want a StartContainer error")
 	}
 
@@ -178,7 +178,7 @@ func TestStartContainerProbesAfterPostStart(t *testing.T) {
 			}
 
 			before := time.Now()
-			_, err = m.startContainer(tCtx, sandbox.Id, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "10.0.0.1", []string{"10.0.0.1"}, nil)
+			_, err = m.startContainer(tCtx, sandbox.Id, sandboxConfig, "", containerStartSpec(&pod.Spec.Containers[0]), pod, &kubecontainer.PodStatus{}, nil, "10.0.0.1", []string{"10.0.0.1"}, nil)
 			if hookFails {
 				if !errors.Is(err, ErrPostStartHook) {
 					t.Fatalf("startContainer error = %v, want %v", err, ErrPostStartHook)
