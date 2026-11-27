@@ -267,28 +267,36 @@ func (s *specProxier) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, "/openapi/v3", time.Now(), bytes.NewReader(j))
 }
 
-// handleGroupVersion is the OpenAPI V3 handler for a specified group/version
-func (s *specProxier) handleGroupVersion(w http.ResponseWriter, r *http.Request) {
+// getGroupVersionHandler keeps the selected handler reachable even if its APIService is removed.
+// It does not snapshot the handler's internal state; the handler manages its own updates.
+func (s *specProxier) getGroupVersionHandler(targetGV string) http.Handler {
 	s.rwMutex.RLock()
 	defer s.rwMutex.RUnlock()
-
-	// TODO: Import this logic from kube-openapi instead of duplicating
-	// URLs for OpenAPI V3 have the format /openapi/v3/<groupversionpath>
-	// SplitAfterN with 4 yields ["", "openapi", "v3", <groupversionpath>]
-	url := strings.SplitAfterN(r.URL.Path, "/", 4)
-	targetGV := url[3]
 
 	for _, apiServiceInfo := range s.apiServiceInfo {
 		if apiServiceInfo.discovery == nil {
 			continue
 		}
 
-		for key := range apiServiceInfo.discovery.Paths {
-			if targetGV == key {
-				apiServiceInfo.handler.ServeHTTP(w, r)
-				return
-			}
+		if _, exists := apiServiceInfo.discovery.Paths[targetGV]; exists {
+			return apiServiceInfo.handler
 		}
+	}
+	return nil
+}
+
+// handleGroupVersion is the OpenAPI V3 handler for a specified group/version
+func (s *specProxier) handleGroupVersion(w http.ResponseWriter, r *http.Request) {
+	// TODO: Import this logic from kube-openapi instead of duplicating
+	// URLs for OpenAPI V3 have the format /openapi/v3/<groupversionpath>
+	// SplitAfterN with 4 yields ["", "openapi", "v3", <groupversionpath>]
+	url := strings.SplitAfterN(r.URL.Path, "/", 4)
+	targetGV := url[3]
+
+	// Release the lock before serving so a slow response cannot block APIService changes.
+	if handler := s.getGroupVersionHandler(targetGV); handler != nil {
+		handler.ServeHTTP(w, r)
+		return
 	}
 	// No group-versions match the desired request
 	w.WriteHeader(404)
