@@ -2381,15 +2381,25 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			}
 		}
 		if !podKilled || !runOnce {
-			if !pcm.Exists(pod) {
-				if err := kl.containerManager.UpdateQOSCgroups(logger); err != nil {
-					logger.V(2).Info("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
+			podCgroupExists := pcm.Exists(pod)
+			// Until the pod has a ready sandbox or a running container nothing runs
+			// in its cgroup, so its resource parameters are (re)applied on every
+			// sync. This repairs a pod cgroup left without its parameters by a
+			// failed write, or by a kubelet restart between creating the cgroup and
+			// configuring it. Once the pod has started, in-place resize owns the
+			// pod cgroup's parameters and they are not touched here.
+			if !podCgroupExists || !podHasReadySandboxOrRunningContainer(podStatus) {
+				if !podCgroupExists {
+					if err := kl.containerManager.UpdateQOSCgroups(logger); err != nil {
+						logger.V(2).Info("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
+					}
 				}
 				if err := pcm.EnsureExists(logger, pod); err != nil {
 					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
-					return false, nil, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+					return false, nil, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %w", pod.UID, err)
 				}
 
+				// The pod cgroup now holds the allocated pod-level resources.
 				if err = kl.containerRuntime.UpdateActuatedPodLevelResources(logger, pod); err != nil {
 					return false, nil, fmt.Errorf("failed to update the state of pod-level resources for the pod %v : %w", pod.UID, err)
 				}
@@ -4060,4 +4070,24 @@ func (p *allocatedStatsProvider) GetPods() []*v1.Pod {
 
 func (p *allocatedStatsProvider) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return p.podManager.GetPodByName(namespace, name)
+}
+
+// podHasReadySandboxOrRunningContainer reports whether anything may be running
+// in the pod's cgroup: the pod has a ready sandbox, or a container that is
+// running or whose state is unknown.
+func podHasReadySandboxOrRunningContainer(podStatus *kubecontainer.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	for _, sandbox := range podStatus.SandboxStatuses {
+		if sandbox.GetState() == runtimeapi.PodSandboxState_SANDBOX_READY {
+			return true
+		}
+	}
+	for _, container := range podStatus.ContainerStatuses {
+		if container.State == kubecontainer.ContainerStateRunning || container.State == kubecontainer.ContainerStateUnknown {
+			return true
+		}
+	}
+	return false
 }

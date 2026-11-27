@@ -8162,3 +8162,56 @@ func TestSyncLoopIteration_VolumePodSync(t *testing.T) {
 	require.True(t, ok)
 	testKubelet.fakeRuntime.AssertStartedPods([]string{string(pod.UID)})
 }
+
+func TestPodHasReadySandboxOrRunningContainer(t *testing.T) {
+	tests := []struct {
+		name      string
+		podStatus *kubecontainer.PodStatus
+		want      bool
+	}{
+		{name: "nil status", podStatus: nil, want: false},
+		{name: "no sandbox and no containers", podStatus: &kubecontainer.PodStatus{}, want: false},
+		{
+			name: "sandbox not ready",
+			podStatus: &kubecontainer.PodStatus{SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+				{State: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+			}},
+			want: false,
+		},
+		{
+			name: "sandbox ready",
+			podStatus: &kubecontainer.PodStatus{SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+				{State: runtimeapi.PodSandboxState_SANDBOX_NOTREADY},
+				{State: runtimeapi.PodSandboxState_SANDBOX_READY},
+			}},
+			want: true,
+		},
+		{
+			name: "only exited or created containers",
+			podStatus: &kubecontainer.PodStatus{ContainerStatuses: []*kubecontainer.Status{
+				{State: kubecontainer.ContainerStateExited},
+				{State: kubecontainer.ContainerStateCreated},
+			}},
+			want: false,
+		},
+		{
+			name: "running container",
+			podStatus: &kubecontainer.PodStatus{ContainerStatuses: []*kubecontainer.Status{
+				{State: kubecontainer.ContainerStateRunning},
+			}},
+			want: true,
+		},
+		{
+			name: "container in unknown state",
+			podStatus: &kubecontainer.PodStatus{ContainerStatuses: []*kubecontainer.Status{
+				{State: kubecontainer.ContainerStateUnknown},
+			}},
+			want: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, podHasReadySandboxOrRunningContainer(tc.podStatus))
+		})
+	}
+}

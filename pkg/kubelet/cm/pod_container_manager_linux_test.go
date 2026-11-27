@@ -1016,3 +1016,103 @@ func TestEnsureExistsNoCappedEventOnCreateFailure(t *testing.T) {
 	default:
 	}
 }
+
+// errCgroupManager is a fakeCgroupManager whose Create and Update return the
+// configured errors. createLeavesCgroup simulates a Create that made the
+// cgroup but failed to apply its parameters.
+type errCgroupManager struct {
+	fakeCgroupManager
+	createErr          error
+	updateErr          error
+	createLeavesCgroup bool
+}
+
+func (m *errCgroupManager) Create(logger klog.Logger, config *CgroupConfig) error {
+	if err := m.fakeCgroupManager.Create(logger, config); err != nil {
+		return err
+	}
+	if m.createLeavesCgroup {
+		m.exists = true
+	}
+	return m.createErr
+}
+
+func (m *errCgroupManager) Update(logger klog.Logger, config *CgroupConfig) error {
+	if err := m.fakeCgroupManager.Update(logger, config); err != nil {
+		return err
+	}
+	return m.updateErr
+}
+
+// TestEnsureExistsReconcilesParameters verifies that EnsureExists creates a
+// missing pod cgroup, reapplies the same parameters to an existing one, and
+// returns errors from both paths so that the kubelet retries on the next sync.
+func TestEnsureExistsReconcilesParameters(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, "burstable"),
+		BestEffort: NewCgroupName(RootCgroupName, "besteffort"),
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default", UID: "fake-uid"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("64Mi")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("128Mi")},
+				},
+			}},
+		},
+	}
+	newPCM := func(cm CgroupManager) *podContainerManagerImpl {
+		return &podContainerManagerImpl{
+			qosContainersInfo:   qosContainersInfo,
+			cgroupManager:       cm,
+			enforceCPULimits:    true,
+			cpuCFSQuotaPeriod:   QuotaPeriod,
+			podPidsLimit:        1024,
+			podContainerManager: NewStubContainerManager(),
+		}
+	}
+
+	t.Run("creates a missing pod cgroup", func(t *testing.T) {
+		fakeCM := &fakeCgroupManager{}
+		require.NoError(t, newPCM(fakeCM).EnsureExists(logger, pod))
+		require.Len(t, fakeCM.snapshotCreated(), 1)
+		require.Empty(t, fakeCM.snapshotUpdates())
+	})
+
+	t.Run("reapplies the same parameters to an existing pod cgroup", func(t *testing.T) {
+		created := &fakeCgroupManager{}
+		require.NoError(t, newPCM(created).EnsureExists(logger, pod))
+
+		existing := &fakeCgroupManager{exists: true}
+		require.NoError(t, newPCM(existing).EnsureExists(logger, pod))
+		require.Empty(t, existing.snapshotCreated())
+		require.Len(t, existing.snapshotUpdates(), 1)
+		require.Equal(t, created.snapshotCreated()[0], existing.snapshotUpdates()[0])
+	})
+
+	t.Run("a partial Create failure is returned and repaired on the next call", func(t *testing.T) {
+		createErr := fmt.Errorf("cgroup manager.Set failed")
+		cm := &errCgroupManager{createErr: createErr, createLeavesCgroup: true}
+
+		err := newPCM(cm).EnsureExists(logger, pod)
+		require.ErrorIs(t, err, createErr)
+		require.True(t, cm.Exists(nil))
+
+		// The kubelet builds a new pod container manager on every sync.
+		require.NoError(t, newPCM(cm).EnsureExists(logger, pod))
+		require.Len(t, cm.snapshotCreated(), 1)
+		require.Len(t, cm.snapshotUpdates(), 1)
+	})
+
+	t.Run("an Update failure is returned", func(t *testing.T) {
+		updateErr := fmt.Errorf("write failed")
+		cm := &errCgroupManager{updateErr: updateErr}
+		cm.exists = true
+		require.ErrorIs(t, newPCM(cm).EnsureExists(logger, pod), updateErr)
+	})
+}
