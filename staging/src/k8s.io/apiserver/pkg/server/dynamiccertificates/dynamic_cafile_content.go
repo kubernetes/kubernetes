@@ -58,7 +58,7 @@ type DynamicFileCAContent struct {
 	// caBundle is a caBundleAndVerifier that contains the last read, non-zero length content of the file
 	caBundle atomic.Value
 
-	listeners []Listener
+	listeners listenerList
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
 	queue workqueue.TypedRateLimitingInterface[string]
@@ -97,7 +97,7 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 
 // AddListener adds a listener to be notified when the CA content changes.
 func (c *DynamicFileCAContent) AddListener(listener Listener) {
-	c.listeners = append(c.listeners, listener)
+	c.listeners.Add(listener)
 }
 
 // loadCABundle determines the next set of content for the file.
@@ -122,9 +122,7 @@ func (c *DynamicFileCAContent) loadCABundle() error {
 	c.caBundle.Store(caBundleAndVerifier)
 	klog.V(2).InfoS("Loaded a new CA Bundle and Verifier", "name", c.Name())
 
-	for _, listener := range c.listeners {
-		listener.Enqueue()
-	}
+	c.listeners.Notify()
 
 	return nil
 }
