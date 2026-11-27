@@ -1538,6 +1538,11 @@ func servedVersions(versions []apiextensionsv1.CustomResourceDefinitionVersion) 
 }
 
 func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
+	// This test updates CRD storage directly in etcd, which can race with background
+	// watch teardown. Keep decode errors non-fatal to avoid panic from this race.
+	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
+	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
+
 	// Setup server and clients
 	apiServerTearDown, config, options, err := fixtures.StartDefaultServer(t)
 	if err != nil {
