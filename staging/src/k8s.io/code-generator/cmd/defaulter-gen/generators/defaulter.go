@@ -24,6 +24,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -199,6 +200,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 		}
 		// Check if this is the primary defaulter.
 		args := defaultingArgsFromType(inType.Elem)
+		buffer.Reset()
 		sw.Do("$.inType|defaultfn$", args)
 		switch {
 		case f.Name.Name == buffer.String():
@@ -245,7 +247,6 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 			manualMap[key] = v
 			klog.V(6).Infof("found object defaulter function for %s from %s", key.Name, f.Name)
 		}
-		buffer.Reset()
 	}
 }
 
@@ -674,21 +675,20 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		return parent
 
 	case defaults.base != nil:
-		parent.call = append(parent.call, defaults.base)
-		// if the base function indicates it "covers" (it already includes defaulters)
-		// we can halt recursion
+		// A covering base defaulter already handles its children.
 		isCovers, err := checkTag(defaults.base.CommentLines, "covers")
 		if err != nil {
 			klog.Fatalf("error extracting %s tag: %v", tagName, err)
 		}
+		parent.addCall(defaults.base)
 		if isCovers {
 			klog.V(6).Infof("the defaulter %s indicates it covers all sub generators", t.Name)
 			return parent
 		}
 	}
-
-	// base has been added already, now add any additional defaulters defined for this object
-	parent.call = append(parent.call, defaults.additional...)
+	for _, fn := range defaults.additional {
+		parent.addCall(fn)
+	}
 
 	// if the type already exists, don't build the tree for it and don't generate anything.
 	// This is used to avoid recursion for nested recursive types.
@@ -754,7 +754,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 			parent.children = append(parent.children, *child)
 		}
 	}
-	if len(parent.children) == 0 && len(parent.call) == 0 {
+	if len(parent.children) == 0 && len(parent.call) == 0 && len(parent.after) == 0 {
 		// klog.V(6).Infof("decided type %s needs no generation", t.Name)
 		return nil
 	}
@@ -873,7 +873,7 @@ func (g *genDefaulter) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 			ref.Package = g.imports.LocalNameOf(ref.Package)
 		}
 
-		if len(current.call) == 0 {
+		if len(current.call) == 0 && len(current.after) == 0 {
 			return
 		}
 		path := callPath(append(ancestors, current))
@@ -936,8 +936,9 @@ type callNode struct {
 	// elem is true if the previous elements refer to a pointer (typically just field)
 	elem bool
 
-	// call is all of the functions that must be invoked on this particular node, in order
-	call []*types.Type
+	// call and after run before and after defaulting the children, respectively.
+	call  []*types.Type
+	after []*types.Type
 	// children is the child call nodes that must also be traversed
 	children []callNode
 
@@ -1027,14 +1028,24 @@ func varsForDepth(depth int) (index, local string) {
 	return
 }
 
-// writeCalls generates a list of function calls based on the calls field for the provided variable
-// name and pointer.
-func (n *callNode) writeCalls(varName string, isVarPointer bool, sw *generator.SnippetWriter) {
+func (n *callNode) addCall(fn *types.Type) {
+	tags, _ := extractTag(fn.CommentLines)
+	if slices.Contains(tags, "after") {
+		if len(tags) != 1 {
+			klog.Fatalf("%s: +%s=after cannot be combined with other +%s tags", fn.Name, tagName, tagName)
+		}
+		n.after = append(n.after, fn)
+	} else {
+		n.call = append(n.call, fn)
+	}
+}
+
+func writeCalls(calls []*types.Type, varName string, isVarPointer bool, sw *generator.SnippetWriter) {
 	accessor := varName
 	if !isVarPointer {
 		accessor = "&" + accessor
 	}
-	for _, fn := range n.call {
+	for _, fn := range calls {
 		sw.Do("$.fn|raw$($.var$)\n", generator.Args{
 			"fn":  fn,
 			"var": accessor,
@@ -1217,10 +1228,7 @@ func (n *callNode) WriteMethod(c *generator.Context, varName string, depth int, 
 		}
 
 		n.writeDefaulter(c, varName, index, isPointer, sw)
-		n.writeCalls(local, true, sw)
-		for i := range n.children {
-			n.children[i].WriteMethod(c, local, depth+1, append(ancestors, n), sw)
-		}
+		n.writeCallsAndChildren(c, local, true, depth+1, ancestors, sw)
 		sw.Do("}\n", nil)
 	case n.key:
 		if !n.defaultValue.IsEmpty() {
@@ -1233,15 +1241,20 @@ func (n *callNode) WriteMethod(c *generator.Context, varName string, depth int, 
 		}
 	default:
 		n.writeDefaulter(c, varName, index, isPointer, sw)
-		n.writeCalls(varName, isPointer, sw)
-		for i := range n.children {
-			n.children[i].WriteMethod(c, varName, depth, append(ancestors, n), sw)
-		}
+		n.writeCallsAndChildren(c, varName, isPointer, depth, ancestors, sw)
 	}
 
 	if isPointer && len(ancestors) > 0 {
 		sw.Do("}\n", nil)
 	}
+}
+
+func (n *callNode) writeCallsAndChildren(c *generator.Context, varName string, isPointer bool, depth int, ancestors []*callNode, sw *generator.SnippetWriter) {
+	writeCalls(n.call, varName, isPointer, sw)
+	for i := range n.children {
+		n.children[i].WriteMethod(c, varName, depth, append(ancestors, n), sw)
+	}
+	writeCalls(n.after, varName, isPointer, sw)
 }
 
 type callPath []*callNode
@@ -1283,7 +1296,8 @@ func (path callPath) String() string {
 		}
 	}
 	var calls []string
-	for _, fn := range path[len(path)-1].call {
+	node := path[len(path)-1]
+	for _, fn := range slices.Concat(node.call, node.after) {
 		calls = append(calls, fn.Name.String())
 	}
 	if len(calls) == 0 {

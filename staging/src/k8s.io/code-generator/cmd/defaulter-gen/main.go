@@ -39,6 +39,16 @@ limitations under the License.
 //
 // to indicate that the defaulter does not or should not call any nested
 // defaulters.
+//
+// A handwritten SetDefaults_TYPE or SetDefaults_TYPE_Qualifier function that
+// depends on defaults in its fields can use:
+//
+//	// +k8s:defaulter-gen=after
+//
+// The generator invokes that function after defaulting the type's children.
+// Untagged functions still run before the children. Fields created by an
+// after function are not visited again. The after and covers tags are mutually
+// exclusive.
 package main
 
 import (

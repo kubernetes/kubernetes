@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external"
 	externalexternal "k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external/external"
 	"k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external2"
@@ -352,6 +353,32 @@ func Test_DefaultingFunction(t *testing.T) {
 		t.Errorf("Error: Expected and actual output are different \n %s\n", diff)
 	}
 
+}
+
+func TestDefaultingAfterChildren(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := RegisterDefaults(scheme); err != nil {
+		t.Fatal(err)
+	}
+	obj := &DefaultedWithFunction{Services: []Service{
+		{},
+		{Spec: ServiceSpec{Type: "ExternalName"}},
+		{Spec: ServiceSpec{InternalTrafficPolicy: "Local"}},
+	}}
+	want := []Service{
+		{Spec: ServiceSpec{Type: "ClusterIP", InternalTrafficPolicy: "Cluster"}},
+		{Spec: ServiceSpec{Type: "ExternalName"}},
+		{Spec: ServiceSpec{Type: "ClusterIP", InternalTrafficPolicy: "Local"}},
+	}
+	for pass := 1; pass <= 2; pass++ {
+		scheme.Default(obj)
+		if diff := cmp.Diff(want, obj.Services); diff != "" {
+			t.Fatalf("pass %d (-want +got):\n%s", pass, diff)
+		}
+		if obj.PrimaryService != &obj.Services[0] {
+			t.Fatalf("pass %d: primary service did not default to the first Cluster service", pass)
+		}
+	}
 }
 
 func Test_DefaultingReference(t *testing.T) {

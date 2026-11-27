@@ -190,6 +190,19 @@ type DefaultedWithFunction struct {
 	S1 string `json:"S1,omitempty"`
 	// +default="default_marker"
 	S2 string `json:"S2,omitempty"`
+
+	Services       []Service
+	PrimaryService *Service
+}
+
+type Service struct {
+	Spec ServiceSpec
+}
+
+type ServiceSpec struct {
+	// +default="ClusterIP"
+	Type                  string
+	InternalTrafficPolicy string
 }
 
 type DefaultedWithReference struct {
