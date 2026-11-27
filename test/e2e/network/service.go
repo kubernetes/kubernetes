@@ -2287,6 +2287,87 @@ var _ = common.SIGDescribe("Services", func() {
 		execAffinityTestForNonLBServiceWithTransition(ctx, f, cs, svc)
 	})
 
+	// With ClientIP session affinity and multiple backends, deleting the pod a
+	// client is currently pinned to must re-pin the client to a different,
+	// still-running endpoint and keep the new affinity sticky. The backends are
+	// standalone pods (not a Deployment) so the deleted pod is not recreated.
+	ginkgo.It("should maintain session affinity after the pod serving a client is deleted [LinuxOnly]", func(ctx context.Context) {
+		// windows does not support session affinity.
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+
+		ns := f.Namespace.Name
+		serviceName := "affinity-pod-deletion"
+		numPods := 3
+
+		svc := getServeHostnameService(serviceName)
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+
+		ginkgo.By("creating standalone backend pods serving their hostname")
+		for i := 0; i < numPods; i++ {
+			createPodOrFail(ctx, f, ns, fmt.Sprintf("%s-%d", serviceName, i),
+				map[string]string{"name": serviceName},
+				[]v1.ContainerPort{{ContainerPort: 9376}},
+				"serve-hostname")
+		}
+
+		ginkgo.By("creating the ClusterIP service with session affinity")
+		_, err := cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create service %s in namespace %s", serviceName, ns)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			framework.ExpectNoError(cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{}))
+		})
+		svc, err = cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		svcIP := svc.Spec.ClusterIP
+		servicePort := defaultServeHostnameServicePort
+
+		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod-affinity", nil)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			framework.ExpectNoError(cs.CoreV1().Pods(ns).Delete(ctx, execPod.Name, metav1.DeleteOptions{}))
+		})
+
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		framework.ExpectNoError(jig.CheckServiceReachability(ctx, svc, execPod))
+
+		// servedHost returns the hostname (== backend pod name) currently serving
+		// the client, or "" if the request failed (e.g. during an endpoint change).
+		servedHost := func() string {
+			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 --max-time 60 http://%s/`, net.JoinHostPort(svcIP, strconv.Itoa(servicePort)))
+			out, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			if err != nil {
+				framework.Logf("request to service failed, will retry: %v", err)
+				return ""
+			}
+			return strings.TrimSpace(out)
+		}
+
+		ginkgo.By("verifying the client is pinned to a single backend")
+		if !checkAffinity(ctx, cs, execPod, svcIP, servicePort, true) {
+			framework.Failf("session affinity did not hold for service %s/%s", ns, serviceName)
+		}
+		var firstHost string
+		gomega.Eventually(ctx, servedHost, e2eservice.KubeProxyEndpointLagTimeout, time.Second).ShouldNot(gomega.BeEmpty())
+		firstHost = servedHost()
+
+		ginkgo.By("deleting the pod currently serving the client: " + firstHost)
+		framework.ExpectNoError(cs.CoreV1().Pods(ns).Delete(ctx, firstHost, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, cs, firstHost, ns, e2eservice.KubeProxyEndpointLagTimeout))
+
+		ginkgo.By("verifying the client re-pins to a different, still-running backend")
+		var secondHost string
+		gomega.Eventually(ctx, func() string {
+			secondHost = servedHost()
+			return secondHost
+		}, e2eservice.KubeProxyEndpointLagTimeout, time.Second).ShouldNot(gomega.Or(gomega.BeEmpty(), gomega.Equal(firstHost)))
+
+		ginkgo.By("verifying the new affinity is sticky")
+		if !checkAffinity(ctx, cs, execPod, svcIP, servicePort, true) {
+			framework.Failf("session affinity did not re-establish after deleting the serving pod for service %s/%s", ns, serviceName)
+		}
+		gomega.Expect(servedHost()).To(gomega.Equal(secondHost), "affinity should remain pinned to the new backend")
+	})
+
 	ginkgo.It("should implement service.kubernetes.io/service-proxy-name", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
@@ -2821,6 +2902,86 @@ var _ = common.SIGDescribe("Services", func() {
 		if clientIP != execPod.Status.PodIP {
 			framework.Failf("Source IP %s is not the client IP", clientIP)
 		}
+	})
+
+	// Validates NodePort externalTrafficPolicy semantics when the service backend
+	// is a hostNetwork pod:
+	//   - ExternalTrafficPolicy=Local: the NodePort responds only on the node that
+	//     hosts the backend; other nodes do not.
+	//   - ExternalTrafficPolicy=Cluster: the NodePort responds on all nodes.
+	ginkgo.It("should respect externalTrafficPolicy for type=NodePort with a hostNetwork backend [LinuxOnly]", func(ctx context.Context) {
+		// windows kube-proxy does not support this feature yet
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 3)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) < 3 {
+			e2eskipper.Skipf("The test requires at least 3 schedulable nodes, found %d", len(nodes.Items))
+		}
+		endpointNode := nodes.Items[0]
+		otherNode := nodes.Items[1]
+
+		ns := f.Namespace.Name
+		serviceName := "nodeport-hostnetwork-etp"
+		endpointPort := 10180
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("creating a NodePort service with externalTrafficPolicy=Local")
+		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeNodePort
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(endpointPort)},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("creating a hostNetwork backend pod on the endpoint node")
+		backendPod := e2epod.NewAgnhostPod(ns, "hostnetwork-backend", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(endpointPort))
+		backendPod.Labels = jig.Labels
+		backendPod.Spec.HostNetwork = true
+		e2epod.SetNodeSelection(&backendPod.Spec, e2epod.NodeSelection{Name: endpointNode.Name})
+		_, err = cs.CoreV1().Pods(ns).Create(ctx, backendPod, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, cs, backendPod.Name, ns, framework.PodStartTimeout))
+		framework.ExpectNoError(e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1))
+
+		endpointNodeIPs := e2enode.GetAddresses(&endpointNode, v1.NodeInternalIP)
+		gomega.Expect(endpointNodeIPs).NotTo(gomega.BeEmpty(), "no internal IP found for node %s", endpointNode.Name)
+		otherNodeIPs := e2enode.GetAddresses(&otherNode, v1.NodeInternalIP)
+		gomega.Expect(otherNodeIPs).NotTo(gomega.BeEmpty(), "no internal IP found for node %s", otherNode.Name)
+
+		ginkgo.By("creating a hostNetwork exec pod to probe the NodePort")
+		execPod := launchHostExecPod(ctx, cs, ns, "hostexec", &endpointNode.Name)
+
+		checkNodePort := func(nodeIP string, expectReachable bool) {
+			nodePort := int(svc.Spec.Ports[0].NodePort)
+			cmd := fmt.Sprintf(`curl -g -s --connect-timeout 3 http://%s/hostname`, net.JoinHostPort(nodeIP, strconv.Itoa(nodePort)))
+			gomega.Eventually(ctx, func() error {
+				_, err := e2eoutput.RunHostCmd(ns, execPod.Name, cmd)
+				if expectReachable {
+					return err
+				}
+				if err == nil {
+					return fmt.Errorf("expected NodePort on %s to be unreachable, but the connection succeeded", nodeIP)
+				}
+				return nil
+			}, e2eservice.KubeProxyEndpointLagTimeout, time.Second).Should(gomega.Succeed())
+		}
+
+		ginkgo.By("verifying ExternalTrafficPolicy=Local: NodePort is reachable only on the endpoint node")
+		checkNodePort(endpointNodeIPs[0], true)
+		checkNodePort(otherNodeIPs[0], false)
+
+		ginkgo.By("switching the service to externalTrafficPolicy=Cluster")
+		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("verifying ExternalTrafficPolicy=Cluster: NodePort is reachable on all nodes")
+		checkNodePort(endpointNodeIPs[0], true)
+		checkNodePort(otherNodeIPs[0], true)
 	})
 
 	ginkgo.It("should fail health check node port if there are only terminating endpoints", func(ctx context.Context) {
