@@ -4272,6 +4272,15 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pleg_relist_requests_dropped_total
+  subsystem: kubelet
+  help: The number of on-demand pod relist requests dropped because the PLEG request
+    queue is full.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_deferred_accepted_resizes_total
   subsystem: kubelet
   help: Cumulative number of resizes that were accepted after being deferred.

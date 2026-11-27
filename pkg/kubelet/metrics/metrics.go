@@ -52,6 +52,7 @@ const (
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
 	PLEGRelistDurationKey              = "pleg_relist_duration_seconds"
 	PLEGDiscardEventsKey               = "pleg_discard_events"
+	PLEGRelistRequestsDroppedKey       = "pleg_relist_requests_dropped_total"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
 	PLEGPodRelistDurationKey           = "pleg_pod_relist_duration_seconds"
@@ -453,6 +454,16 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PLEGDiscardEventsKey,
 			Help:           "The number of discard events in PLEG.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// PLEGRelistRequestsDropped counts on-demand pod relist requests dropped because the request queue is full.
+	PLEGRelistRequestsDropped = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PLEGRelistRequestsDroppedKey,
+			Help:           "The number of on-demand pod relist requests dropped because the PLEG request queue is full.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -1583,6 +1594,7 @@ func Register() {
 		legacyregistry.MustRegister(ContainersPerPodCount)
 		legacyregistry.MustRegister(PLEGRelistDuration)
 		legacyregistry.MustRegister(PLEGDiscardEvents)
+		legacyregistry.MustRegister(PLEGRelistRequestsDropped)
 		legacyregistry.MustRegister(PLEGRelistInterval)
 		legacyregistry.MustRegister(PLEGLastSeen)
 		legacyregistry.MustRegister(PLEGPodRelistDuration)
