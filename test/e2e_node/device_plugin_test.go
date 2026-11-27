@@ -215,6 +215,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 
 			restartKubelet(ctx, true)
+			waitForKubeletToStart(ctx, f)
 
 			ginkgo.By("Waiting for devices to become unavailable on the local node")
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
