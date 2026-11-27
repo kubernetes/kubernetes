@@ -312,18 +312,21 @@ var _ json.Marshaler = FieldsV1{}
 var _ json.Unmarshaler = &FieldsV1{}
 
 func (f FieldsV1) MarshalCBOR() ([]byte, error) {
-	raw := f.GetRawBytes()
-	if len(raw) == 0 {
+	rawStr := f.GetRawString()
+	if len(rawStr) == 0 {
 		return cbor.Marshal(nil)
 	}
 	if f.getContentType() == fieldsV1InvalidOrValidJSONObject {
+		if out, ok := cbor.TranscodeJSONObject(rawStr); ok {
+			return out, nil
+		}
 		var u map[string]interface{}
-		if err := utiljson.Unmarshal(raw, &u); err != nil {
+		if err := utiljson.Unmarshal(f.GetRawBytes(), &u); err != nil {
 			return nil, fmt.Errorf("metav1.FieldsV1 json invalid: %w", err)
 		}
 		return cbor.Marshal(u)
 	}
-	return raw, nil
+	return f.GetRawBytes(), nil
 }
 
 var cborNull = []byte{0xf6}
@@ -368,13 +371,9 @@ const (
 // or, if a tag-enclosed map, an initial byte with major type "tag" (0xf6, 0xa0...0xbf, or
 // 0xc6...0xdb). The two sets of valid initial bytes don't intersect.
 func (f FieldsV1) getContentType() int {
-	reader := f.GetRawReader()
-	if reader.Size() > 0 {
-		var buf [1]byte
-		if _, err := reader.Read(buf[:]); err != nil {
-			return fieldsV1InvalidOrEmpty
-		}
-		p := buf[0]
+	rawStr := f.GetRawString()
+	if len(rawStr) > 0 {
+		p := rawStr[0]
 		switch p {
 		case 'n', '{', '\t', '\r', '\n', ' ':
 			return fieldsV1InvalidOrValidJSONObject
