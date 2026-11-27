@@ -81,6 +81,11 @@ limitations under the License.
 //		OldRoot: oldItem,
 //	})...)
 //
+// When none of the inputs to Validate change on an update, skip calling
+// Validate (for example, check with apiequality.Semantic.DeepEqual). This
+// ratcheting pattern makes sure that stricter validation rules in future
+// releases never reject already-persisted objects on unrelated updates.
+//
 // See ExampleOutOfTreeControllerValidation for a runnable version. An in-tree
 // controller whose apiserver already runs DV on the embedded building blocks
 // sets BuildOptions.DisableDeclarativeValidation to skip the first layer and run

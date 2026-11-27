@@ -50,6 +50,10 @@ type ValidationInput struct {
 // set OldRoot to the previous WorkloadItem. Validate infers create vs update
 // from whether OldRoot is nil. Each item's building-block errors are reported
 // relative to that item's Path.
+//
+// When none of the inputs to Validate change on an update, skip calling
+// Validate. This ratcheting pattern makes sure that stricter checks in future
+// releases never reject already-persisted objects on unrelated updates.
 func (b *Builder) Validate(ctx context.Context, input ValidationInput) field.ErrorList {
 	// A Builder created from an existing, persisted Workload has no WorkloadItem
 	// tree to check, so calling Validate on it is an invocation error rather than
