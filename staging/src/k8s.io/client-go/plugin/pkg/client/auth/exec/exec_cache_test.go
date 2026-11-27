@@ -18,6 +18,7 @@ package exec_test // separate package to prevent circular import
 
 import (
 	"context"
+	"crypto/tls"
 	"testing"
 	"time"
 
@@ -102,5 +103,154 @@ func TestExecTLSCache(t *testing.T) {
 
 	if tlsConfig1 == tlsConfig3 {
 		t.Fatal("expected different TLS config for non-matching exec config via rest config")
+	}
+}
+
+// TestExecTLSCacheWithMapConfig verifies that equivalent exec configs containing
+// maps produce stable cache keys and share a cached authenticator.
+func TestExecTLSCacheWithMapConfig(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+
+	newConfig := func() *rest.Config {
+		execConfig := &clientcmdapi.ExecConfig{
+			Command:         "./testdata/test-plugin.sh",
+			APIVersion:      "client.authentication.k8s.io/v1",
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+			Config: &clientcmdapi.Config{
+				Clusters: map[string]*clientcmdapi.Cluster{
+					"a": {Server: "https://a.example.com"},
+					"b": {Server: "https://b.example.com"},
+					"c": {Server: "https://c.example.com"},
+				},
+			},
+		}
+
+		return &rest.Config{
+			Host:         "https://localhost",
+			ExecProvider: execConfig,
+		}
+	}
+
+	var expected *tls.Config
+
+	for range 100 {
+		client := clientset.NewForConfigOrDie(newConfig())
+
+		_, _ = client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+
+		rt := client.RESTClient().(*rest.RESTClient).Client.Transport
+		tlsConfig, err := utilnet.TLSClientConfig(rt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tlsConfig == nil {
+			t.Fatal("expected non-nil TLS config")
+		}
+
+		if expected == nil {
+			expected = tlsConfig
+			continue
+		}
+		if expected != tlsConfig {
+			t.Fatal("expected the same TLS config for equivalent exec configs containing maps")
+		}
+	}
+}
+
+// TestExecTLSCacheWithDifferentPluginPolicy verifies that exec configurations
+// with different plugin policies do not share cached TLS configuration.
+func TestExecTLSCacheWithDifferentPluginPolicy(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+
+	newConfig := func(policyType clientcmdapi.PolicyType) *rest.Config {
+		return &rest.Config{
+			Host: "https://localhost",
+			ExecProvider: &clientcmdapi.ExecConfig{
+				Command:         "./testdata/test-plugin.sh",
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+				PluginPolicy: clientcmdapi.PluginPolicy{
+					PolicyType: policyType,
+				},
+			},
+		}
+	}
+
+	client1 := clientset.NewForConfigOrDie(newConfig(clientcmdapi.PluginPolicyAllowAll))
+	client2 := clientset.NewForConfigOrDie(newConfig(clientcmdapi.PluginPolicyDenyAll))
+
+	_, _ = client1.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	_, _ = client2.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+
+	rt1 := client1.RESTClient().(*rest.RESTClient).Client.Transport
+	rt2 := client2.RESTClient().(*rest.RESTClient).Client.Transport
+
+	tlsConfig1, err := utilnet.TLSClientConfig(rt1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tlsConfig2, err := utilnet.TLSClientConfig(rt2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if tlsConfig1 == nil || tlsConfig2 == nil {
+		t.Fatal("expected non-nil TLS configs")
+	}
+
+	if tlsConfig1 == tlsConfig2 {
+		t.Fatal("expected different TLS configs for different plugin policies")
+	}
+}
+
+// TestExecTLSCacheWithDifferentPluginAllowlist verifies that exec configurations
+// with different plugin allowlist entries do not share cached TLS configuration.
+func TestExecTLSCacheWithDifferentPluginAllowlist(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+
+	newConfig := func(command string) *rest.Config {
+		return &rest.Config{
+			Host: "https://localhost",
+			ExecProvider: &clientcmdapi.ExecConfig{
+				Command:         "./testdata/test-plugin.sh",
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+				PluginPolicy: clientcmdapi.PluginPolicy{
+					PolicyType: clientcmdapi.PluginPolicyAllowlist,
+					Allowlist: []clientcmdapi.AllowlistEntry{
+						{Command: command},
+					},
+				},
+			},
+		}
+	}
+
+	client1 := clientset.NewForConfigOrDie(newConfig("testdata/test-plugin.sh"))
+	client2 := clientset.NewForConfigOrDie(newConfig("testdata/other-plugin.sh"))
+
+	_, _ = client1.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	_, _ = client2.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+
+	rt1 := client1.RESTClient().(*rest.RESTClient).Client.Transport
+	rt2 := client2.RESTClient().(*rest.RESTClient).Client.Transport
+
+	tlsConfig1, err := utilnet.TLSClientConfig(rt1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tlsConfig2, err := utilnet.TLSClientConfig(rt2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if tlsConfig1 == nil || tlsConfig2 == nil {
+		t.Fatal("expected non-nil TLS configs")
+	}
+
+	if tlsConfig1 == tlsConfig2 {
+		t.Fatal("expected different TLS configs for different plugin allowlists")
 	}
 }
