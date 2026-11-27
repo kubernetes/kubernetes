@@ -51,6 +51,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -395,6 +396,23 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 		serverPod.Spec.NodeName = config.ClientNodeSelection.Name
 	}
 
+	// A server that has merely reached Running is not necessarily accepting
+	// connections, and callers point workloads at it as soon as this function
+	// returns. Gate on the first declared port so that a server which starts but
+	// never listens is reported as such here, rather than surfacing much later as
+	// unexplained mount failures in whichever test happens to use it.
+	if portCount > 0 {
+		serverPod.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.FromInt32(int32(config.ServerPorts[0])),
+				},
+			},
+			PeriodSeconds:    2,
+			FailureThreshold: 3,
+		}
+	}
+
 	var pod *v1.Pod
 	serverPod, err := podClient.Create(ctx, serverPod, metav1.CreateOptions{})
 	// ok if the server pod already exists. TODO: make this controllable by callers
@@ -414,6 +432,10 @@ func startVolumeServer(ctx context.Context, client clientset.Interface, config T
 		framework.ExpectNoError(podClient.Delete(ctx, serverPod.Name, metav1.DeleteOptions{}))
 	} else {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, client, serverPod))
+		if portCount > 0 {
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, client, serverPodName, config.Namespace, VolumeServerPodStartupTimeout),
+				"%q is running but never started accepting connections on port %d", serverPodName, config.ServerPorts[0])
+		}
 		if pod == nil {
 			ginkgo.By(fmt.Sprintf("locating the %q server pod", serverPodName))
 			pod, err = podClient.Get(ctx, serverPodName, metav1.GetOptions{})
