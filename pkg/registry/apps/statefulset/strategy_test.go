@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -36,6 +37,115 @@ import (
 )
 
 var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+
+func TestStatefulSetVolumeClaimTemplateWarnings(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	claim := func(request, limit string) api.PersistentVolumeClaim {
+		pvc := api.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+			Spec: api.PersistentVolumeClaimSpec{
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				Resources: api.VolumeResourceRequirements{
+					Requests: api.ResourceList{api.ResourceStorage: resource.MustParse(request)},
+				},
+			},
+		}
+		if limit != "" {
+			pvc.Spec.Resources.Limits = api.ResourceList{api.ResourceStorage: resource.MustParse(limit)}
+		}
+		return pvc
+	}
+	for _, tc := range []struct {
+		name     string
+		claims   []api.PersistentVolumeClaim
+		warnings []string
+	}{
+		{name: "no templates"},
+		{name: "integer bytes", claims: []api.PersistentVolumeClaim{claim("1Gi", "2Gi")}},
+		{
+			name:   "fractional request",
+			claims: []api.PersistentVolumeClaim{claim("200m", "1")},
+			warnings: []string{
+				`spec.volumeClaimTemplates[0].spec.resources.requests[storage]: fractional byte value "200m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name:   "fractional limit",
+			claims: []api.PersistentVolumeClaim{claim("1", "1500m")},
+			warnings: []string{
+				`spec.volumeClaimTemplates[0].spec.resources.limits[storage]: fractional byte value "1500m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name:   "second template with fractional request and limit",
+			claims: []api.PersistentVolumeClaim{claim("1Gi", ""), claim("200m", "500m")},
+			warnings: []string{
+				`spec.volumeClaimTemplates[1].spec.resources.requests[storage]: fractional byte value "200m" is invalid, must be an integer`,
+				`spec.volumeClaimTemplates[1].spec.resources.limits[storage]: fractional byte value "500m" is invalid, must be an integer`,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			old := &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "example", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					Replicas:            1,
+					ServiceName:         "headless",
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"app": "example"}},
+					Template: api.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "example"}},
+						Spec: api.PodSpec{
+							RestartPolicy:                 api.RestartPolicyAlways,
+							DNSPolicy:                     api.DNSClusterFirst,
+							TerminationGracePeriodSeconds: ptr.To[int64](30),
+							Containers: []api.Container{{
+								Name: "app", Image: "image", ImagePullPolicy: api.PullIfNotPresent,
+								TerminationMessagePolicy: api.TerminationMessageReadFile,
+							}},
+						},
+					},
+					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+					VolumeClaimTemplates: tc.claims,
+				},
+			}
+			if len(old.Spec.VolumeClaimTemplates) > 1 {
+				old.Spec.VolumeClaimTemplates[1].Name = "other-data"
+			}
+			Strategy.PrepareForCreate(ctx, old)
+			if errs := Strategy.Validate(ctx, old); len(errs) != 0 {
+				t.Fatalf("create validation: %v", errs)
+			}
+			t.Run("create", func(t *testing.T) {
+				if diff := cmp.Diff(tc.warnings, Strategy.WarningsOnCreate(ctx, old), cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("warnings (-want +got):\n%s", diff)
+				}
+			})
+			old.ResourceVersion = "1"
+			for _, scale := range []bool{true, false} {
+				name := "metadata update"
+				if scale {
+					name = "scale update"
+				}
+				t.Run(name, func(t *testing.T) {
+					updated := old.DeepCopy()
+					if scale {
+						updated.Spec.Replicas++
+					} else {
+						updated.Annotations = map[string]string{"description": "updated"}
+					}
+					Strategy.PrepareForUpdate(ctx, updated, old)
+					if errs := Strategy.ValidateUpdate(ctx, updated, old); len(errs) != 0 {
+						t.Fatalf("update validation: %v", errs)
+					}
+					if diff := cmp.Diff(tc.warnings, Strategy.WarningsOnUpdate(ctx, updated, old), cmpopts.EquateEmpty()); diff != "" {
+						t.Errorf("warnings (-want +got):\n%s", diff)
+					}
+				})
+			}
+		})
+	}
+}
 
 func TestStatefulSetStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
