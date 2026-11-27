@@ -34,6 +34,9 @@ type MessageCountMap map[string]int
 // a specific error type.
 // Errors.As() is not supported, because the caller presumably cares about a
 // specific error of potentially multiple that match the given type.
+// The Unwrap() method is also not supported, because adding that also enables
+// errors.As() and that breaks caller assumptions (checking the contained error
+// type before the aggregate type then matches even on aggregate types).
 type Aggregate interface {
 	error
 	Errors() []error
