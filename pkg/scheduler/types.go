@@ -80,6 +80,11 @@ type PodScheduledResult struct {
 	schedulingDuration time.Duration
 	// status is a scheduling algorithm status.
 	status *fwk.Status
+	// notEvaluated reports that the pod never reached the scheduling algorithm because the pod
+	// group was abandoned first. Such a result carries a clone of the group status, which is
+	// indistinguishable from a pod that was evaluated and rejected for that same group-level
+	// reason, so the distinction has to be recorded explicitly.
+	notEvaluated bool
 }
 
 var _ fwk.ProposedAssignment = (*PodScheduledResult)(nil)
