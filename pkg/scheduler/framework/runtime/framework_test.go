@@ -69,6 +69,9 @@ const (
 	testPlugin                        = "test-plugin"
 	permitPlugin                      = "permit-plugin"
 	bindPlugin                        = "bind-plugin"
+	requiredEPPlugin                  = "required-ep-plugin"
+	unknownEPPlugin                   = "unknown-ep-plugin"
+	duplicateEPPlugin                 = "duplicate-ep-plugin"
 	testCloseErrorPlugin              = "test-close-error-plugin"
 	placementGeneratePlugin           = "placement-generate-plugin"
 	placementGeneratePlugin2          = "placement-generate-plugin-2"
@@ -450,6 +453,65 @@ func (t TestBindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Po
 	return nil
 }
 
+// TestRequiredEPPlugin implements PreBind/PostBind/Reserve/Filter and declares
+// a configurable set of required-together extension points, mimicking a plugin
+// that holds a node lock from PreBind until PostBind/Unreserve.
+type TestRequiredEPPlugin struct {
+	name     string
+	required []string
+}
+
+var _ fwk.RequiredExtensionPointsPlugin = &TestRequiredEPPlugin{}
+
+func (t *TestRequiredEPPlugin) Name() string { return t.name }
+
+func (t *TestRequiredEPPlugin) RequiredExtensionPoints() []string {
+	return t.required
+}
+
+func (t *TestRequiredEPPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
+	return &fwk.PreBindPreFlightResult{AllowParallel: true}, fwk.NewStatus(fwk.Success, "")
+}
+
+func (t *TestRequiredEPPlugin) PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+func (t *TestRequiredEPPlugin) PostBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
+}
+
+func (t *TestRequiredEPPlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+func (t *TestRequiredEPPlugin) Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
+}
+
+func (t *TestRequiredEPPlugin) Filter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	return nil
+}
+
+func newTestRequiredEPPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	return &TestRequiredEPPlugin{
+		name:     requiredEPPlugin,
+		required: []string{fwk.ExtensionPointPreBind, fwk.ExtensionPointPostBind, fwk.ExtensionPointReserve},
+	}, nil
+}
+
+func newTestUnknownEPPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	return &TestRequiredEPPlugin{
+		name:     unknownEPPlugin,
+		required: []string{"Prebind", fwk.ExtensionPointPostBind, fwk.ExtensionPointReserve},
+	}, nil
+}
+
+func newTestDuplicateEPPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+	return &TestRequiredEPPlugin{
+		name:     duplicateEPPlugin,
+		required: []string{fwk.ExtensionPointPreBind, fwk.ExtensionPointPreBind, fwk.ExtensionPointPostBind, fwk.ExtensionPointReserve},
+	}, nil
+}
+
 // TestPlacementGeneratePlugin only implements GeneratePlacements extension point.
 type TestPlacementGeneratePlugin struct {
 	name       string
@@ -496,6 +558,9 @@ var registry = func() Registry {
 	r.Register(testPlugin, newTestPlugin)
 	r.Register(queueSortPlugin, newQueueSortPlugin)
 	r.Register(bindPlugin, newBindPlugin)
+	r.Register(requiredEPPlugin, newTestRequiredEPPlugin)
+	r.Register(unknownEPPlugin, newTestUnknownEPPlugin)
+	r.Register(duplicateEPPlugin, newTestDuplicateEPPlugin)
 	r.Register(testCloseErrorPlugin, newTestCloseErrorPlugin)
 	r.Register(placementGeneratePlugin, newTestPlacementGeneratePlugin)
 	r.Register(placementGeneratePlugin2, newTestPlacementGeneratePlugin2)
@@ -662,6 +727,117 @@ func TestNewFrameworkErrors(t *testing.T) {
 			_, err := NewFramework(ctx, registry, profile)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestRequiredExtensionPointsValidation(t *testing.T) {
+	enable := func(names ...string) config.PluginSet {
+		var ps config.PluginSet
+		for _, n := range names {
+			ps.Enabled = append(ps.Enabled, config.Plugin{Name: n})
+		}
+		return ps
+	}
+	tests := []struct {
+		name     string
+		preBind  config.PluginSet
+		postBind config.PluginSet
+		reserve  config.PluginSet
+		filter   config.PluginSet
+		wantErr  bool
+	}{
+		{
+			name:    "PreBind only, PostBind and Reserve disabled",
+			preBind: enable(requiredEPPlugin),
+			wantErr: true,
+		},
+		{
+			name:     "PreBind and PostBind, Reserve disabled",
+			preBind:  enable(requiredEPPlugin),
+			postBind: enable(requiredEPPlugin),
+			wantErr:  true,
+		},
+		{
+			name:    "PreBind and Reserve, PostBind disabled",
+			preBind: enable(requiredEPPlugin),
+			reserve: enable(requiredEPPlugin),
+			wantErr: true,
+		},
+		{
+			name:     "PreBind, PostBind and Reserve all enabled",
+			preBind:  enable(requiredEPPlugin),
+			postBind: enable(requiredEPPlugin),
+			reserve:  enable(requiredEPPlugin),
+			wantErr:  false,
+		},
+		{
+			name:    "only Filter enabled, outside the required set",
+			filter:  enable(requiredEPPlugin),
+			wantErr: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			profile := config.KubeSchedulerProfile{
+				Plugins: &config.Plugins{
+					PreBind:  tc.preBind,
+					PostBind: tc.postBind,
+					Reserve:  tc.reserve,
+					Filter:   tc.filter,
+				},
+			}
+			_, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "enabled together") {
+					t.Fatalf("expected required-extension-points error, got %v", err)
+				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestRequiredExtensionPointsInvalidNames(t *testing.T) {
+	enable := func(name string) config.PluginSet {
+		return config.PluginSet{Enabled: []config.Plugin{{Name: name}}}
+	}
+	tests := []struct {
+		name    string
+		plugins *config.Plugins
+		wantErr string
+	}{
+		{
+			name: "misspelled extension point name must fail fast",
+			plugins: &config.Plugins{
+				PreBind: enable(unknownEPPlugin),
+			},
+			wantErr: "unknown required extension point",
+		},
+		{
+			name: "duplicate extension point name must fail fast",
+			plugins: &config.Plugins{
+				PreBind:  enable(duplicateEPPlugin),
+				PostBind: enable(duplicateEPPlugin),
+				Reserve:  enable(duplicateEPPlugin),
+			},
+			wantErr: "duplicate required extension point",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			profile := config.KubeSchedulerProfile{Plugins: tc.plugins}
+			_, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected %q error, got %v", tc.wantErr, err)
 			}
 		})
 	}
