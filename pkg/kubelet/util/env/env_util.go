@@ -19,6 +19,7 @@ package env
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -46,8 +47,13 @@ func ParseEnv(envFilePath, key string) (string, bool, error) {
 		return "", false, fmt.Errorf("failed to open environment variable file %q: %w", envFilePath, err)
 	}
 	defer func() { _ = file.Close() }()
+	return ParseEnvFromReader(file, envFilePath, key)
+}
 
-	scanner := bufio.NewScanner(file)
+// ParseEnvFromReader parses key from an env file already opened by the caller.
+// envFilePath is used only for error messages.
+func ParseEnvFromReader(r io.Reader, envFilePath, key string) (string, bool, error) {
+	scanner := bufio.NewScanner(r)
 	lineNum := 0
 
 	for scanner.Scan() {

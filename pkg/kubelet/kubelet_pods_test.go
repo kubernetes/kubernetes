@@ -10433,6 +10433,92 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 	}
 }
 
+// TestMakeEnvironmentVariablesWithFileKeyRefSymlinks verifies that a FileKeyRef
+// is resolved inside its volume: a symlink that leads out of the volume is
+// rejected, and a symlink that stays inside the volume is followed.
+func TestMakeEnvironmentVariablesWithFileKeyRefSymlinks(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("creating symlinks requires elevated privileges on Windows")
+	}
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvFiles, true)
+
+	// Layout:
+	//   <tmp>/outside/secret.env       a file that the pod must not read
+	//   <tmp>/vol/real/app.env         a file inside the volume
+	//   <tmp>/vol/inside -> real       relative symlink that stays inside
+	//   <tmp>/vol/abs -> <tmp>/outside absolute symlink that leaves the volume
+	//   <tmp>/vol/rel -> ../outside    relative symlink that leaves the volume
+	//   <tmp>/vol/file.env -> ../outside/secret.env
+	tmpDir := t.TempDir()
+	outside := filepath.Join(tmpDir, "outside")
+	vol := filepath.Join(tmpDir, "vol")
+	require.NoError(t, os.MkdirAll(outside, 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(vol, "real"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(outside, "secret.env"), []byte("KEY='leaked'\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(vol, "real", "app.env"), []byte("KEY='benign'\n"), 0644))
+	require.NoError(t, os.Symlink("real", filepath.Join(vol, "inside")))
+	require.NoError(t, os.Symlink(outside, filepath.Join(vol, "abs")))
+	require.NoError(t, os.Symlink(filepath.Join("..", "outside"), filepath.Join(vol, "rel")))
+	require.NoError(t, os.Symlink(filepath.Join("..", "outside", "secret.env"), filepath.Join(vol, "file.env")))
+
+	testCases := []struct {
+		name          string
+		path          string
+		optional      bool
+		expectedValue string
+		expectedError bool
+	}{
+		{name: "regular file", path: "real/app.env", expectedValue: "benign"},
+		{name: "symlink that stays inside the volume", path: "inside/app.env", expectedValue: "benign"},
+		{name: "absolute directory symlink that leaves the volume", path: "abs/secret.env", expectedError: true},
+		{name: "relative directory symlink that leaves the volume", path: "rel/secret.env", expectedError: true},
+		{name: "file symlink that leaves the volume", path: "file.env", expectedError: true},
+		{name: "optional does not hide a symlink that leaves the volume", path: "abs/secret.env", optional: true, expectedError: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			container := &v1.Container{
+				Env: []v1.EnvVar{{
+					Name: "KEY",
+					ValueFrom: &v1.EnvVarSource{
+						FileKeyRef: &v1.FileKeySelector{
+							VolumeName: "config-volume",
+							Path:       tc.path,
+							Key:        "KEY",
+							Optional:   ptr.To(tc.optional),
+						},
+					},
+				}},
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "test-namespace", UID: "test-pod-uid"},
+				Spec: v1.PodSpec{
+					Containers:         []v1.Container{*container},
+					EnableServiceLinks: ptr.To(false),
+				},
+			}
+			podVolumes := kubecontainer.VolumeMap{
+				"config-volume": {Mounter: &testVolumeMounter{path: vol}},
+			}
+
+			envs, err := kl.makeEnvironmentVariables(tCtx, pod, container, "192.168.1.1", []string{"192.168.1.1"}, podVolumes)
+			if tc.expectedError {
+				require.Error(t, err)
+				assert.Empty(t, envs)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, []kubecontainer.EnvVar{{Name: "KEY", Value: tc.expectedValue}}, envs)
+		})
+	}
+}
+
 type Envs []kubecontainer.EnvVar
 
 func (e Envs) Len() int           { return len(e) }
