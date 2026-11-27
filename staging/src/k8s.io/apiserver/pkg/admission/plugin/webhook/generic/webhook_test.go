@@ -31,11 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -496,6 +499,263 @@ func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
 	return nil, k8serrors.NewNotFound(corev1.Resource("namespaces"), name)
 }
 
+func podRule(ops []v1.OperationType, resources ...string) v1.RuleWithOperations {
+	return v1.RuleWithOperations{
+		Operations: ops,
+		Rule:       v1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: resources},
+	}
+}
+
+func TestShouldCallHookCoverage(t *testing.T) {
+	createUpdate := []v1.OperationType{v1.Create, v1.Update}
+	update := []v1.OperationType{v1.Update}
+	matchConditions := []v1.MatchCondition{{Name: "c", Expression: "unused: fake matcher"}}
+	badSelector := &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "k", Operator: "BadOp"}}}
+
+	dynamic := webhooktesting.NewCoverageRequirements(t)
+	mainResource := []coverage.Requirement{{
+		Resource: schema.GroupResource{Resource: "pods"},
+		Target:   coverage.Shape{Operation: admission.Update},
+		Sources:  []coverage.Shape{{Operation: admission.Create}},
+	}}
+
+	target := func() *webhooktesting.FakeAttributes {
+		return webhooktesting.NewPodAttribute(admission.Update, "dynamic", map[string]string{"app": "y"})
+	}
+	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: runtime.NewEquivalentResourceRegistry()}
+	namespaceLister := fakeNamespaceLister{map[string]*corev1.Namespace{
+		"default": {ObjectMeta: metav1.ObjectMeta{Name: "default", Labels: map[string]string{"env": "prod"}}},
+	}}
+	annotationKey := coverage.AuditAnnotationKey(coverage.WebhookValidating)
+
+	// apps and extensions deployments are equivalent, so that a hook can match
+	// an apps request only through matchPolicy: Equivalent.
+	equivalentMapper := runtime.NewEquivalentResourceRegistryWithIdentity(func(resource schema.GroupResource) string {
+		if resource.Resource == "deployments" {
+			return "/deployments"
+		}
+		return ""
+	})
+	equivalentMapper.RegisterKindFor(gvr("apps", "v1", "deployments"), "scale", gvk("autoscaling", "v1", "Scale"))
+	equivalentMapper.RegisterKindFor(gvr("extensions", "v1beta1", "deployments"), "scale", gvk("extensions", "v1beta1", "Scale"))
+	deploymentScale := []coverage.Requirement{{
+		Resource: schema.GroupResource{Group: "apps", Resource: "deployments"},
+		Target:   coverage.Shape{Operation: admission.Update, Subresource: "scale"},
+		Sources:  []coverage.Shape{{Operation: admission.Create}, {Operation: admission.Update}},
+	}}
+	// Intercepts apps deployments, but their scale subresource only in extensions.
+	equivalentScaleRules := []v1.RuleWithOperations{{
+		Operations: createUpdate,
+		Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}},
+	}, {
+		Operations: update,
+		Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments/scale"}},
+	}}
+	deploymentScaleTarget := func() *webhooktesting.FakeAttributes {
+		return &webhooktesting.FakeAttributes{Attributes: admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "default", "d",
+			gvr("apps", "v1", "deployments"), "scale", admission.Update, &metav1.UpdateOptions{}, false, nil)}
+	}
+	equivalent, exact := v1.Equivalent, v1.Exact
+
+	testcases := []struct {
+		name              string
+		reqs              []coverage.Requirement
+		rules             []v1.RuleWithOperations
+		matchPolicy       *v1.MatchPolicyType
+		mapper            runtime.EquivalentResourceMapper
+		namespaceSelector *metav1.LabelSelector // nil: match everything
+		objectSelector    *metav1.LabelSelector // nil: match everything
+		matchConditions   []v1.MatchCondition
+		matchResult       bool
+		matchError        error
+		attrs             *webhooktesting.FakeAttributes
+		reinvoke          bool
+		versioned         bool // pass attrs as the mutating dispatcher does after a mutation
+
+		expectCall bool
+		expectCode int32    // 0: no error
+		expectMsg  []string // substrings of the error message
+		rejectMsg  []string // substrings that must NOT appear
+		// expectAnnotation, if set, is the exact coverage audit annotation.
+		// Every 403 must be annotated and nothing else may be.
+		expectAnnotation string
+	}{
+		// Violations.
+		{
+			name: "violation: intercepts CREATE,UPDATE pods but not pods/dynamic", reqs: dynamic,
+			rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, attrs: target(),
+			expectCode: 403,
+			expectMsg: []string{
+				`pods "p" is forbidden: admission webhook "hook.example.com" (configuration "cfg") intercepts CREATE pods but not UPDATE pods/dynamic`,
+				`; add a rule for UPDATE on "pods/dynamic" (or "pods/*") to the webhook's rules to allow this request`,
+			},
+			expectAnnotation: `[{"name":"hook.example.com","configuration":"cfg","source":"CREATE pods","target":"UPDATE pods/dynamic"}]`,
+		},
+		{
+			name: "violation: matching namespace selector is honored, not skipped", reqs: dynamic,
+			rules:             []v1.RuleWithOperations{podRule(createUpdate, "pods")},
+			namespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"env": "prod"}},
+			attrs:             target(), expectCode: 403,
+		},
+		{
+			name: "violation: excluding matchConditions are not evaluated", reqs: dynamic,
+			rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, matchConditions: matchConditions, matchResult: false,
+			attrs: target(), expectCode: 403, expectMsg: []string{"intercepts CREATE pods"},
+		},
+		{
+			name: "violation: erroring matchConditions are not evaluated", reqs: dynamic,
+			rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, matchConditions: matchConditions, matchError: errors.New("test error"),
+			attrs: target(), expectCode: 403, expectMsg: []string{"intercepts CREATE pods"}, rejectMsg: []string{"test error"},
+		},
+		{
+			name: "violation: versioned attributes from the mutating dispatcher", reqs: dynamic,
+			rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, attrs: target(), versioned: true,
+			expectCode: 403, expectMsg: []string{"intercepts CREATE pods but not UPDATE pods/dynamic"},
+			expectAnnotation: `[{"name":"hook.example.com","configuration":"cfg","source":"CREATE pods","target":"UPDATE pods/dynamic"}]`,
+		},
+		{
+			name: "main-resource target: hint has no trailing slash", reqs: mainResource,
+			rules:      []v1.RuleWithOperations{podRule([]v1.OperationType{v1.Create}, "pods")},
+			attrs:      webhooktesting.NewPodAttribute(admission.Update, "", nil),
+			expectCode: 403, expectMsg: []string{"intercepts CREATE pods but not UPDATE pods", `add a rule for UPDATE on "pods" (or "pods/*") to the webhook's rules`},
+			rejectMsg: []string{`"pods/"`},
+		},
+
+		// Direct matches are called normally.
+		{name: "direct match: pods/*", reqs: dynamic, rules: []v1.RuleWithOperations{podRule(createUpdate, "pods/*")}, attrs: target(), matchResult: true, expectCall: true},
+		{name: "direct match: */*", reqs: dynamic, rules: []v1.RuleWithOperations{podRule(createUpdate, "*/*")}, attrs: target(), matchResult: true, expectCall: true},
+		{name: "direct match: explicit target", reqs: dynamic, rules: []v1.RuleWithOperations{podRule(createUpdate, "pods", "pods/dynamic")}, attrs: target(), matchResult: true, expectCall: true},
+		{
+			name: "direct match: matchConditions still apply", reqs: dynamic,
+			rules: []v1.RuleWithOperations{podRule(createUpdate, "pods", "pods/dynamic")}, matchConditions: matchConditions, matchResult: false,
+			attrs: target(),
+		},
+
+		// Directionality.
+		{name: "target-only hook, UPDATE pods source request: not called", reqs: dynamic, rules: []v1.RuleWithOperations{podRule(update, "pods/dynamic")}, attrs: webhooktesting.NewPodAttribute(admission.Update, "", nil)},
+		{name: "violating hook, source request: called normally", reqs: dynamic, rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, attrs: webhooktesting.NewPodAttribute(admission.Update, "", nil), matchResult: true, expectCall: true},
+
+		// matchPolicy. The gaps ignore it, so they flag the target either way;
+		// only a hook that matches the real request through Equivalent is called.
+		{
+			name: "matchPolicy Equivalent: hook with gaps matching the target via another group is called", reqs: deploymentScale,
+			rules: equivalentScaleRules, matchPolicy: &equivalent, mapper: equivalentMapper,
+			attrs: deploymentScaleTarget(), matchResult: true, expectCall: true,
+		},
+		{
+			name: "matchPolicy Exact: same hook is in violation", reqs: deploymentScale,
+			rules: equivalentScaleRules, matchPolicy: &exact, mapper: equivalentMapper,
+			attrs: deploymentScaleTarget(), expectCode: 403,
+			expectMsg: []string{`intercepts CREATE deployments.apps but not UPDATE deployments.apps/scale; add a rule for UPDATE on "deployments/scale" (or "deployments/*")`},
+		},
+
+		// Selectors.
+		{
+			name: "namespace selector excludes: no violation", reqs: dynamic,
+			rules:             []v1.RuleWithOperations{podRule(createUpdate, "pods")},
+			namespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"env": "dev"}}, attrs: target(),
+		},
+		{
+			name: "object selector excludes: no violation", reqs: dynamic,
+			rules:          []v1.RuleWithOperations{podRule(createUpdate, "pods")},
+			objectSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "x"}}, attrs: target(),
+		},
+		{
+			name: "deferred namespace selector error preferred over coverage", reqs: dynamic,
+			rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, namespaceSelector: badSelector, attrs: target(),
+			expectCode: 500, rejectMsg: []string{"intercepts"},
+		},
+		{
+			name: "deferred object selector error preferred over coverage", reqs: dynamic,
+			rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, objectSelector: badSelector, attrs: target(),
+			expectCode: 500, rejectMsg: []string{"intercepts"},
+		},
+		{
+			name: "selector error on a hook not in violation stays hidden", reqs: dynamic,
+			rules: []v1.RuleWithOperations{podRule(update, "pods/resize")}, namespaceSelector: badSelector, attrs: target(),
+		},
+
+		// Exemptions and no requirements.
+		{name: "mutating reinvocation is exempt", reqs: dynamic, rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, attrs: target(), reinvoke: true},
+		{name: "no requirements: violating hook not called, no error", rules: []v1.RuleWithOperations{podRule(createUpdate, "pods")}, attrs: target()},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &Webhook{
+				namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister},
+				objectMatcher:    &object.Matcher{},
+			}
+			a.SetAdmissionCoverage(tc.reqs)
+
+			nsSel, objSel := tc.namespaceSelector, tc.objectSelector
+			if nsSel == nil {
+				nsSel = &metav1.LabelSelector{}
+			}
+			if objSel == nil {
+				objSel = &metav1.LabelSelector{}
+			}
+			h := &fakeWebhookAccessor{
+				WebhookAccessor: webhook.NewValidatingWebhookAccessor("cfg/hook.example.com/0", "cfg", &v1.ValidatingWebhook{
+					Name: "hook.example.com", Rules: tc.rules, MatchPolicy: tc.matchPolicy,
+					NamespaceSelector: nsSel, ObjectSelector: objSel, MatchConditions: tc.matchConditions,
+				}),
+				matchResult: tc.matchResult,
+				throwError:  tc.matchError,
+			}
+			if tc.reinvoke {
+				tc.attrs.GetReinvocationContext().SetIsReinvoke()
+			}
+			var attrs admission.Attributes = tc.attrs
+			if tc.versioned {
+				v := &admission.VersionedAttributes{Attributes: tc.attrs, VersionedKind: tc.attrs.GetKind()}
+				v.VersionedObject.Set(tc.attrs.GetObject().DeepCopyObject())
+				v.VersionedOldObject.Set(tc.attrs.GetOldObject().DeepCopyObject())
+				attrs = v
+			}
+
+			objectInterfaces := interfaces
+			if tc.mapper != nil {
+				objectInterfaces = &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: tc.mapper}
+			}
+			invocation, err := a.ShouldCallHook(t.Context(), h, attrs, objectInterfaces, &fakeVersionedAttributeAccessor{})
+			if tc.expectCode == 0 {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("expected %d error, got invocation %v", tc.expectCode, invocation)
+				}
+				if err.ErrStatus.Code != tc.expectCode {
+					t.Fatalf("expected code %d, got %d: %v", tc.expectCode, err.ErrStatus.Code, err)
+				}
+			}
+			for _, s := range tc.expectMsg {
+				if err == nil || !strings.Contains(err.Error(), s) {
+					t.Errorf("expected error containing %q, got %v", s, err)
+				}
+			}
+			for _, s := range tc.rejectMsg {
+				if err != nil && strings.Contains(err.Error(), s) {
+					t.Errorf("expected error not containing %q, got %v", s, err)
+				}
+			}
+			if (invocation != nil) != tc.expectCall {
+				t.Errorf("expected call=%v, got invocation %v", tc.expectCall, invocation)
+			}
+
+			annotation, annotated := tc.attrs.GetAnnotations(auditinternal.LevelMetadata)[annotationKey]
+			if want := tc.expectCode == 403; annotated != want {
+				t.Errorf("expected coverage audit annotation: %v, got %q (present=%v)", want, annotation, annotated)
+			}
+			if tc.expectAnnotation != "" && annotation != tc.expectAnnotation {
+				t.Errorf("expected coverage audit annotation %s, got %s", tc.expectAnnotation, annotation)
+			}
+		})
+	}
+}
+
 func BenchmarkShouldCallHookWithComplexSelector(b *testing.B) {
 	allScopes := v1.AllScopes
 	equivalentMatch := v1.Equivalent
@@ -712,5 +972,53 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		a.ShouldCallHook(context.TODO(), wbAccessor, attrs, interfaces, nil)
+	}
+}
+
+// BenchmarkShouldCallHookCoverage measures the coverage check for a hook whose
+// rules don't match the request. Its selectors are empty, unlike the
+// benchmarks above, so that ShouldCallHook gets past them to the check.
+func BenchmarkShouldCallHookCoverage(b *testing.B) {
+	allScopes := v1.AllScopes
+	wb := &v1.ValidatingWebhook{
+		NamespaceSelector: &metav1.LabelSelector{},
+		ObjectSelector:    &metav1.LabelSelector{},
+		Rules: []v1.RuleWithOperations{{
+			Operations: []v1.OperationType{v1.Create, v1.Update},
+			Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}, Scope: &allScopes},
+		}},
+	}
+	reqs := []coverage.Requirement{{
+		Resource: schema.GroupResource{Group: "apps", Resource: "deployments"},
+		Target:   coverage.Shape{Operation: admission.Update, Subresource: "scale"},
+		Sources:  []coverage.Shape{{Operation: admission.Create}, {Operation: admission.Update}},
+	}}
+	newAttrs := func(subresource string) admission.Attributes {
+		return admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), subresource, admission.Update, &metav1.UpdateOptions{}, false, nil)
+	}
+	reinvocation := newAttrs("scale")
+	reinvocation.GetReinvocationContext().SetIsReinvoke()
+	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: runtime.NewEquivalentResourceRegistry()}
+
+	for _, tc := range []struct {
+		name  string
+		reqs  []coverage.Requirement
+		attrs admission.Attributes
+	}{
+		{name: "no requirements", attrs: newAttrs("status")},
+		{name: "non-target", reqs: reqs, attrs: newAttrs("status")},
+		{name: "reinvocation", reqs: reqs, attrs: reinvocation},
+		{name: "target violation", reqs: reqs, attrs: newAttrs("scale")},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			// A fresh accessor per sub-benchmark: GetCoverageGaps keeps the gaps of the first requirements.
+			wbAccessor := &fakeWebhookAccessor{WebhookAccessor: webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb)}
+			a := &Webhook{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
+			a.SetAdmissionCoverage(tc.reqs)
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				_, _ = a.ShouldCallHook(b.Context(), wbAccessor, tc.attrs, interfaces, nil)
+			}
+		})
 	}
 }
