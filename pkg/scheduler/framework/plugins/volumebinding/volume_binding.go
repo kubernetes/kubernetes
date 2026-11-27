@@ -493,7 +493,8 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.P
 	} else {
 		// group dynamic binding volumes by storage class
 		for _, provision := range podVolumes.DynamicProvisions {
-			if provision.NodeCapacity == nil {
+			capacity, ok := provision.AvailableCapacity()
+			if !ok {
 				continue
 			}
 			class := *provision.PVC.Spec.StorageClassName
@@ -506,7 +507,7 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.P
 			// The following line cannot be +=. For example, if a Pod requests two 50GB volumes from
 			// a StorageClass with 100GB of capacity on a node, this part of the code will be executed twice.
 			// In that case, using += would incorrectly set classResources[class].Capacity to 200GB.
-			classResources[class].Capacity = provision.NodeCapacity.Capacity.Value()
+			classResources[class].Capacity = capacity
 			requestedQty := provision.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 			classResources[class].Requested += requestedQty.Value()
 		}
