@@ -98,10 +98,15 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersionWithContext(ctx co
 		klog.FromContext(ctx).V(3).Info("Skipped caching discovery info due to error", "err", err)
 		return liveResources, err
 	}
-	if liveResources == nil || len(liveResources.APIResources) == 0 {
+	if liveResources == nil {
 		klog.FromContext(ctx).V(3).Info("skipped caching discovery info, no resources found")
 		return liveResources, err
 	}
+	// A group/version with no resources is cached like any other. A server
+	// that serves aggregated discovery reports such a group/version as a
+	// valid, empty list (an external metrics API with no metrics is the
+	// common case); leaving it out of the cache makes every new client miss
+	// on it and go back to the server for discovery.
 
 	if err := d.writeCachedFile(filename, liveResources); err != nil {
 		klog.FromContext(ctx).V(1).Info("Failed to write cache", "fileName", filename, "err", err)
