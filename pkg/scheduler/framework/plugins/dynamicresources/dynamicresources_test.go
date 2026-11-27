@@ -1365,9 +1365,8 @@ type testPluginCase struct {
 	metrics          func(ktesting.TContext, compbasemetrics.Gatherer)
 }
 
-// TestConsumedCapacityPreBindHandoff checks that a second claim fits before,
-// during, and after the first allocation moves from pending to persisted.
-// PreBind can defer pending-allocation cleanup while waiting for binding conditions.
+// TestConsumedCapacityPreBindHandoff checks that a second claim fits before
+// and after the first allocation moves from pending to persisted.
 func TestConsumedCapacityPreBindHandoff(t *testing.T) {
 	testConsumedCapacityPreBindHandoff(ktesting.Init(t))
 }
@@ -1396,16 +1395,11 @@ func testConsumedCapacityPreBindHandoff(tCtx ktesting.TContext) {
 	require.True(tCtx, status.IsSuccess(), "one pending allocation consumes two of four shares: %v", status)
 	state, err := getStateData(cycle)
 	require.NoError(tCtx, err)
-	// PreBind may wait for binding conditions after persisting the allocation.
-	persisted, cleanup, err := tc.p.bindClaim(tCtx, state, 0, podWithClaimName, nodeName)
+	persisted, err := tc.p.bindClaim(tCtx, state, 0, podWithClaimName, nodeName)
 	require.NoError(tCtx, err)
 	require.NotNil(tCtx, persisted.Status.Allocation)
-	require.NotNil(tCtx, cleanup)
 	_, status = filter(secondPod)
-	require.True(tCtx, status.IsSuccess(), "the persisted allocation must not be counted again while still pending: %v", status)
-	cleanup()
-	_, status = filter(secondPod)
-	require.True(tCtx, status.IsSuccess(), "the persisted allocation remains counted once after cleanup: %v", status)
+	require.True(tCtx, status.IsSuccess(), "the persisted allocation must be counted once: %v", status)
 }
 
 // TestSharedCounterPreBindHandoff checks that capacity and counter consumption
@@ -1469,13 +1463,10 @@ func testSharedCounterPreBindHandoff(tCtx ktesting.TContext) {
 	checkConsumption("pending")
 	state, err := getStateData(cycle)
 	require.NoError(tCtx, err)
-	persisted, cleanup, err := tc.p.bindClaim(tCtx, state, 0, podWithClaimName, nodeName)
+	persisted, err := tc.p.bindClaim(tCtx, state, 0, podWithClaimName, nodeName)
 	require.NoError(tCtx, err)
 	require.NotNil(tCtx, persisted.Status.Allocation)
-	require.NotNil(tCtx, cleanup)
-	checkConsumption("persisted but still pending")
-	cleanup()
-	checkConsumption("after cleanup")
+	checkConsumption("persisted")
 }
 
 // TestResourceSliceUpdatePreservesSharedCounterAllocation verifies that slice
@@ -3204,10 +3195,9 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 					inFlightClaims: []metav1.Object{extendedResourceClaimNoName},
 				},
 				prebind: result{
-					inFlightClaims: []metav1.Object{addAllocationTimestamp(extendedResourceClaimNoName)},
-					assumedClaim:   addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
-					added:          []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
-					status:         fwk.NewStatus(fwk.Error, `patch error`),
+					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName)),
+					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaim, podWithExtendedResourceName))},
+					status:       fwk.NewStatus(fwk.Error, `patch error`),
 				},
 				postbind: result{
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
@@ -3553,8 +3543,7 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 					}()},
 				},
 				prebind: result{
-					inFlightClaims: []metav1.Object{bindClaim},
-					assumedClaim:   reserve(bindClaim, podWithClaimName),
+					assumedClaim: reserve(bindClaim, podWithClaimName),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return reserve(bindClaim, podWithClaimName)
@@ -3585,8 +3574,7 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 					}()},
 				},
 				prebind: result{
-					inFlightClaims: []metav1.Object{bindClaim},
-					assumedClaim:   reserve(bindClaim, podWithClaimName),
+					assumedClaim: reserve(bindClaim, podWithClaimName),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							return reserve(bindClaim, podWithClaimName)
@@ -3630,7 +3618,6 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 				},
 				prebind: result{
 					inFlightClaims: []metav1.Object{
-						addAllocationTimestamp(allocatedClaim),
 						addAllocationTimestamp(st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj()),
 					},
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
@@ -3699,8 +3686,9 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 					},
 				},
 				prebind: result{
+					// The first claim's pending allocation was released right after
+					// its allocation got stored, so only the second one is in flight.
 					inFlightClaims: []metav1.Object{
-						addAllocationTimestamp(allocatedClaim),
 						addAllocationTimestamp(st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj()),
 					},
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),

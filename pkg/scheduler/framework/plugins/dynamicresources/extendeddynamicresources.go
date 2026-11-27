@@ -605,11 +605,9 @@ func (pl *DynamicResources) unreserveExtendedResourceClaim(ctx context.Context, 
 		return
 	}
 
-	// If the claim was marked as pending allocation (in-flight), remove that
-	// marker. The assume cache is not restored for the same reason as in
-	// Unreserve. Deleting the claim below updates the assume cache through
-	// the informer.
-	pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(state.claims.getInitialExtendedResourceClaimUID(), false)
+	// The assume cache is not restored for the same reason as in Unreserve.
+	// Deleting the claim below updates the assume cache through the informer.
+	pl.releasePendingAllocation(state, state.claims.numUserOwned, state.claims.getInitialExtendedResourceClaimUID())
 	if isSpecialClaimName(extendedResourceClaim.Name) {
 		// In memory temporary extended resource claim does not need to be deleted
 		return
