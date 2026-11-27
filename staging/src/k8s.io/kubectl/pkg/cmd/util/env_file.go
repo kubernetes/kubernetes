@@ -99,5 +99,11 @@ func AddFromEnvFile(filePath string, addTo func(key, value string) error) error 
 			return err
 		}
 	}
+	// bufio.Scanner stops at its token limit (a line longer than 64KiB) and reports the reason only
+	// through Err(). Dropping it made kubectl exit successfully while the ConfigMap or Secret was
+	// built from a truncated file.
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading env file %s: %w", filePath, err)
+	}
 	return nil
 }
