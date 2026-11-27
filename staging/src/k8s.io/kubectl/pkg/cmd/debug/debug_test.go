@@ -3040,3 +3040,87 @@ func TestCompleteAndValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestDisplayWarning(t *testing.T) {
+	tests := []struct {
+		name               string
+		podSecurityContext *corev1.PodSecurityContext
+		container          *corev1.Container
+		expectWarning      bool
+	}{
+		{
+			// Pods decoded from a manifest have no pod-level securityContext
+			// unless the user sets it explicitly.
+			name:               "no pod security context",
+			podSecurityContext: nil,
+			container: &corev1.Container{
+				SecurityContext: &corev1.SecurityContext{Privileged: ptr.To(true)},
+			},
+			expectWarning: false,
+		},
+		{
+			name:               "pod runs as root",
+			podSecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](0)},
+			container: &corev1.Container{
+				SecurityContext: &corev1.SecurityContext{Privileged: ptr.To(true)},
+			},
+			expectWarning: false,
+		},
+		{
+			name:               "pod runs as non-root, debug container is privileged",
+			podSecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](1000)},
+			container: &corev1.Container{
+				SecurityContext: &corev1.SecurityContext{Privileged: ptr.To(true)},
+			},
+			expectWarning: true,
+		},
+		{
+			name:               "pod runs as non-root, debug container overrides runAsUser to root",
+			podSecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](1000)},
+			container: &corev1.Container{
+				// Privileged, so only the container-level runAsUser: 0 can suppress the warning.
+				SecurityContext: &corev1.SecurityContext{
+					RunAsUser:  ptr.To[int64](0),
+					Privileged: ptr.To(true),
+				},
+			},
+			expectWarning: false,
+		},
+		{
+			name:               "pod runs as non-root, debug container has no extra privileges",
+			podSecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](1000)},
+			container: &corev1.Container{
+				SecurityContext: &corev1.SecurityContext{},
+			},
+			expectWarning: false,
+		},
+		{
+			name:               "pod runs as non-root, debug container adds capabilities",
+			podSecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](1000)},
+			container: &corev1.Container{
+				SecurityContext: &corev1.SecurityContext{
+					Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"SYS_PTRACE"}},
+				},
+			},
+			expectWarning: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ioStreams, _, _, errOut := genericiooptions.NewTestIOStreams()
+			o := &DebugOptions{IOStreams: ioStreams}
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Spec:       corev1.PodSpec{SecurityContext: tc.podSecurityContext},
+			}
+
+			o.displayWarning(tc.container, pod)
+
+			gotWarning := strings.Contains(errOut.String(), "capabilities granted by debug profile may not work")
+			if gotWarning != tc.expectWarning {
+				t.Errorf("displayWarning() warning = %v, want %v, stderr: %q", gotWarning, tc.expectWarning, errOut.String())
+			}
+		})
+	}
+}
