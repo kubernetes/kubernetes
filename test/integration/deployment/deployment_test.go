@@ -18,16 +18,23 @@ package deployment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
+	admissionv1 "k8s.io/api/admission/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -592,6 +599,172 @@ func TestFailedDeployment(t *testing.T) {
 	// Wait for the deployment to have a progress complete condition.
 	if err = tester.waitForDeploymentWithCondition(deploymentutil.NewRSAvailableReason, apps.DeploymentProgressing); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDeploymentScalingFailureReportsTimeout(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var scalingAttempts atomic.Int32
+	webhookURL, closeWebhook, err := testutil.NewAdmissionWebhookServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := r.Body.Close(); err != nil {
+				t.Errorf("failed to close admission request body: %v", err)
+			}
+		}()
+		var review admissionv1.AdmissionReview
+		if err := json.NewDecoder(r.Body).Decode(&review); err != nil {
+			t.Errorf("failed to decode admission review: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if review.Request == nil {
+			t.Error("admission review has no request")
+			http.Error(w, "missing admission request", http.StatusBadRequest)
+			return
+		}
+		var rs apps.ReplicaSet
+		if err := json.Unmarshal(review.Request.Object.Raw, &rs); err != nil {
+			t.Errorf("failed to decode ReplicaSet: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if rs.Annotations[deploymentutil.DesiredReplicasAnnotation] == "8" {
+			scalingAttempts.Add(1)
+		}
+		http.Error(w, "ReplicaSet updates are unavailable", http.StatusServiceUnavailable)
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeWebhook()
+
+	closeFn, rm, dc, informers, c := dcSetup(ctx, t)
+	defer closeFn()
+	name := "deployment-scaling-failure"
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
+
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, 10)}
+	quarter := intstr.FromString("25%")
+	tester.deployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
+		MaxSurge:       &quarter,
+		MaxUnavailable: &quarter,
+	}
+	tester.deployment.Spec.ProgressDeadlineSeconds = ptr.To[int32](600)
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(ctx, tester.deployment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+	oldRS, err := tester.expectNewReplicaSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const webhookName = "reject-old-replicaset.example.com"
+	_, err = c.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(ctx, &admissionregistrationv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{{
+			Name: webhookName,
+			ClientConfig: admissionregistrationv1.WebhookClientConfig{
+				URL:      &webhookURL,
+				CABundle: testutil.LocalhostCert,
+			},
+			Rules: []admissionregistrationv1.RuleWithOperations{{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Update},
+				Rule: admissionregistrationv1.Rule{
+					APIGroups:   []string{"apps"},
+					APIVersions: []string{"v1"},
+					Resources:   []string{"replicasets"},
+				},
+			}},
+			NamespaceSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{v1.LabelMetadataName: ns.Name}},
+			ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{apps.DefaultDeploymentUniqueLabelKey: oldRS.Labels[apps.DefaultDeploymentUniqueLabelKey]}},
+			FailurePolicy:           ptr.To(admissionregistrationv1.Fail),
+			SideEffects:             ptr.To(admissionregistrationv1.SideEffectClassNone),
+			AdmissionReviewVersions: []string{"v1"},
+		}},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := c.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	// Wait for admission configuration propagation without changing the ReplicaSet.
+	if err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
+		rs, err := c.AppsV1().ReplicaSets(ns.Name).Get(ctx, oldRS.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		_, err = c.AppsV1().ReplicaSets(ns.Name).Update(ctx, rs, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+		if apierrors.IsInternalError(err) && strings.Contains(err.Error(), webhookName) {
+			return true, nil
+		}
+		return false, err
+	}); err != nil {
+		t.Fatalf("webhook did not start rejecting ReplicaSet updates: %v", err)
+	}
+
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = "new-image"
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentUpdatedReplicasGTE(3); err != nil {
+		t.Fatal(err)
+	}
+
+	// Only shorten the deadline with the scaling event, so an earlier rollout sync cannot time out.
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
+		update.Spec.Replicas = ptr.To[int32](8)
+		update.Spec.ProgressDeadlineSeconds = ptr.To[int32](5)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	progressing := deploymentutil.GetDeploymentCondition(tester.deployment.Status, apps.DeploymentProgressing)
+	if progressing == nil || progressing.Status != v1.ConditionTrue {
+		t.Fatalf("expected an in-progress rollout before the scaling failure, got %+v", progressing)
+	}
+	deadline := progressing.LastUpdateTime.Add(time.Duration(*tester.deployment.Spec.ProgressDeadlineSeconds) * time.Second)
+
+	var latest *apps.Deployment
+	if err := wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, func(ctx context.Context) (bool, error) {
+		var err error
+		latest, err = c.AppsV1().Deployments(ns.Name).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		condition := deploymentutil.GetDeploymentCondition(latest.Status, apps.DeploymentProgressing)
+		return scalingAttempts.Load() > 0 &&
+			latest.Status.ObservedGeneration >= tester.deployment.Generation &&
+			condition != nil && condition.Status == v1.ConditionFalse && condition.Reason == deploymentutil.TimedOutReason, nil
+	}); err != nil {
+		t.Fatalf("expected rollout timeout after failed scaling, got deployment %+v after %d scaling attempts: %v", latest, scalingAttempts.Load(), err)
+	}
+	oldRS, err = c.AppsV1().ReplicaSets(ns.Name).Get(ctx, oldRS.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *oldRS.Spec.Replicas != 10 || oldRS.Annotations[deploymentutil.DesiredReplicasAnnotation] != "10" {
+		t.Fatalf("expected failed scaling to preserve 10 old replicas and the previous desired-replicas annotation, got replicas %d and annotations %v", *oldRS.Spec.Replicas, oldRS.Annotations)
+	}
+	if time.Now().Before(deadline) {
+		t.Error("rollout timed out before the progress deadline elapsed")
 	}
 }
 
