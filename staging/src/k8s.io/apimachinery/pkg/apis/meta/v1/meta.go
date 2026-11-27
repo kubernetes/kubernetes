@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"sync"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -150,8 +152,139 @@ func (obj *TypeMeta) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 
 // GroupVersionKind satisfies the ObjectKind interface for all objects that embed TypeMeta
 func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
+	if o, ok := typeMetaOverrides.Load(obj); ok {
+		typeMeta := o.(typeMetaOverride).typeMeta
+		return typeMeta.GroupVersionKind()
+	}
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
+
+var (
+	// typeMetaOverrides maps TypeMeta pointers to typeOverride structs values
+	// which contain the actual TypeMeta while an object embedding the
+	// original TypeMeta instance is being encoded.
+	//
+	// A sync.Map is here because in practice there is no contention on they keys
+	// ("The Map type is optimized for ... (2) when multiple goroutines read, write, and overwrite
+	// entries for disjoint sets of keys").
+	typeMetaOverrides sync.Map
+)
+
+// typeMetaOverride contains the refcount (= number of active encoding operations)
+// and actual TypeMeta for those operations. Doesn't use pointers because the
+// entire struct must be comparable.
+type typeMetaOverride struct {
+	refcount int
+	typeMeta TypeMeta
+}
+
+// OverrideVersionForProtobufEncoding satisfies the ProtobufVersionOverrider interface for all objects that embed TypeMeta
+func (obj *TypeMeta) OverrideVersionForProtobufEncoding(gvk schema.GroupVersionKind) func() {
+	// The most common case is that an object is being encoded once,
+	// so typically we do one LoadOrStore and one CompareAndDelete.
+	//
+	// But we have to support encoding it in parallel, too, so
+	// each override must bump the refcount and only the last one may
+	// remove the override entry. This is achieved by comparing
+	// and retrying in case of a conflict.
+	//
+	// Theoretically it could happen that two concurrent encoding operations
+	// want to use different GVK for the same object. This is handled
+	// by comparing the desired TypeMeta as part of the typeMetaOverride,
+	// which forces the loosing operation to busy loop until it can store
+	// its override - not ideal, but seems so unlikely that it doesn't
+	// warant adding additional code (like exponential backoff).
+	want := typeMetaOverride{refcount: 1}
+	want.typeMeta.APIVersion, want.typeMeta.Kind = gvk.ToAPIVersionAndKind()
+	for {
+		if want.refcount == 1 {
+			// Try adding a new entry. Fails if added by someone else already.
+			if actual, loaded := typeMetaOverrides.LoadOrStore(obj, want); loaded {
+				// Try again with new refcount.
+				want.refcount = actual.(typeMetaOverride).refcount + 1
+				continue
+			}
+			// Done with insertion.
+			break
+		} else {
+			// Increase refcount, but only if we bump it exactly by one.
+			if swapped := typeMetaOverrides.CompareAndSwap(obj, typeMetaOverride{refcount: want.refcount - 1, typeMeta: want.typeMeta}, want); swapped {
+				// Done with increment.
+				break
+			}
+			if old, ok := typeMetaOverrides.Load(obj); ok {
+				// Someone else changed the refcount in the meantime, try again with new value.
+				want.refcount = old.(typeMetaOverride).refcount + 1
+				continue
+			}
+			// Gone in the meantime, insert anew.
+			want.refcount = 1
+		}
+	}
+
+	return func() {
+		for {
+			if want.refcount == 1 {
+				if deleted := typeMetaOverrides.CompareAndDelete(obj, want); deleted {
+					// Done.
+					break
+				}
+			} else {
+				if swapped := typeMetaOverrides.CompareAndSwap(obj, want, typeMetaOverride{refcount: want.refcount - 1, typeMeta: want.typeMeta}); swapped {
+					// Done with decrement.
+					break
+				}
+			}
+			if old, ok := typeMetaOverrides.Load(obj); ok {
+				// Someone else changed the refcount in the meantime, try again with new value.
+				want.refcount = old.(typeMetaOverride).refcount
+				continue
+			}
+			// It's gone?! Shouldn't happen.
+			break
+		}
+	}
+}
+
+var _ runtime.ProtobufVersionOverrider = &TypeMeta{}
+
+func (m *TypeMeta) Marshal() (dAtA []byte, err error) {
+	if o, ok := typeMetaOverrides.Load(m); ok {
+		override := o.(typeMetaOverride).typeMeta
+		return override.marshal()
+	}
+	return m.marshal()
+}
+
+func (m *TypeMeta) MarshalTo(dAtA []byte) (int, error) {
+	if o, ok := typeMetaOverrides.Load(m); ok {
+		override := o.(typeMetaOverride).typeMeta
+		return override.marshalTo(dAtA)
+	}
+	return m.marshalTo(dAtA)
+}
+
+func (m *TypeMeta) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	if o, ok := typeMetaOverrides.Load(m); ok {
+		override := o.(typeMetaOverride).typeMeta
+		return override.marshalToSizedBuffer(dAtA)
+	}
+	return m.marshalToSizedBuffer(dAtA)
+}
+
+func (m *TypeMeta) Size() (n int) {
+	if o, ok := typeMetaOverrides.Load(m); ok {
+		override := o.(typeMetaOverride).typeMeta
+		return override.size()
+	}
+	return m.size()
+}
+
+// The approach above for overriding the TypeMeta in the marshal function for protobuf
+// does not work for JSON: objects embedding TypeMeta inherit MarshalJSON from
+// TypeMeta and (in contrast to protobuf) don't provide their own method, so
+// encoding objects would only encode TypeMeta and none of the other other fields
+// of the object.
 
 func (obj *ListMeta) GetListMeta() ListInterface { return obj }
 

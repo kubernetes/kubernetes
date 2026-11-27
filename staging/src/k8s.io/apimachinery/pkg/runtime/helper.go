@@ -238,10 +238,23 @@ func (e WithVersionEncoder) Encode(obj Object, stream io.Writer) error {
 	}
 
 	// The gvk only needs to be set if not already as desired.
-	if gvk != oldGVK {
-		kind.SetGroupVersionKind(gvk)
-		defer kind.SetGroupVersionKind(oldGVK)
+	if gvk == oldGVK {
+		return e.Encoder.Encode(obj, stream)
 	}
+
+	// Modifying the object can cause data races.
+	//
+	// Let the encoder handle the GVK if supported, it might have a better way:
+	// - If the object is cached, the cached encoding can be returned directly.
+	// - The object might support injecting the GVK differently for certain encoders.
+	if versioningEncoder, ok := e.Encoder.(VersioningEncoder); ok {
+		return versioningEncoder.EncodeWithGVK(obj, gvk, stream)
+	}
+
+	// We have no choice, we must temporarily set the GVK in the object,
+	// then restore the old one when done.
+	kind.SetGroupVersionKind(gvk)
+	defer kind.SetGroupVersionKind(oldGVK)
 
 	return e.Encoder.Encode(obj, stream)
 }

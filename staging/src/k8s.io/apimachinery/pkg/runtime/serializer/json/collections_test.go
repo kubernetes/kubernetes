@@ -595,12 +595,12 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 			if got := buf.String(); got != tc.expect && !slices.Contains(tc.allow, got) {
 				t.Errorf("not matching:\n%s", cmp.Diff(got, tc.expect))
 			}
+			// When we expect streaming, we know that the encoder must write more than once.
+			// But otherwise it depends on the encoder implementation how often it writes:
+			// json/v1 used to write once, json/v2 writes several times.
 			expectStreaming := !tc.cannotStream && streamingEnabled
 			if expectStreaming && buf.writeCount <= 1 {
 				t.Errorf("expected streaming but Write was called only: %d", buf.writeCount)
-			}
-			if !expectStreaming && buf.writeCount > 1 {
-				t.Errorf("expected non-streaming but Write was called more than once: %d", buf.writeCount)
 			}
 		})
 	}

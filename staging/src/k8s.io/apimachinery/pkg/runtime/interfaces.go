@@ -69,6 +69,18 @@ type Encoder interface {
 	Identifier() Identifier
 }
 
+// VersioningEncoder accepts the GVK for the object separately instead of requiring that it is set
+// in the object itself.
+type VersioningEncoder interface {
+	Encoder
+
+	// EncodeWithGVK writes an object to a stream, using the given GVK instead of whatever
+	// may or may not be set in the object.
+	// Implementations may return errors if the versions are
+	// incompatible, or if no conversion is defined.
+	EncodeWithGVK(obj Object, gvk schema.GroupVersionKind, w io.Writer) error
+}
+
 // NondeterministicEncoder is implemented by Encoders that can serialize objects more efficiently in
 // cases where the output does not need to be deterministic.
 type NondeterministicEncoder interface {
@@ -80,6 +92,21 @@ type NondeterministicEncoder interface {
 	// generic decoder. For example, map entries and struct fields might be encoded in any
 	// order.
 	EncodeNondeterministic(Object, io.Writer) error
+}
+
+// ProtobufVersionOverrider is an optional interface implemented by object types which
+// support overriding the GVK that will be encoded in protobuf together with
+// an object. Because protobuf encoding passes no context into Marshal methods,
+// overrides have to be stored in some global shared state.
+type ProtobufVersionOverrider interface {
+	// OverrideVersionForProtobugEncoding will be called before encoding an object if the object
+	// doesn't have the right GVK already set. The returned restore
+	// function must be called after encoding is done.
+	//
+	// Implementations must support overriding more than once for the same object.
+	// The GVK is typically the same. In the unlikely case that it isn't, blocking
+	// while waiting for some conflicting encoding to finish is okay.
+	OverrideVersionForProtobufEncoding(gvk schema.GroupVersionKind) (restore func())
 }
 
 // MemoryAllocator is responsible for allocating memory.

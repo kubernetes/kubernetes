@@ -18,12 +18,15 @@ package json
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"io"
 	"strconv"
 
 	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
@@ -113,6 +116,7 @@ type Serializer struct {
 
 // Serializer implements Serializer
 var _ runtime.Serializer = &Serializer{}
+var _ runtime.VersioningEncoder = &Serializer{}
 var _ recognizer.RecognizingDecoder = &Serializer{}
 
 // gvkWithDefaults returns group kind and version defaulting from provided default
@@ -221,14 +225,68 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	if co, ok := obj.(runtime.CacheableObject); ok {
-		return co.CacheEncode(s.Identifier(), s.doEncode, w)
+		return co.CacheEncode(s.Identifier(), func(obj runtime.Object, w io.Writer) error {
+			return s.doEncode(obj, w)
+		}, w)
 	}
 	return s.doEncode(obj, w)
 }
 
-func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
+func (s *Serializer) EncodeWithGVK(obj runtime.Object, gvk schema.GroupVersionKind, w io.Writer) error {
+	doEncode := func(obj runtime.Object, w io.Writer) error {
+		return s.doEncode(obj, w)
+	}
+
+	kind := obj.GetObjectKind()
+	oldGVK := kind.GroupVersionKind()
+	if gvk != oldGVK {
+		// Inject GVK before encoding.
+		doEncode = func(obj runtime.Object, w io.Writer) error {
+			var opts []jsonv2.Options
+			// TODO: this doesn't actually work for inlined structs (https://github.com/golang/go/issues/83375),
+			// disabled for now.
+			if oldTypeMeta, ok := kind.(*metav1.TypeMeta); ok && false /* TODO */ {
+				// As kind is implementd by TypeMeta, we can override the encoding using
+				// a caller-specified customization (https://go.dev/blog/jsonv2#caller-specified-customization).
+				// No changes needed in TypeMeta itself for this.
+				var newTypeMeta metav1.TypeMeta
+				newTypeMeta.APIVersion, newTypeMeta.Kind = gvk.ToAPIVersionAndKind()
+				opts = append(opts, jsonv2.WithMarshalers(jsonv2.MarshalFunc(func(existing *metav1.TypeMeta) ([]byte, error) {
+					// Only override the one instance of TypeMeta which is used for
+					// versioning the object, otherwise encode the original value.
+					typeMeta := existing
+					if typeMeta == oldTypeMeta {
+						typeMeta = &newTypeMeta
+					}
+					return jsonv2.Marshal(typeMeta, json.DefaultOptionsV1())
+				})))
+			} else {
+				// Override inline in the object.
+				// This code path is taken for unstructured.Unstructured.
+				kind.SetGroupVersionKind(gvk)
+				defer kind.SetGroupVersionKind(oldGVK)
+			}
+			return s.doEncode(obj, w, opts...)
+		}
+	}
+
+	// Now encode, with or without caching.
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(s.Identifier(), doEncode, w)
+	}
+	return doEncode(obj, w)
+}
+
+func (s *Serializer) doEncode(obj runtime.Object, w io.Writer, opts ...jsonv2.Options) error {
+	opts = append([]jsonv2.Options{
+		// Start with v1 behavior.
+		json.DefaultOptionsV1(),
+	},
+		// Apply caller-provided tweaks.
+		opts...)
+
 	if s.options.Yaml {
-		json, err := json.Marshal(obj)
+		json, err := jsonv2.Marshal(obj, opts...)
 		if err != nil {
 			return err
 		}
@@ -241,14 +299,11 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 
 	if s.options.Pretty {
-		data, err := json.MarshalIndent(obj, "", "  ")
-		if err != nil {
-			return err
-		}
-		_, err = w.Write(data)
-		return err
+		opts = append(opts, jsontext.WithIndent("  "))
+		return jsonv2.MarshalWrite(w, obj, opts...)
 	}
 	if s.options.StreamingCollectionsEncoding {
+		// TODO: options
 		ok, err := streamEncodeCollections(obj, w)
 		if err != nil {
 			return err
@@ -257,8 +312,16 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 			return nil
 		}
 	}
-	encoder := json.NewEncoder(w)
-	return encoder.Encode(obj)
+	if err := jsonv2.MarshalWrite(w, obj, opts...); err != nil {
+		return err
+	}
+
+	// Add trailing newline (not done anymore by json/v2).
+	if _, err := w.Write([]byte("\n")); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // IsStrict indicates whether the serializer
