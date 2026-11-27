@@ -73,9 +73,6 @@ func init() {
 			"spec.containers": {
 				{ErrorType: "FieldValueRequired"},
 			},
-			"spec.containers[*].securityContext.cgroupOptions.mountMode": {
-				{ErrorType: "FieldValueNotSupported"},
-			},
 			"spec.containers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -127,9 +124,6 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
-			"spec.initContainers[*].securityContext.cgroupOptions.mountMode": {
-				{ErrorType: "FieldValueNotSupported"},
-			},
 			"spec.initContainers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -147,9 +141,6 @@ func init() {
 			},
 			"spec.initContainers[*].securityContext.seccompProfile.type": {
 				{ErrorType: "FieldValueRequired"},
-			},
-			"spec.podNetwork": {
-				{ErrorType: "FieldValueNotSupported"},
 			},
 			"spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
@@ -175,10 +166,31 @@ func init() {
 			"spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
 			},
-			"status.extraNodeAllocatableResources[*]": {
+			"spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*]": {
 				{ErrorType: "FieldValueDuplicate"},
 			},
-			"status.extraNodeAllocatableResources[*].limits": {
+			"status.nodeAllocatableResourceClaimStatuses[*].containers[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].mapping[*].quantity": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].overhead[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].overhead[*].name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.nodeAllocatableResourceClaimStatuses[*].resourceClaimName": {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.volumeStatuses[*]": {
@@ -200,9 +212,6 @@ func init() {
 			"status.volumeStatuses[*].healthStatus.healthConditions[*].status": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
-			},
-			"status.volumeStatuses[*].hostPhase": {
-				{ErrorType: "FieldValueNotSupported"},
 			},
 			"status.volumeStatuses[*].name": {
 				{ErrorType: "FieldValueRequired"},
