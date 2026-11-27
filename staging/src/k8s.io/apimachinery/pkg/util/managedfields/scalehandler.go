@@ -18,6 +18,7 @@ package managedfields
 
 import (
 	"fmt"
+	"maps"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
@@ -54,6 +55,41 @@ func NewScaleHandler(parentEntries []metav1.ManagedFieldsEntry, groupVersion sch
 	}
 }
 
+// Older scale updates could split one Update entry into an untimed entry
+// owning only replicas and another entry with the same identifier owning the
+// remaining fields. DecodeManagedFields retains only the last such entry.
+func (h *ScaleHandler) decodeParentEntries() (internal.ManagedInterface, error) {
+	managed, err := internal.DecodeManagedFields(h.parentEntries)
+	if err != nil || len(managed.Fields()) == len(h.parentEntries) {
+		return managed, err
+	}
+	for _, entry := range h.parentEntries {
+		path := h.mappings[entry.APIVersion]
+		if entry.Operation != metav1.ManagedFieldsOperationUpdate || path == nil || entry.FieldsV1 == nil {
+			continue
+		}
+		manager, err := internal.BuildManagerIdentifier(&entry)
+		if err != nil {
+			return nil, err
+		}
+		fields, err := internal.FieldsToSet(*entry.FieldsV1)
+		if err != nil {
+			return nil, err
+		}
+		retained := managed.Fields()[manager]
+		replicas := fieldpath.NewSet(path)
+		switch {
+		case entry.Time == nil && fields.Equals(replicas) && !retained.Set().Has(path):
+			retained.Set().Insert(path)
+		case managed.Times()[manager] == nil && retained.Set().Equals(replicas) && !fields.Has(path):
+			fields.Insert(path)
+			managed.Fields()[manager] = fieldpath.NewVersionedSet(&fields, retained.APIVersion(), false)
+			managed.Times()[manager] = entry.Time
+		}
+	}
+	return managed, nil
+}
+
 // ToSubresource filter the managed fields of the main resource and convert
 // them so that they can be handled by scale.
 // For the managed fields that have a replicas path it performs two changes:
@@ -61,7 +97,7 @@ func NewScaleHandler(parentEntries []metav1.ManagedFieldsEntry, groupVersion sch
 //  2. Replicas path of the main resource is transformed to the replicas path of
 //     the scale subresource
 func (h *ScaleHandler) ToSubresource() ([]metav1.ManagedFieldsEntry, error) {
-	managed, err := internal.DecodeManagedFields(h.parentEntries)
+	managed, err := h.decodeParentEntries()
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +129,7 @@ func (h *ScaleHandler) ToSubresource() ([]metav1.ManagedFieldsEntry, error) {
 // ToParent merges `scaleEntries` with the entries of the main resource and
 // transforms them accordingly
 func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]metav1.ManagedFieldsEntry, error) {
-	decodedParentEntries, err := internal.DecodeManagedFields(h.parentEntries)
+	decodedParentEntries, err := h.decodeParentEntries()
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +140,18 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 		return nil, err
 	}
 	scaleFields := decodedScaleEntries.Fields()
+	// Multiple parent API versions can project to the same scale manager.
+	unmatchedScaleFields := maps.Clone(scaleFields)
 
 	f := fieldpath.ManagedFields{}
 	t := map[string]*metav1.Time{}
 
-	for manager, versionedSet := range parentFields {
+	for _, entry := range h.parentEntries {
+		manager, err := internal.BuildManagerIdentifier(&entry)
+		if err != nil {
+			return nil, err
+		}
+		versionedSet := parentFields[manager]
 		// Get the main resource "replicas" path
 		path, ok := h.mappings[string(versionedSet.APIVersion())]
 		// Drop the entry if the APIVersion is unknown.
@@ -125,7 +168,14 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 			continue
 		}
 
-		if _, ok := scaleFields[manager]; !ok {
+		// Update manager identifiers include the API version. Look up the
+		// projected owner under the version used by the scale subresource.
+		entry.APIVersion = scaleGroupVersion.String()
+		scaleManager, err := internal.BuildManagerIdentifier(&entry)
+		if err != nil {
+			return nil, err
+		}
+		if fields, ok := scaleFields[scaleManager]; !ok || !fields.Set().Has(replicasPathInScale) {
 			// "Steal" the replicas path from the main resource entry
 			newSet := versionedSet.Set().Difference(fieldpath.NewSet(path))
 
@@ -142,11 +192,11 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 			// Field wasn't stolen, let's keep the entry as it is.
 			f[manager] = versionedSet
 			t[manager] = decodedParentEntries.Times()[manager]
-			delete(scaleFields, manager)
+			delete(unmatchedScaleFields, scaleManager)
 		}
 	}
 
-	for manager, versionedSet := range scaleFields {
+	for manager, versionedSet := range unmatchedScaleFields {
 		if !versionedSet.Set().Has(replicasPathInScale) {
 			continue
 		}
