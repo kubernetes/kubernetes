@@ -643,6 +643,13 @@ const (
 	// volumes.
 	KubeAPIServerWorkloadsTrust featuregate.Feature = "KubeAPIServerWorkloadsTrust"
 
+	// owner: @jcmoraisjr @danwinship
+	//
+	// Strips a leading PROXY protocol v2 header from connections to kube-proxy's
+	// HealthCheckNodePorts. Lets load balancers that send the header on
+	// health check probes detect nodes with local endpoints.
+	KubeProxyHealthCheckNodePortProxyProtocol featuregate.Feature = "KubeProxyHealthCheckNodePortProxyProtocol"
+
 	// owner: @adrianmoisey @danwinship
 	// kep: https://kep.k8s.io/5495
 	//
@@ -1774,6 +1781,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	KubeProxyHealthCheckNodePortProxyProtocol: {
+		{Version: version.MustParse("1.39"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	KubeProxyIPVS: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated},
@@ -2706,6 +2717,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InterPodAffinityHostnameFastPath: {},
 
 	KubeAPIServerWorkloadsTrust: {ClusterTrustBundle, ClusterTrustBundleProjection},
+
+	KubeProxyHealthCheckNodePortProxyProtocol: {},
 
 	KubeProxyIPVS: {},
 

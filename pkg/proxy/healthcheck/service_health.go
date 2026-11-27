@@ -30,9 +30,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
@@ -196,6 +198,11 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 			// to allow a retry/or port ownership change as needed
 			_ = hcI.closeAll()
 			return err
+		}
+
+		// wrap the listener to discard PROXY protocol v2 header if present
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyHealthCheckNodePortProxyProtocol) {
+			listener = proxyProtocolListener{Listener: listener}
 		}
 
 		// start serving
