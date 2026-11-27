@@ -6177,8 +6177,7 @@
   type: Counter
   stabilityLevel: ALPHA
   labels:
-  - allowed
-  - denied
+  - status
   componentEndpoints:
   - component: cloud-controller-manager
     endpoint: /metrics
