@@ -499,7 +499,7 @@ func TestEmbeddedResources(t *testing.T) {
 	t.Logf("Creation of invalid object failed with: %v", err)
 
 	invalidErrors := []string{
-		`[metadata.labels: Invalid value: "x y"`,
+		`[metadata.labels[foo]: Invalid value: "x y"`,
 		` embedded.kind: Invalid value: "%"`,
 		` embedded.metadata.name: Invalid value: ".."`,
 		` embeddedNested.kind: Invalid value: "%"`,
