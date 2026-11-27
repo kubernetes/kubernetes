@@ -113,7 +113,7 @@ func (a *Plugin) filterAnnotations(allAnnotations map[string]string) map[string]
 }
 
 // Function to call on webhook failure; behavior determined by defaultAllow flag
-func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err error) error {
+func (a *Plugin) webhookError(pod podutil.PodAccessor, attributes admission.Attributes, err error) error {
 	if err != nil {
 		klog.V(2).Infof("error contacting webhook backend: %s", err)
 		if a.defaultAllow {
@@ -124,7 +124,7 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 				annotations = make(map[string]string)
 			}
 			annotations[api.ImagePolicyFailedOpenKey] = "true"
-			pod.ObjectMeta.SetAnnotations(annotations)
+			pod.SetAnnotations(annotations)
 
 			klog.V(2).Infof("resource allowed in spite of webhook backend failure")
 			return nil
@@ -143,8 +143,8 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 		return nil
 	}
 
-	pod, ok := attributes.GetObject().(*api.Pod)
-	if !ok {
+	pod, err := podutil.Accessor(attributes.GetObject())
+	if err != nil {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
@@ -152,13 +152,21 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 	var imageReviewContainerSpecs []v1alpha1.ImageReviewContainerSpec
 	switch subresource {
 	case "", dynamic:
-		for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		initContainers := pod.GetSpecInitContainers()
+		specContainers := pod.GetSpecContainers()
+		imageReviewContainerSpecs = make([]v1alpha1.ImageReviewContainerSpec, 0, len(initContainers)+len(specContainers))
+		for i := range initContainers {
 			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
-				Image: c.Image,
+				Image: initContainers[i].Image,
+			})
+		}
+		for i := range specContainers {
+			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
+				Image: specContainers[i].Image,
 			})
 		}
 	case ephemeralcontainers:
-		for _, c := range pod.Spec.EphemeralContainers {
+		for _, c := range pod.GetSpecEphemeralContainers() {
 			imageReviewContainerSpecs = append(imageReviewContainerSpecs, v1alpha1.ImageReviewContainerSpec{
 				Image: c.Image,
 			})
@@ -167,7 +175,7 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 	imageReview := v1alpha1.ImageReview{
 		Spec: v1alpha1.ImageReviewSpec{
 			Containers:  imageReviewContainerSpecs,
-			Annotations: a.filterAnnotations(pod.Annotations),
+			Annotations: a.filterAnnotations(pod.GetAnnotations()),
 			Namespace:   attributes.GetNamespace(),
 		},
 	}
@@ -177,7 +185,7 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 	return nil
 }
 
-func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admission.Attributes, review *v1alpha1.ImageReview) error {
+func (a *Plugin) admitPod(ctx context.Context, pod podutil.PodAccessor, attributes admission.Attributes, review *v1alpha1.ImageReview) error {
 	cacheKey, err := json.Marshal(review.Spec)
 	if err != nil {
 		return err
