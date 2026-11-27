@@ -24,7 +24,11 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
+
+	"golang.org/x/time/rate"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -59,10 +63,11 @@ const (
 
 // Configurer is used for setting up DNS resolver configuration when launching pods.
 type Configurer struct {
-	recorder         record.EventRecorderLogger
-	getHostDNSConfig func(klog.Logger, string) (*runtimeapi.DNSConfig, error)
-	nodeRef          *v1.ObjectReference
-	nodeIPs          []net.IP
+	recorder             record.EventRecorderLogger
+	getHostDNSConfig     func(klog.Logger, string) (*runtimeapi.DNSConfig, error)
+	nodeRef              *v1.ObjectReference
+	nodeIPs              []net.IP
+	nameserverLogLimiter *rate.Limiter
 
 	// If non-nil, use this for container DNS server.
 	clusterDNS []net.IP
@@ -77,13 +82,14 @@ type Configurer struct {
 // NewConfigurer returns a DNS configurer for launching pods.
 func NewConfigurer(recorder record.EventRecorderLogger, nodeRef *v1.ObjectReference, nodeIPs []net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string) *Configurer {
 	return &Configurer{
-		recorder:         recorder,
-		getHostDNSConfig: getHostDNSConfig,
-		nodeRef:          nodeRef,
-		nodeIPs:          nodeIPs,
-		clusterDNS:       clusterDNS,
-		ClusterDomain:    clusterDomain,
-		ResolverConfig:   resolverConfig,
+		recorder:             recorder,
+		nameserverLogLimiter: rate.NewLimiter(rate.Every(time.Hour), 1),
+		getHostDNSConfig:     getHostDNSConfig,
+		nodeRef:              nodeRef,
+		nodeIPs:              nodeIPs,
+		clusterDNS:           clusterDNS,
+		ClusterDomain:        clusterDomain,
+		ResolverConfig:       resolverConfig,
 	}
 }
 
@@ -147,20 +153,33 @@ func (c *Configurer) formDNSSearchFitsLimits(logger klog.Logger, composedSearch 
 	return composedSearch
 }
 
-func (c *Configurer) formDNSNameserversFitsLimits(logger klog.Logger, nameservers []string, pod *v1.Pod) []string {
-	if len(nameservers) > validation.MaxDNSNameservers {
-		nameservers = nameservers[0:validation.MaxDNSNameservers]
-		err := fmt.Errorf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
+func podAddsNameserver(config *v1.PodDNSConfig, inherited []string) bool {
+	if config != nil {
+		for _, server := range config.Nameservers {
+			if !slices.Contains(inherited, server) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (c *Configurer) formDNSNameserversFitsLimits(logger klog.Logger, nameservers, inherited []string, pod *v1.Pod) []string {
+	if len(nameservers) <= validation.MaxDNSNameservers {
+		return nameservers
+	}
+	nameservers = nameservers[:validation.MaxDNSNameservers]
+	podWarning := podAddsNameserver(pod.Spec.DNSConfig, inherited)
+	if !podWarning && !c.nameserverLogLimiter.Allow() {
+		return nameservers
+	}
+	err := fmt.Errorf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
+	if podWarning {
 		c.recorder.WithLogger(logger).Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+	} else {
 		logger.Error(err, "Nameserver limits exceeded")
 	}
 	return nameservers
-}
-
-func (c *Configurer) formDNSConfigFitsLimits(logger klog.Logger, dnsConfig *runtimeapi.DNSConfig, pod *v1.Pod) *runtimeapi.DNSConfig {
-	dnsConfig.Servers = c.formDNSNameserversFitsLimits(logger, dnsConfig.Servers, pod)
-	dnsConfig.Searches = c.formDNSSearchFitsLimits(logger, dnsConfig.Searches, pod)
-	return dnsConfig
 }
 
 func (c *Configurer) generateSearchesForDNSClusterFirst(hostSearch []string, pod *v1.Pod) []string {
@@ -483,10 +502,13 @@ func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DN
 		}
 	}
 
+	inheritedNameservers := dnsConfig.Servers
 	if pod.Spec.DNSConfig != nil {
 		dnsConfig = appendDNSConfig(dnsConfig, pod.Spec.DNSConfig)
 	}
-	return c.formDNSConfigFitsLimits(logger, dnsConfig, pod), nil
+	dnsConfig.Servers = c.formDNSNameserversFitsLimits(logger, dnsConfig.Servers, inheritedNameservers, pod)
+	dnsConfig.Searches = c.formDNSSearchFitsLimits(logger, dnsConfig.Searches, pod)
+	return dnsConfig, nil
 }
 
 // SetupDNSinContainerizedMounter replaces the nameserver in containerized-mounter's rootfs/etc/resolv.conf with kubelet.ClusterDNS
