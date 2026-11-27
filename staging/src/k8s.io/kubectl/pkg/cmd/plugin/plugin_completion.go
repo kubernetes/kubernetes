@@ -83,16 +83,44 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 			kubectl.ResetFlags()
 			cobra.CompDebugln("Cleared global flags for plugin completion", true)
 
+			if registerPluginCompletion(kubectl, args[:len(args)-1]) {
+				return
+			}
 			registerPluginCommands(kubectl, true)
 		}
 	}
 }
 
+// A plugin with a completion helper supplies its own argument completions. Resolve
+// the longest matching plugin just as execution does, without listing all of PATH.
+func registerPluginCompletion(kubectl *cobra.Command, args []string) bool {
+	var pluginArgs []string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			break
+		}
+		if strings.ContainsAny(arg, `/\\`) {
+			break
+		}
+		pluginArgs = append(pluginArgs, strings.ReplaceAll(arg, "-", "_"))
+	}
+	for len(pluginArgs) > 0 {
+		name := "kubectl-" + strings.Join(pluginArgs, "-")
+		if _, err := exec.LookPath(name); err == nil {
+			if _, found := lookupCompletionExec(name); !found {
+				return false
+			}
+			registerPluginCommandsFromPaths(kubectl, true, []string{name})
+			return true
+		}
+		pluginArgs = pluginArgs[:len(pluginArgs)-1]
+	}
+	return false
+}
+
 // registerPluginCommand allows adding Cobra command to the command tree or extracting them for usage in
 // e.g. the help function or for registering the completion function
 func registerPluginCommands(kubectl *cobra.Command, list bool) (cmds []*cobra.Command) {
-	userDefinedCommands := []*cobra.Command{}
-
 	streams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
 		Out:    io.Discard,
@@ -102,7 +130,11 @@ func registerPluginCommands(kubectl *cobra.Command, list bool) (cmds []*cobra.Co
 	o := &PluginListOptions{IOStreams: streams}
 	o.Complete(kubectl)
 	plugins, _ := o.ListPlugins()
+	return registerPluginCommandsFromPaths(kubectl, list, plugins)
+}
 
+func registerPluginCommandsFromPaths(kubectl *cobra.Command, list bool, plugins []string) []*cobra.Command {
+	userDefinedCommands := []*cobra.Command{}
 	for _, plugin := range plugins {
 		plugin = filepath.Base(plugin)
 		args := []string{}
