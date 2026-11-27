@@ -5,7 +5,6 @@
 package ssh
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -181,6 +180,7 @@ type userAuthBannerMsg struct {
 	Message string `sshtype:"53"`
 	// unused, but required to allow message parsing
 	Language string
+	Rest     []byte `ssh:"rest"`
 }
 
 // See RFC 4256, section 3.2
@@ -619,10 +619,7 @@ func parseString(in []byte) (out, rest []byte, ok bool) {
 	return
 }
 
-var (
-	comma         = []byte{','}
-	emptyNameList = []string{}
-)
+var emptyNameList = []string{}
 
 func parseNameList(in []byte) (out []string, rest []byte, ok bool) {
 	contents, rest, ok := parseString(in)
@@ -633,11 +630,7 @@ func parseNameList(in []byte) (out []string, rest []byte, ok bool) {
 		out = emptyNameList
 		return
 	}
-	parts := bytes.Split(contents, comma)
-	out = make([]string, len(parts))
-	for i, part := range parts {
-		out[i] = string(part)
-	}
+	out = strings.Split(string(contents), ",")
 	return
 }
 

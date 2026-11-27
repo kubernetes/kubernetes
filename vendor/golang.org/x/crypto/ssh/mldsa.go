@@ -105,7 +105,7 @@ func (k *mldsaPublicKey) Marshal() []byte {
 
 func (k *mldsaPublicKey) Verify(b []byte, sig *Signature) error {
 	if sig.Format != k.Type() {
-		return fmt.Errorf("ssh: signature type %s for key type %s", sig.Format, k.Type())
+		return fmt.Errorf("ssh: signature type %q for key type %q", sig.Format, k.Type())
 	}
 	// nil options select pure ML-DSA with an empty context, as required by
 	// [SSH-MLDSA], Sections 6 and 8.

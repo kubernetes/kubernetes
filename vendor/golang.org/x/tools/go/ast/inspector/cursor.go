@@ -244,9 +244,8 @@ func (c Cursor) Enclosing(types ...ast.Node) iter.Seq[Cursor] {
 		panic("Cursor.Enclosing called on Root node")
 	}
 
-	mask := maskOf(types)
-
 	return func(yield func(Cursor) bool) {
+		mask := maskOf(types)
 		events := c.in.events
 		for i := c.index; i >= 0; i = events[i].parent {
 			if events[i].typ&mask != 0 && !yield(Cursor{c.in, i}) {
@@ -296,6 +295,36 @@ func (c Cursor) ParentEdgeKind() edge.Kind {
 func (c Cursor) ParentEdgeIndex() int {
 	_, index := c.ParentEdge()
 	return index
+}
+
+// Unparen returns the cursor for an expression with any
+// enclosing parentheses removed, similar to [ast.Unparen].
+// It is often prudent to call this before switching on the
+// type of c.Node().
+//
+// See also [Cursor.UnparenEnclosing].
+func (c Cursor) Unparen() Cursor {
+	for {
+		if _, ok := c.Node().(*ast.ParenExpr); !ok {
+			return c
+		}
+		// The sole child of a ParenExpr is its X operand,
+		// whose push event immediately follows that of the ParenExpr.
+		c.index++
+	}
+}
+
+// UnparenEnclosing returns the first element of
+// the [Cursor.Enclosing] sequence that is not itself enclosed
+// in parens. It is often prudent to call this before switching on
+// c.ParentEdge().
+//
+// See also [Cursor.Unparen].
+func (c Cursor) UnparenEnclosing() Cursor {
+	for c.ParentEdgeKind() == edge.ParenExpr_X {
+		c = c.Parent()
+	}
+	return c
 }
 
 // ChildAt returns the cursor for the child of the

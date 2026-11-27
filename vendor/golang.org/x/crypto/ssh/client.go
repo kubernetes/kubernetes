@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Client implements a traditional SSH client that supports shells,
@@ -136,7 +139,6 @@ func (c *connection) clientHandshake(dialAddress string, config *ClientConfig) e
 	}
 
 	c.sessionID = c.transport.getSessionID()
-	c.algorithms = c.transport.getAlgorithms()
 	return c.clientAuthenticate(config)
 }
 
@@ -359,10 +361,31 @@ func FixedHostKey(key PublicKey) HostKeyCallback {
 
 // BannerDisplayStderr returns a function that can be used for
 // ClientConfig.BannerCallback to display banners on os.Stderr.
+// Non-printable characters, other than newline, carriage return and
+// tab, and invalid UTF-8 sequences are replaced with U+FFFD.
 func BannerDisplayStderr() BannerCallback {
 	return func(banner string) error {
-		_, err := os.Stderr.WriteString(banner)
+		_, err := os.Stderr.WriteString(escapeBanner(banner))
 
 		return err
 	}
+}
+
+// escapeBanner replaces each non-printable character, and each byte of
+// an invalid UTF-8 sequence, with utf8.RuneError.
+func escapeBanner(s string) string {
+	return strings.Map(func(r rune) rune {
+		if isBannerPrintable(r) {
+			return r
+		}
+		return utf8.RuneError
+	}, s)
+}
+
+func isBannerPrintable(r rune) bool {
+	switch r {
+	case '\n', '\r', '\t':
+		return true
+	}
+	return unicode.IsGraphic(r) || unicode.In(r, unicode.Cf, unicode.Co)
 }

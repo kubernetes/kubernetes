@@ -184,7 +184,8 @@ type ServerConfig struct {
 	// authentication algorithms. Note that this should not include certificate
 	// types since those use the underlying algorithm. This list is sent to the
 	// client if it supports the server-sig-algs extension. Order is irrelevant.
-	// If unspecified then a default set of algorithms is used.
+	// If unspecified then a default set of algorithms is used. Unsupported
+	// algorithms are ignored.
 	PublicKeyAuthAlgorithms []string
 
 	hostKeys []Signer
@@ -204,7 +205,9 @@ type ServerConfig struct {
 	// MaxAuthTries specifies the maximum number of authentication attempts
 	// permitted per connection. If set to a negative number, the number of
 	// attempts are unlimited. If set to zero, the number of attempts are limited
-	// to 6.
+	// to 6. Rejected public key queries count towards this limit only after
+	// exceeding a dedicated budget (also controlled by this option). This helps
+	// legitimate clients with multiple keys not hit the limit.
 	MaxAuthTries int
 
 	// PasswordCallback, if non-nil, is called when a user
@@ -359,12 +362,14 @@ func NewServerConn(c net.Conn, config *ServerConfig) (*ServerConn, <-chan NewCha
 	if len(fullConf.PublicKeyAuthAlgorithms) == 0 {
 		fullConf.PublicKeyAuthAlgorithms = defaultPubKeyAuthAlgos
 	} else {
-		for _, algo := range fullConf.PublicKeyAuthAlgorithms {
-			if !slices.Contains(SupportedAlgorithms().PublicKeyAuths, algo) && !slices.Contains(InsecureAlgorithms().PublicKeyAuths, algo) {
-				c.Close()
-				return nil, nil, nil, fmt.Errorf("ssh: unsupported public key authentication algorithm %s", algo)
-			}
+		algos := slices.DeleteFunc(slices.Clone(fullConf.PublicKeyAuthAlgorithms), func(algo string) bool {
+			return !slices.Contains(supportedPubKeyAuthAlgos, algo) && !slices.Contains(insecurePubKeyAuthAlgos, algo)
+		})
+		if len(algos) == 0 {
+			c.Close()
+			return nil, nil, nil, errors.New("ssh: no supported public key authentication algorithms")
 		}
+		fullConf.PublicKeyAuthAlgorithms = algos
 	}
 
 	s := &connection{
@@ -421,7 +426,6 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 
 	// We just did the key change, so the session ID is established.
 	s.sessionID = s.transport.getSessionID()
-	s.algorithms = s.transport.getAlgorithms()
 
 	var packet []byte
 	if packet, err = s.transport.readPacket(); err != nil {
@@ -433,7 +437,7 @@ func (s *connection) serverHandshake(config *ServerConfig) (*Permissions, error)
 		return nil, err
 	}
 	if serviceRequest.Service != serviceUserAuth {
-		return nil, errors.New("ssh: requested service '" + serviceRequest.Service + "' before authenticating")
+		return nil, fmt.Errorf("ssh: requested service %q before authenticating", serviceRequest.Service)
 	}
 	serviceAccept := serviceAcceptMsg{
 		Service: serviceUserAuth,
@@ -660,6 +664,7 @@ func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, err
 
 	authFailures := 0
 	authAttempts := 0
+	pubKeyQueryFailures := 0
 	noneAuthCount := 0
 	var authErrs []error
 	var calledBannerCallback bool
@@ -845,6 +850,10 @@ userAuthLoop:
 					continue userAuthLoop
 				}
 				authErr = candidate.result
+				pubKeyQueryFailures++
+				if pubKeyQueryFailures <= config.MaxAuthTries {
+					authFailures--
+				}
 			} else {
 				sig, payload, ok := parseSignature(payload)
 				if !ok || len(payload) > 0 {

@@ -160,12 +160,10 @@ type channel struct {
 	extraData         []byte
 	localId, remoteId uint32
 
-	// maxIncomingPayload and maxRemotePayload are the maximum
-	// payload sizes of normal and extended data packets for
-	// receiving and sending, respectively. The wire packet will
-	// be 9 or 13 bytes larger (excluding encryption overhead).
-	maxIncomingPayload uint32
-	maxRemotePayload   uint32
+	// maxRemotePayload is the maximum payload size of normal and extended data
+	// packets that we can send to the peer. The wire packet will be 9 or 13
+	// bytes larger (excluding encryption overhead).
+	maxRemotePayload uint32
 
 	mux *mux
 
@@ -328,7 +326,7 @@ func (ch *channel) handleData(packet []byte) error {
 	if length == 0 {
 		return nil
 	}
-	if length > ch.maxIncomingPayload {
+	if length > channelMaxPacket {
 		// TODO(hanwen): should send Disconnect?
 		return errors.New("ssh: incoming packet exceeds maximum payload size")
 	}
@@ -374,7 +372,7 @@ func (c *channel) adjustWindow(adj uint32) error {
 	// exceed the initial window setting, we don't worry about overflow.
 	c.myConsumed += adj
 	var sendAdj uint32
-	if (channelWindowSize-c.myWindow > 3*c.maxIncomingPayload) ||
+	if (channelWindowSize-c.myWindow > 3*channelMaxPacket) ||
 		(c.myWindow < channelWindowSize/2) {
 		sendAdj = c.myConsumed
 		c.myConsumed = 0
@@ -527,20 +525,22 @@ func (ch *channel) handlePacket(packet []byte) error {
 
 func (m *mux) newChannel(chanType string, direction channelDirection, extraData []byte) *channel {
 	ch := &channel{
-		remoteWin:          window{Cond: newCond()},
-		myWindow:           channelWindowSize,
-		maxIncomingPayload: channelMaxPacket,
-		pending:            newBuffer(),
-		extPending:         newBuffer(),
-		direction:          direction,
-		incomingRequests:   make(chan *Request, chanSize),
-		msg:                make(chan interface{}, chanSize),
-		chanType:           chanType,
-		extraData:          extraData,
-		mux:                m,
-		packetPool:         make(map[uint32][]byte),
+		remoteWin:        window{Cond: newCond()},
+		myWindow:         channelWindowSize,
+		pending:          newBuffer(),
+		extPending:       newBuffer(),
+		direction:        direction,
+		incomingRequests: make(chan *Request, chanSize),
+		msg:              make(chan interface{}, chanSize),
+		chanType:         chanType,
+		extraData:        extraData,
+		mux:              m,
+		packetPool:       make(map[uint32][]byte),
 	}
-	m.chanList.add(ch)
+	if !m.chanList.add(ch) {
+		// The mux has shut down and will not close the channel.
+		ch.close()
+	}
 	return ch
 }
 
@@ -568,7 +568,7 @@ func (ch *channel) Accept() (Channel, <-chan *Request, error) {
 		PeersID:       ch.remoteId,
 		MyID:          ch.localId,
 		MyWindow:      ch.myWindow,
-		MaxPacketSize: ch.maxIncomingPayload,
+		MaxPacketSize: channelMaxPacket,
 	}
 	ch.decided = true
 	ch.established.Store(true)

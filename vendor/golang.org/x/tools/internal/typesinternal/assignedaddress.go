@@ -20,11 +20,12 @@ import (
 // These examples cause IsAssignedOrAddressTaken on the identifier for x to
 // return true:
 //
-//		x = 1
-//		x++
-//		x[i] = 1	   (assume x is an array)
-//		x.a[i] = 1	 (assume x.a is a non-pointer struct field)
-//	  use(&x)
+//	x = 1
+//	x++
+//	x[i] = 1	 (assume x is an array)
+//	x.a[i] = 1	 (assume x.a is a non-pointer struct field)
+//	use(&x)
+//	use(x[i:j])	 (assume x is an array; the slice aliases x)
 //
 // whereas these cause it to return false:
 //
@@ -44,15 +45,21 @@ import (
 //	var x int     => IsAssignedOrAddressTaken(x) = false
 //	x := 1        => IsAssignedOrAddressTaken(x) = false
 //
+// For some ill-formed code, such as a non-identifier on the LHS of :=, or when
+// the type of x in x[i] or x[i:j] is unknown, we conservatively return true.
+//
 // TODO(adonovan): revisit the surprising behavior for declarations.
 func IsAssignedOrAddressTaken(info *types.Info, cur inspector.Cursor) bool {
 	// Unfortunately we can't simply use info.Types[e].Assignable()
 	// as it is always true for a variable even when that variable is
 	// used only as an r-value. So we must inspect enclosing syntax.
 outer:
-	// Ascend to outermost aggregate of which
-	// original cur is a part:
-	//    x -> (x) | x.f | x[i] | x[i:j]
+	// Ascend to the outermost expression that denotes the
+	// same variable as the original cur, or part of it:
+	//    x -> (x) | x.f | x[i]
+	// where x.f does not go through a pointer and x[i] indexes an array.
+	// Other forms (array slices x[i:j], method selections, pointer
+	// indirections) are decided immediately within the loop.
 	for cur = range cur.Enclosing() {
 		switch cur.ParentEdgeKind() {
 		case edge.ParenExpr_X:
@@ -76,8 +83,8 @@ outer:
 						// The receiver may be an embedded field, so we need
 						// to get the inner-most type (right before the method
 						// call in seln.Index())
-						for _, idx := range seln.Index()[:len(seln.Index())-1] {
-							t = t.Underlying().(*types.Struct).Field(idx).Type()
+						for field := range ImplicitFieldSelections(seln) {
+							t = field.Type()
 						}
 						if !is[*types.Pointer](t.Underlying()) {
 							return true // takes address of receiver
@@ -87,10 +94,18 @@ outer:
 				}
 			}
 		case edge.IndexExpr_X, edge.SliceExpr_X:
-			// If x[i] or x[i:j] is an lvalue,
-			// then x is an lvalue iff x is an array.
-			if !is[*types.Array](info.TypeOf(cur.Node().(ast.Expr)).Underlying()) {
+			// x[i] and x[i:j] refer to x's own memory only if x is an
+			// array; for slices, maps, strings, and pointers to arrays,
+			// they go through a reference and do not involve x itself.
+			t := info.TypeOf(cur.Node().(ast.Expr))
+			if t == nil || t == types.Typ[types.Invalid] {
+				return true // no type information (ill-typed code); be conservative
+			}
+			if !is[*types.Array](t.Underlying()) {
 				return false
+			}
+			if cur.ParentEdgeKind() == edge.SliceExpr_X {
+				return true // x[i:j] on an array implicitly takes &x
 			}
 		default:
 			break outer
@@ -102,7 +117,10 @@ outer:
 		if assign.Tok != token.DEFINE {
 			return true // x = j or x += j
 		}
-		id := cur.Node().(*ast.Ident)
+		id, ok := cur.Node().(*ast.Ident)
+		if !ok {
+			return true // ill-formed, e.g. (x) := 1; be conservative
+		}
 		// Re-assigned identifiers are recorded in the Uses map.
 		if _, ok := info.Uses[id]; ok {
 			return true // reassignment of x (x, y := 1, 2)

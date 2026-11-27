@@ -180,7 +180,6 @@ var (
 		CertAlgoRSASHA256v01,
 		CertAlgoRSASHA512v01,
 		CertAlgoRSAv01,
-		InsecureCertAlgoDSAv01,
 		CertAlgoECDSA256v01,
 		CertAlgoECDSA384v01,
 		CertAlgoECDSA521v01,
@@ -191,16 +190,13 @@ var (
 		KeyAlgoRSASHA256,
 		KeyAlgoRSASHA512,
 		KeyAlgoRSA,
-		InsecureKeyAlgoDSA,
 		KeyAlgoED25519,
 	}
 	// insecureHostKeyAlgos specifies host-key algorithms implemented by this
 	// package and which have security issues.
 	insecureHostKeyAlgos = []string{
 		KeyAlgoRSA,
-		InsecureKeyAlgoDSA,
 		CertAlgoRSAv01,
-		InsecureCertAlgoDSAv01,
 	}
 	// supportedPubKeyAuthAlgos specifies the supported client public key
 	// authentication algorithms. Note that this doesn't include certificate
@@ -229,13 +225,11 @@ var (
 		KeyAlgoRSASHA256,
 		KeyAlgoRSASHA512,
 		KeyAlgoRSA,
-		InsecureKeyAlgoDSA,
 	}
 	// insecurePubKeyAuthAlgos specifies client public key authentication
 	// algorithms implemented by this package and which have security issues.
 	insecurePubKeyAuthAlgos = []string{
 		KeyAlgoRSA,
-		InsecureKeyAlgoDSA,
 	}
 )
 
@@ -290,7 +284,7 @@ func hashFunc(format string) (crypto.Hash, error) {
 		// ML-DSA doesn't pre-hash. This case is not build tagged, availability
 		// is decided by mldsaKeyAlgos.
 		return 0, nil
-	case KeyAlgoRSA, InsecureKeyAlgoDSA:
+	case KeyAlgoRSA:
 		if fips140.Enabled() {
 			return 0, fmt.Errorf("ssh: hash algorithm for format %q not allowed in FIPS 140 mode", format)
 		}
@@ -356,8 +350,6 @@ func keyFormatForAlgorithm(sigAlgo string) string {
 		KeyAlgoECDSA256,
 		KeyAlgoECDSA384,
 		KeyAlgoECDSA521,
-		InsecureKeyAlgoDSA,
-		InsecureCertAlgoDSAv01,
 		CertAlgoECDSA256v01,
 		CertAlgoECDSA384v01,
 		CertAlgoECDSA521v01,
@@ -406,7 +398,12 @@ func findCommon(what string, client []string, server []string, isClient bool) (s
 	for _, c := range client {
 		for _, s := range server {
 			if c == s {
-				return c, nil
+				// Return the name from the local list, not the peer's, which
+				// would keep the peer's whole name list alive (see parseNameList).
+				if isClient {
+					return c, nil
+				}
+				return s, nil
 			}
 		}
 	}
