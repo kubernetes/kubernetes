@@ -62,6 +62,12 @@ var (
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
 		kubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar
 
+		# Copy /tmp/foo local file to /tmp/bar using the resource/name format
+		kubectl cp /tmp/foo pod/<some-pod>:/tmp/bar
+
+		# Copy /tmp/foo local file to /tmp/bar using the resource/name format with a namespace
+		kubectl cp /tmp/foo <some-namespace>/pod/<some-pod>:/tmp/bar
+
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
 		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
 )
@@ -190,14 +196,33 @@ func extractFileSpec(arg string) (fileSpec, error) {
 			File:    newRemotePath(file),
 		}, nil
 	case 2:
+		if isPodResource(pieces[0]) {
+			return fileSpec{
+				PodName: pieces[1],
+				File:    newRemotePath(file),
+			}, nil
+		}
 		return fileSpec{
 			PodNamespace: pieces[0],
 			PodName:      pieces[1],
 			File:         newRemotePath(file),
 		}, nil
+	case 3:
+		if !isPodResource(pieces[1]) {
+			return fileSpec{}, errFileSpecDoesntMatchFormat
+		}
+		return fileSpec{
+			PodNamespace: pieces[0],
+			PodName:      pieces[2],
+			File:         newRemotePath(file),
+		}, nil
 	default:
 		return fileSpec{}, errFileSpecDoesntMatchFormat
 	}
+}
+
+func isPodResource(resource string) bool {
+	return resource == "pod" || resource == "pods"
 }
 
 // Complete completes all the required options
