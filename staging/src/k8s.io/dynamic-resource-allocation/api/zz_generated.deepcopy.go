@@ -71,8 +71,7 @@ func (in *Device) DeepCopyInto(out *Device) {
 	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = new(corev1.NodeSelector)
-		(*in).DeepCopyInto(*out)
+		*out = (*in).DeepCopy()
 	}
 	if in.AllNodes != nil {
 		in, out := &in.AllNodes, &out.AllNodes
@@ -283,8 +282,7 @@ func (in *ResourceSliceSpec) DeepCopyInto(out *ResourceSliceSpec) {
 	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = new(corev1.NodeSelector)
-		(*in).DeepCopyInto(*out)
+		*out = (*in).DeepCopy()
 	}
 	if in.Devices != nil {
 		in, out := &in.Devices, &out.Devices

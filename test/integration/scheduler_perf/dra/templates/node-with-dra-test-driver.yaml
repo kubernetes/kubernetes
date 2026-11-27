@@ -4,11 +4,21 @@ metadata:
   # The name is relevant for selecting whether the driver has resources for this node.
   # It's deterministic and can be matched with per-node ResourceSlices.
   name: scheduler-perf-dra-{{.Index}}
-  # The label can used by the node selector in ResourceSlices to scope devices to nodes
-  # that have DRA enabled. Only use this for workloads which simulate network-attached
-  # devices, it wouldn't be realistic for node-local devices.
   labels:
+    # The label can used by the node selector in ResourceSlices to scope devices to nodes
+    # that have DRA enabled. Only use this for workloads which simulate network-attached
+    # devices, it wouldn't be realistic for node-local devices.
     node-with-dra: "true"
+    # Labels normally set by the kubelet. Added here to make node objects more realistic
+    # in test cases which use label selectors.
+    beta.kubernetes.io/arch: amd64
+    beta.kubernetes.io/os: linux
+    kubernetes.io/arch: amd64
+    kubernetes.io/hostname: scheduler-perf-dra-{{.Index}}
+    kubernetes.io/os: linux
+    # Labels set by kubeadm. Added for the same reason.
+    node-role.kubernetes.io/control-plane: ""
+    node.kubernetes.io/exclude-from-external-load-balancers: "" 
 spec: {}
 status:
   capacity:
