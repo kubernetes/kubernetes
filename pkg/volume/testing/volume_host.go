@@ -54,21 +54,16 @@ type FakeVolumeHost interface {
 }
 
 // fakeVolumeHost is useful for testing volume plugins.
-// TODO: Extract fields specific to fakeKubeletVolumeHost and fakeAttachDetachVolumeHost.
 type fakeVolumeHost struct {
-	rootDir                string
-	kubeClient             clientset.Interface
-	pluginMgr              *VolumePluginMgr
-	mounter                mount.Interface
-	hostUtil               hostutil.HostUtils
-	nodeName               string
-	subpather              subpath.Interface
-	node                   *v1.Node
-	csiDriverLister        storagelistersv1.CSIDriverLister
-	volumeAttachmentLister storagelistersv1.VolumeAttachmentLister
-	informerFactory        informers.SharedInformerFactory
-	kubeletErr             error
-	mux                    sync.Mutex
+	rootDir         string
+	kubeClient      clientset.Interface
+	pluginMgr       *VolumePluginMgr
+	mounter         mount.Interface
+	nodeName        string
+	subpather       subpath.Interface
+	csiDriverLister storagelistersv1.CSIDriverLister
+	kubeletErr      error
+	mux             sync.Mutex
 }
 
 var _ VolumeHost = &fakeVolumeHost{}
@@ -83,27 +78,25 @@ type T interface {
 var _ T = &testing.T{}
 
 func NewFakeVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) FakeVolumeHost {
-	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, "", nil, nil)
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, "", nil)
 }
 
 func NewFakeVolumeHostWithCloudProvider(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) FakeVolumeHost {
-	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, "", nil, nil)
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, "", nil)
 }
 
 func NewFakeVolumeHostWithCSINodeName(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
-	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister, volumeAttachLister)
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nodeName, driverLister)
 }
 
-func newFakeVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
-	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, nodeName: nodeName, csiDriverLister: driverLister, volumeAttachmentLister: volumeAttachLister}
+func newFakeVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister) FakeVolumeHost {
+	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, nodeName: nodeName, csiDriverLister: driverLister}
 	host.mounter = mount.NewFakeMounter(nil)
-	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
 	host.pluginMgr = &VolumePluginMgr{}
 	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
 		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
 	}
 	host.subpather = &subpath.FakeSubpath{}
-	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
 	// Wait until the InitPlugins setup is finished before returning from this setup func
 	if err := host.WaitForKubeletErrNil(); err != nil {
 		t.Fatalf("Failed to wait for kubelet err to be nil while creating fake volume host: %v", err)
@@ -229,16 +222,17 @@ func (f *fakeVolumeHost) WaitForKubeletErrNil() error {
 
 type fakeAttachDetachVolumeHost struct {
 	fakeVolumeHost
+	volumeAttachmentLister storagelistersv1.VolumeAttachmentLister
 }
 
 var _ AttachDetachVolumeHost = &fakeAttachDetachVolumeHost{}
 var _ FakeVolumeHost = &fakeAttachDetachVolumeHost{}
 
 func NewFakeAttachDetachVolumeHostWithCSINodeName(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
-	return newFakeAttachDetachVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister, volumeAttachLister)
+	return newFakeAttachDetachVolumeHost(t, rootDir, kubeClient, plugins, nodeName, driverLister, volumeAttachLister)
 }
 
-func newFakeAttachDetachVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
+func newFakeAttachDetachVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) FakeVolumeHost {
 	host := &fakeAttachDetachVolumeHost{}
 	host.rootDir = rootDir
 	host.kubeClient = kubeClient
@@ -246,13 +240,11 @@ func newFakeAttachDetachVolumeHost(t T, rootDir string, kubeClient clientset.Int
 	host.csiDriverLister = driverLister
 	host.volumeAttachmentLister = volumeAttachLister
 	host.mounter = mount.NewFakeMounter(nil)
-	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
 	host.pluginMgr = &VolumePluginMgr{}
 	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
 		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
 	}
 	host.subpather = &subpath.FakeSubpath{}
-	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
 	// Wait until the InitPlugins setup is finished before returning from this setup func
 	if err := host.WaitForKubeletErrNil(); err != nil {
 		t.Fatalf("Failed to wait for kubelet err to be nil while creating fake volume host: %v", err)
@@ -299,30 +291,32 @@ func (f *fakeAttachDetachVolumeHost) IsAttachDetachController() bool {
 
 type fakeKubeletVolumeHost struct {
 	fakeVolumeHost
+	hostUtil        hostutil.HostUtils
+	node            *v1.Node
+	informerFactory informers.SharedInformerFactory
 }
 
 var _ KubeletVolumeHost = &fakeKubeletVolumeHost{}
 var _ FakeVolumeHost = &fakeKubeletVolumeHost{}
 
 func NewFakeKubeletVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeKubeletVolumeHost {
-	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, "", nil, nil)
+	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, "", nil)
 }
 
 func NewFakeKubeletVolumeHostWithCSINodeName(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeKubeletVolumeHost {
-	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister, volumeAttachLister)
+	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, nil, nodeName, driverLister)
 }
 
 func NewFakeKubeletVolumeHostWithMounterFSType(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeKubeletVolumeHost {
-	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, pathToTypeMap, "", nil, nil)
+	return newFakeKubeletVolumeHost(t, rootDir, kubeClient, plugins, pathToTypeMap, "", nil)
 }
 
-func newFakeKubeletVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister, volumeAttachLister storagelistersv1.VolumeAttachmentLister) *fakeKubeletVolumeHost {
+func newFakeKubeletVolumeHost(t T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelistersv1.CSIDriverLister) *fakeKubeletVolumeHost {
 	host := &fakeKubeletVolumeHost{}
 	host.rootDir = rootDir
 	host.kubeClient = kubeClient
 	host.nodeName = nodeName
 	host.csiDriverLister = driverLister
-	host.volumeAttachmentLister = volumeAttachLister
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
 	host.pluginMgr = &VolumePluginMgr{}
