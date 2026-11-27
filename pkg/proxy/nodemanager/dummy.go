@@ -53,11 +53,11 @@ func (n *Dummy) NodeInformer() v1informers.NodeInformer {
 	return nil
 }
 
+// RegisterTopologyHandler registers a handler which is called on node topology label changes.
+func (n *Dummy) RegisterTopologyHandler(handler NodeTopologyHandler) {}
+
 // OnNodeChange is a handler for Node creation and update.
 func (n *Dummy) OnNodeChange(node *v1.Node) {}
 
 // OnNodeDelete is a handler for Node deletes.
 func (n *Dummy) OnNodeDelete(node *v1.Node) {}
-
-// OnNodeSynced is called after the cache is synced and all pre-existing Nodes have been reported
-func (n *Dummy) OnNodeSynced() {}
