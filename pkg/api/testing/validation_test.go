@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"maps"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	nodevalidation "k8s.io/kubernetes/pkg/apis/node/validation"
 	resourcevalidation "k8s.io/kubernetes/pkg/apis/resource/validation"
 )
@@ -87,6 +89,7 @@ func TestVersionedValidationByFuzzing(t *testing.T) {
 
 				// TODO: accumulate omitted fields and and set opts
 				allOmittedPaths := authorizationvalidation.OmittedFieldPaths()
+				maps.Copy(allOmittedPaths, corevalidation.EventOmittedFieldPaths())
 				opts = append(opts, WithOmittedFieldPaths(allOmittedPaths))
 
 				if subresource != "" {
