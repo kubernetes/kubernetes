@@ -20,7 +20,9 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	coordination "k8s.io/kubernetes/pkg/apis/coordination"
 	registry "k8s.io/kubernetes/pkg/registry/coordination/leasecandidate"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -52,6 +54,23 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		Verb:              "create",
 	}), metav1.NamespaceDefault)
 
+	testCases := map[string]struct {
+		input        coordination.LeaseCandidate
+		expectedErrs field.ErrorList
+	}{
+		"spec.binaryVersion: empty = invalid": {
+			input: mkValidLeaseCandidate(tweakBinaryVersion("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "binaryVersion"), "").MarkAlpha(),
+			},
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	obj := mkValidLeaseCandidate()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy)
 }
@@ -67,12 +86,32 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		Verb:              "update",
 	}), metav1.NamespaceDefault)
 
+	testCases := map[string]struct {
+		old, update  coordination.LeaseCandidate
+		expectedErrs field.ErrorList
+	}{
+		"spec.binaryVersion: set to empty = invalid": {
+			old:    mkValidLeaseCandidate(),
+			update: mkValidLeaseCandidate(tweakBinaryVersion("")),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "binaryVersion"), "").MarkAlpha(),
+			},
+		},
+	}
+	for k, tc := range testCases {
+		t.Run(k, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "1"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	updateObj := mkValidLeaseCandidate()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy)
 }
 
-func mkValidLeaseCandidate() coordination.LeaseCandidate {
-	return coordination.LeaseCandidate{
+func mkValidLeaseCandidate(tweaks ...func(lc *coordination.LeaseCandidate)) coordination.LeaseCandidate {
+	lc := coordination.LeaseCandidate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "valid-obj",
 			Namespace: metav1.NamespaceDefault,
@@ -83,5 +122,15 @@ func mkValidLeaseCandidate() coordination.LeaseCandidate {
 			EmulationVersion: "1.0.0",
 			Strategy:         coordination.OldestEmulationVersion,
 		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&lc)
+	}
+	return lc
+}
+
+func tweakBinaryVersion(binaryVersion string) func(*coordination.LeaseCandidate) {
+	return func(lc *coordination.LeaseCandidate) {
+		lc.Spec.BinaryVersion = binaryVersion
 	}
 }
