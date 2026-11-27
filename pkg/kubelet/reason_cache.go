@@ -24,7 +24,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// ReasonCache stores the failure reason of the latest container start
+// ReasonCache stores the failure reason of the latest container or pod sandbox start
 // in a string, keyed by <pod_UID>_<container_name>. The goal is to
 // propagate this reason to the container status. This endeavor is
 // "best-effort" for two reasons:
@@ -50,6 +50,9 @@ type ReasonItem struct {
 // may want to increase the number.
 const maxReasonCacheEntries = 1000
 
+// Container names cannot be empty, so this key isolates pod sandbox failures.
+const podSandboxReasonCacheKey = ""
+
 // NewReasonCache creates an instance of 'ReasonCache'.
 func NewReasonCache() *ReasonCache {
 	return &ReasonCache{cache: lru.New(maxReasonCacheEntries)}
@@ -65,13 +68,18 @@ func (c *ReasonCache) add(uid types.UID, name string, reason error, message stri
 }
 
 // Update updates the reason cache with the SyncPodResult. Only SyncResult with
-// StartContainer action will change the cache.
+// StartContainer or CreatePodSandbox action will change the cache.
 func (c *ReasonCache) Update(uid types.UID, result kubecontainer.PodSyncResult) {
 	for _, r := range result.SyncResults {
-		if r.Action != kubecontainer.StartContainer {
+		var name string
+		switch r.Action {
+		case kubecontainer.StartContainer:
+			name = r.Target.(string)
+		case kubecontainer.CreatePodSandbox:
+			name = podSandboxReasonCacheKey
+		default:
 			continue
 		}
-		name := r.Target.(string)
 		if r.Error != nil {
 			c.add(uid, name, r.Error, r.Message)
 		} else {
