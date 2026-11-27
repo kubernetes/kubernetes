@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/dump"
 	netutils "k8s.io/utils/net"
 )
@@ -111,6 +112,7 @@ func TestServiceToServiceMap(t *testing.T) {
 	testSourceRangeIPv6 := "2001:db8::/32"
 	ipModeVIP := v1.LoadBalancerIPModeVIP
 	ipModeProxy := v1.LoadBalancerIPModeProxy
+	ipModeRouter := v1.LoadBalancerIPModeRouter
 
 	testCases := []struct {
 		desc     string
@@ -245,6 +247,29 @@ func TestServiceToServiceMap(t *testing.T) {
 				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
 				}),
 				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+				}),
+			},
+		},
+		{
+			desc:     "load balancer service ipMode Router",
+			ipFamily: v1.IPv4Protocol,
+
+			service: makeTestService("ns1", "load-balancer", func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeLoadBalancer
+				svc.Spec.ClusterIP = "172.16.55.11"
+				svc.Spec.LoadBalancerIP = "5.6.7.8"
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port3", "UDP", 8675, 30061, 7000)
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port4", "UDP", 8676, 30062, 7001)
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "10.1.2.4", IPMode: &ipModeRouter}}
+			}),
+			expected: map[ServicePortName]*BaseServicePortInfo{
+				makeServicePortName("ns1", "load-balancer", "port3", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
+					bsvcPortInfo.loadBalancerRouterIPs = sets.New("10.1.2.4")
+				}),
+				makeServicePortName("ns1", "load-balancer", "port4", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0, func(bsvcPortInfo *BaseServicePortInfo) {
+					bsvcPortInfo.loadBalancerVIPs = makeIPs("10.1.2.4")
+					bsvcPortInfo.loadBalancerRouterIPs = sets.New("10.1.2.4")
 				}),
 			},
 		},
@@ -543,7 +568,8 @@ func TestServiceToServiceMap(t *testing.T) {
 					svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
 					!reflect.DeepEqual(svcInfo.externalIPs, expectedInfo.externalIPs) ||
 					!reflect.DeepEqual(svcInfo.loadBalancerSourceRanges, expectedInfo.loadBalancerSourceRanges) ||
-					!reflect.DeepEqual(svcInfo.loadBalancerVIPs, expectedInfo.loadBalancerVIPs) {
+					!reflect.DeepEqual(svcInfo.loadBalancerVIPs, expectedInfo.loadBalancerVIPs) ||
+					!reflect.DeepEqual(svcInfo.loadBalancerRouterIPs, expectedInfo.loadBalancerRouterIPs) {
 					t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 				}
 				for svcKey, expectedInfo := range tc.expected {
@@ -554,7 +580,8 @@ func TestServiceToServiceMap(t *testing.T) {
 						svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
 						!reflect.DeepEqual(svcInfo.externalIPs, expectedInfo.externalIPs) ||
 						!reflect.DeepEqual(svcInfo.loadBalancerSourceRanges, expectedInfo.loadBalancerSourceRanges) ||
-						!reflect.DeepEqual(svcInfo.loadBalancerVIPs, expectedInfo.loadBalancerVIPs) {
+						!reflect.DeepEqual(svcInfo.loadBalancerVIPs, expectedInfo.loadBalancerVIPs) ||
+						!reflect.DeepEqual(svcInfo.loadBalancerRouterIPs, expectedInfo.loadBalancerRouterIPs) {
 						t.Errorf("expected new[%v]to be %v, got %v", svcKey, expectedInfo, *svcInfo)
 					}
 				}
