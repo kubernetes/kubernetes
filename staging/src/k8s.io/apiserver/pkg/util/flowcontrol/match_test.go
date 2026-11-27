@@ -19,11 +19,13 @@ package flowcontrol
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"testing"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
@@ -328,5 +330,55 @@ func checkRules(t *testing.T, expectMatch bool, digest RequestDigest, rules []fl
 		if expectMatch != actualMatch {
 			t.Errorf("expectMatch=%v, actualMatch=%v, digest=%#+v, fs=%s", expectMatch, actualMatch, digest, fcfmt.Fmt(fs))
 		}
+	}
+}
+
+// TestSuggestedFlowSchemasMatchKubeProxy checks that a request from kube-proxy is
+// matched by a suggested FlowSchema that references the "system" priority level.
+// The bootstrap configuration documents "system" as the priority level "for the
+// system components that affects self-maintenance of the cluster ... including
+// kubelet and kube-proxy", but kube-proxy authenticates as the user
+// system:kube-proxy rather than as a member of the system:nodes group, so before
+// the kube-proxy FlowSchema existed it fell through to "global-default".
+func TestSuggestedFlowSchemasMatchKubeProxy(t *testing.T) {
+	// The request kube-proxy issues on startup, as reported in
+	// https://github.com/kubernetes/kubernetes/issues/105370.
+	digest := RequestDigest{
+		RequestInfo: &request.RequestInfo{
+			IsResourceRequest: true,
+			Verb:              "list",
+			APIGroup:          "",
+			APIVersion:        "v1",
+			Resource:          "nodes",
+			Namespace:         "",
+		},
+		User: &user.DefaultInfo{
+			Name:   user.KubeProxy,
+			Groups: []string{user.AllAuthenticated},
+		},
+	}
+
+	schemas := make([]*flowcontrol.FlowSchema, len(fcboot.SuggestedFlowSchemas))
+	copy(schemas, fcboot.SuggestedFlowSchemas)
+	sort.SliceStable(schemas, func(i, j int) bool {
+		return schemas[i].Spec.MatchingPrecedence < schemas[j].Spec.MatchingPrecedence
+	})
+
+	var matched *flowcontrol.FlowSchema
+	for _, schema := range schemas {
+		if matchesFlowSchema(digest, schema) {
+			matched = schema
+			break
+		}
+	}
+
+	if matched == nil {
+		t.Fatalf("no suggested FlowSchema matched a request from %q", user.KubeProxy)
+	}
+	if got, want := matched.Name, "kube-proxy"; got != want {
+		t.Errorf("request from %q matched FlowSchema %q, want %q", user.KubeProxy, got, want)
+	}
+	if got, want := matched.Spec.PriorityLevelConfiguration.Name, "system"; got != want {
+		t.Errorf("request from %q was assigned priority level %q, want %q", user.KubeProxy, got, want)
 	}
 }
