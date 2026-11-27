@@ -379,7 +379,7 @@ func TestUpdateAnnotations(t *testing.T) {
 			RemoveAnnotations: test.remove,
 			ResourceVersion:   test.version,
 		}
-		err := options.updateAnnotations(test.obj)
+		_, _, err := options.updateAnnotations(test.obj)
 		if test.expectedErr != "" {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
@@ -662,5 +662,147 @@ func TestAnnotateResourceVersion(t *testing.T) {
 	}
 	if err := o.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestRunAnnotateMsg checks that the printed operation reflects what actually
+// changed on each object, matching the messages `kubectl label` prints.
+func TestRunAnnotateMsg(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	// The pod starts with one annotation so the cases can remove it, overwrite it,
+	// or set it to its current value. The PATCH response is not inspected, since the
+	// message is derived from the object before it is sent to the server.
+	podJSON := `{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","annotations":{"existing":"abc"}}}`
+	tf.UnstructuredClient = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch {
+			case (req.Method == "GET" || req.Method == "PATCH") && req.URL.Path == "/namespaces/test/pods/foo":
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     cmdtesting.DefaultHeader(),
+					Body:       io.NopCloser(bytes.NewBufferString(podJSON)),
+				}, nil
+			default:
+				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	testCases := []struct {
+		name        string
+		args        []string
+		overwrite   bool
+		dryRun      string
+		output      string
+		expectedOut string
+	}{
+		{
+			name:        "add new annotation",
+			args:        []string{"pods/foo", "foo=bar"},
+			expectedOut: "pod/foo annotated\n",
+		},
+		{
+			name:        "overwrite existing annotation with a new value",
+			args:        []string{"pods/foo", "existing=bar"},
+			overwrite:   true,
+			expectedOut: "pod/foo annotated\n",
+		},
+		{
+			// Setting a key to the value it already has is not a change.
+			name:        "overwrite existing annotation with the same value",
+			args:        []string{"pods/foo", "existing=abc"},
+			overwrite:   true,
+			expectedOut: "pod/foo not annotated\n",
+		},
+		{
+			name:        "remove existing annotation",
+			args:        []string{"pods/foo", "existing-"},
+			expectedOut: "pod/foo unannotated\n",
+		},
+		{
+			// Removing a key the object does not have is not a change either.
+			name:        "remove nonexistent annotation",
+			args:        []string{"pods/foo", "missing-"},
+			expectedOut: "pod/foo not annotated\n",
+		},
+		{
+			name:        "add and remove annotations",
+			args:        []string{"pods/foo", "foo=bar", "existing-"},
+			expectedOut: "pod/foo modified\n",
+		},
+		{
+			name:        "remove existing annotation with client dry run",
+			args:        []string{"pods/foo", "existing-"},
+			dryRun:      "client",
+			expectedOut: "pod/foo unannotated (dry run)\n",
+		},
+		{
+			name:        "remove existing annotation with server dry run",
+			args:        []string{"pods/foo", "existing-"},
+			dryRun:      "server",
+			expectedOut: "pod/foo unannotated (server dry run)\n",
+		},
+		{
+			name:        "add new annotation with client dry run",
+			args:        []string{"pods/foo", "foo=bar"},
+			dryRun:      "client",
+			expectedOut: "pod/foo annotated (dry run)\n",
+		},
+		{
+			// -o name prints only the resource name, so the operation must not leak into it.
+			name:        "remove existing annotation with name output",
+			args:        []string{"pods/foo", "existing-"},
+			output:      "name",
+			expectedOut: "pod/foo\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			iostreams, _, bufOut, bufErr := genericiooptions.NewTestIOStreams()
+			// ToOptions reads --dry-run from the command, so the flag is set on cmd
+			// while the remaining options are set directly on flags.
+			cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+			cmd.SetOut(bufOut)
+			cmd.SetErr(bufErr)
+			if tc.dryRun != "" {
+				if err := cmd.Flags().Set("dry-run", tc.dryRun); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			flags := NewAnnotateFlags(tf, iostreams)
+			*flags.PrintFlags.OutputFormat = tc.output
+			flags.Overwrite = tc.overwrite
+			options, err := flags.ToOptions(cmd, tc.args)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// The builder from ToOptions would talk to a real API server; swap in
+			// tf.NewBuilder() (FakeBuilder) so requests go to tf.UnstructuredClient.
+			result := tf.NewBuilder().
+				Unstructured().
+				NamespaceParam("test").DefaultNamespace().
+				ResourceTypeOrNameArgs(false, tc.args[0]).
+				Latest().
+				Flatten().
+				Do()
+			options.ResourceBuilder = resourceFinderFunc(func() resource.Visitor { return result })
+			if err := options.RunAnnotate(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if bufOut.String() != tc.expectedOut {
+				t.Errorf("wrong output\ngot:\n%s\nexpected:\n%s\n", bufOut.String(), tc.expectedOut)
+			}
+			if bufErr.Len() > 0 {
+				t.Errorf("unexpected stderr: %s", bufErr.String())
+			}
+		})
 	}
 }

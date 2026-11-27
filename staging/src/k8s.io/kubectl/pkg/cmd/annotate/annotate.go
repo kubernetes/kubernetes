@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -42,6 +43,17 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+)
+
+const (
+	// MsgNotAnnotated is printed when no annotation was actually added, changed or removed.
+	MsgNotAnnotated = "not annotated"
+	// MsgAnnotated is printed when annotations were only added or changed.
+	MsgAnnotated = "annotated"
+	// MsgUnannotated is printed when annotations were only removed.
+	MsgUnannotated = "unannotated"
+	// MsgModified is printed when annotations were both added or changed and removed.
+	MsgModified = "modified"
 )
 
 // AnnotateFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
@@ -68,7 +80,7 @@ func NewAnnotateFlags(
 ) *AnnotateFlags {
 	return &AnnotateFlags{
 		RESTClientGetter: restClientGetter,
-		PrintFlags:       genericclioptions.NewPrintFlags("annotated").WithTypeSetter(scheme.Scheme),
+		PrintFlags:       genericclioptions.NewPrintFlags(MsgAnnotated).WithTypeSetter(scheme.Scheme),
 		RecordFlags:      genericclioptions.NewRecordFlags(),
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithLabelSelector("").
@@ -85,6 +97,9 @@ func NewAnnotateFlags(
 
 // AnnotateOptions have the data required to perform the annotate operation
 type AnnotateOptions struct {
+	// ToPrinter returns a printer that reports the given operation, e.g. "annotated" or "unannotated".
+	// When it is nil, PrintObj is used instead.
+	ToPrinter       func(operation string) (printers.ResourcePrinter, error)
 	PrintObj        printers.ResourcePrinterFunc
 	Recorder        genericclioptions.Recorder
 	ResourceBuilder genericclioptions.ResourceFinder
@@ -249,8 +264,15 @@ func (flags *AnnotateFlags) ToOptions(cmd *cobra.Command, args []string) (*Annot
 		return nil, err
 	}
 
-	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, options.DryRunStrategy)
-	printer, err := flags.PrintFlags.ToPrinter()
+	printFlags := flags.PrintFlags
+	options.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
+		printFlags.NamePrintFlags.Operation = operation
+		// PrintFlagsWithDryRunStrategy must be done after NamePrintFlags.Operation is set
+		cmdutil.PrintFlagsWithDryRunStrategy(printFlags, options.DryRunStrategy)
+		return printFlags.ToPrinter()
+	}
+	// Build a printer once so an invalid --output value is still reported before any object is changed.
+	printer, err := options.ToPrinter(MsgAnnotated)
 	if err != nil {
 		return nil, err
 	}
@@ -282,12 +304,15 @@ func (o AnnotateOptions) RunAnnotate() error {
 		}
 
 		var outputObj runtime.Object
+		var dataChangeMsg string
 		obj := info.Object
 
 		if o.DryRunStrategy == cmdutil.DryRunClient || o.Local || o.List {
-			if err := o.updateAnnotations(obj); err != nil {
+			added, removed, err := o.updateAnnotations(obj)
+			if err != nil {
 				return err
 			}
+			dataChangeMsg = updateDataChangeMsg(added, removed)
 			outputObj = obj
 		} else {
 			mapping := info.ResourceMapping()
@@ -309,9 +334,11 @@ func (o AnnotateOptions) RunAnnotate() error {
 			if err := o.Recorder.Record(info.Object); err != nil {
 				klog.V(4).Infof("error recording current command: %v", err)
 			}
-			if err := o.updateAnnotations(obj); err != nil {
+			added, removed, err := o.updateAnnotations(obj)
+			if err != nil {
 				return err
 			}
+			dataChangeMsg = updateDataChangeMsg(added, removed)
 			newData, err := json.Marshal(obj)
 			if err != nil {
 				return err
@@ -359,8 +386,30 @@ func (o AnnotateOptions) RunAnnotate() error {
 			return nil
 		}
 
-		return o.PrintObj(outputObj, o.Out)
+		if o.ToPrinter == nil {
+			return o.PrintObj(outputObj, o.Out)
+		}
+		printer, err := o.ToPrinter(dataChangeMsg)
+		if err != nil {
+			return err
+		}
+		return printer.PrintObj(outputObj, o.Out)
 	})
+}
+
+// updateDataChangeMsg returns the operation to print for an object based on
+// which annotations were actually added (or changed) and removed.
+func updateDataChangeMsg(actuallyAdded, actuallyRemoved sets.Set[string]) string {
+	msg := MsgNotAnnotated
+	switch {
+	case actuallyAdded.Len() > 0 && actuallyRemoved.Len() > 0:
+		msg = MsgModified
+	case actuallyAdded.Len() > 0:
+		msg = MsgAnnotated
+	case actuallyRemoved.Len() > 0:
+		msg = MsgUnannotated
+	}
+	return msg
 }
 
 // parseAnnotations retrieves new and remove annotations from annotation args
@@ -407,15 +456,16 @@ func validateNoAnnotationOverwrites(accessor metav1.Object, annotations map[stri
 	return nil
 }
 
-// updateAnnotations updates annotations of obj
-func (o AnnotateOptions) updateAnnotations(obj runtime.Object) error {
+// updateAnnotations updates annotations of obj and returns the keys that were
+// actually added or changed and the keys that were actually removed.
+func (o AnnotateOptions) updateAnnotations(obj runtime.Object) (sets.Set[string], sets.Set[string], error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	if !o.Overwrite {
 		if err := validateNoAnnotationOverwrites(accessor, o.NewAnnotations); err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 
@@ -424,16 +474,25 @@ func (o AnnotateOptions) updateAnnotations(obj runtime.Object) error {
 		annotations = make(map[string]string)
 	}
 
+	added := sets.New[string]()
+	removed := sets.New[string]()
+
 	for key, value := range o.NewAnnotations {
-		annotations[key] = value
+		if currentValue, ok := annotations[key]; !ok || currentValue != value {
+			annotations[key] = value
+			added.Insert(key)
+		}
 	}
 	for _, annotation := range o.RemoveAnnotations {
-		delete(annotations, annotation)
+		if _, ok := annotations[annotation]; ok {
+			delete(annotations, annotation)
+			removed.Insert(annotation)
+		}
 	}
 	accessor.SetAnnotations(annotations)
 
 	if len(o.ResourceVersion) != 0 {
 		accessor.SetResourceVersion(o.ResourceVersion)
 	}
-	return nil
+	return added, removed, nil
 }
