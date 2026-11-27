@@ -488,7 +488,7 @@ func testStoreDoesntMutateCachedObject(t *testing.T, store *Store, newTestObj fu
 
 func newTestCachedStore(t *testing.T, codec runtime.Codec, newFunc, newListFunc func() runtime.Object) (factory.DestroyFunc, *Store) {
 	t.Helper()
-	destroy, store := newTestStoreRegistry(t, scheme, codec, newFunc, newListFunc, true)
+	destroy, store := newTestStoreRegistry(t, scheme, codec, newFunc, newListFunc, true, getPodAttrs)
 	store.DeleteStrategy = &testConditionalGracefulStrategy{testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}}
 	store.ReturnDeletedObject = true
 	store.AfterDelete = func(obj runtime.Object, options *metav1.DeleteOptions) {

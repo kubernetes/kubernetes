@@ -122,8 +122,11 @@ func (s *SelectionPredicate) MatchesObjectAttributes(l labels.Set, f fields.Set)
 
 // MatchesSingleNamespace will return (namespace, true) if and only if s.Field matches on the object's
 // namespace.
+// Unlike MatchesSingle, a continue token does not disqualify the match: the continue key of a
+// namespace-scoped list is encoded relative to the namespace-scoped key prefix, so every page of
+// the list has to re-derive that scope for the decoded continue key to land inside the namespace.
 func (s *SelectionPredicate) MatchesSingleNamespace() (string, bool) {
-	if len(s.Continue) > 0 || s.Field == nil {
+	if s.Field == nil {
 		return "", false
 	}
 	if namespace, ok := s.Field.RequiresExactMatch("metadata.namespace"); ok {

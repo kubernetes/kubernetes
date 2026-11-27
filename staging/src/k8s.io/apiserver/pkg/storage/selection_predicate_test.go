@@ -128,6 +128,49 @@ func TestSelectionPredicate(t *testing.T) {
 	}
 }
 
+func TestSelectionPredicateMatchesSingleNamespace(t *testing.T) {
+	table := map[string]struct {
+		fieldSelector string
+		continueValue string
+		expectNS      string
+		expectMatch   bool
+	}{
+		"namespace selector": {
+			fieldSelector: "metadata.namespace=default",
+			expectNS:      "default",
+			expectMatch:   true,
+		},
+		"namespace selector while paginating": {
+			fieldSelector: "metadata.namespace=default",
+			continueValue: "opaque-continue-token",
+			expectNS:      "default",
+			expectMatch:   true,
+		},
+		"combined with name selector": {
+			fieldSelector: "metadata.namespace=default,metadata.name=foo",
+			expectNS:      "default",
+			expectMatch:   true,
+		},
+		"name only selector": {
+			fieldSelector: "metadata.name=foo",
+			expectMatch:   false,
+		},
+	}
+	for name, item := range table {
+		t.Run(name, func(t *testing.T) {
+			field, err := fields.ParseSelector(item.fieldSelector)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := SelectionPredicate{Field: field, Continue: item.continueValue}
+			ns, ok := p.MatchesSingleNamespace()
+			if ok != item.expectMatch || ns != item.expectNS {
+				t.Errorf("%v: MatchesSingleNamespace() = (%q, %t), want (%q, %t)", name, ns, ok, item.expectNS, item.expectMatch)
+			}
+		})
+	}
+}
+
 // shardSelectorMatchingEverything matches all objects but, unlike
 // sharding.Everything(), is not Empty().
 func shardSelectorMatchingEverything() sharding.Selector {
