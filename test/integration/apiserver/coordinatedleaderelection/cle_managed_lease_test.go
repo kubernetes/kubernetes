@@ -246,13 +246,18 @@ func TestUpgradeSkew(t *testing.T) {
 
 func TestLeaseCandidateCleanup(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
-	apiserver.LeaseCandidateGCPeriod = 1 * time.Second
+	apiserver.LeaseCandidateGCPeriod = 500 * time.Millisecond
 
 	defer func() {
 		apiserver.LeaseCandidateGCPeriod = 30 * time.Minute
 	}()
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	flags := []string{
+		fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion),
+		"--coordinated-leadership-lease-duration=5s",
+		"--coordinated-leadership-renew-deadline=3s",
+		"--coordinated-leadership-retry-period=1s",
+	}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -277,13 +282,13 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 			PingTime:         &metav1.MicroTime{Time: time.Now().Add(-1 * time.Hour)},
 		},
 	}
-	ctx := context.Background()
-	_, err = clientset.CoordinationV1beta1().LeaseCandidates("default").Create(ctx, expiredLC, metav1.CreateOptions{})
+	tCtx := ktesting.Init(t)
+	_, err = clientset.CoordinationV1beta1().LeaseCandidates("default").Create(tCtx, expiredLC, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = wait.PollUntilContextTimeout(ctx, 1000*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+	err = wait.PollUntilContextTimeout(tCtx, 200*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 		_, err = clientset.CoordinationV1beta1().LeaseCandidates("default").Get(ctx, "expired", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -291,7 +296,7 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 		return false, nil
 	})
 	if err != nil {
-		t.Fatalf("Timieout waiting for lease gc")
+		t.Fatalf("Timeout waiting for leasecandidate gc: %v", err)
 	}
 
 }
