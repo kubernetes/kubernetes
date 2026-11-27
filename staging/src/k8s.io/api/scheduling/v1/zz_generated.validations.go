@@ -24,6 +24,7 @@ package v1
 import (
 	context "context"
 
+	corev1 "k8s.io/api/core/v1"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -94,7 +95,39 @@ func Validate_PriorityClass(
 
 	// field PriorityClass.GlobalDefault has no validation
 	// field PriorityClass.Description has no validation
-	// field PriorityClass.PreemptionPolicy has no validation
+
+	{ // field PriorityClass.PreemptionPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PreemptionPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *PriorityClass) *corev1.PreemptionPolicy {
+				return oldObj.PreemptionPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("preemptionPolicy"), obj.PreemptionPolicy, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 

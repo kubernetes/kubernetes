@@ -68,7 +68,7 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	// name is immutable and is checked by the ObjectMeta validator.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&pc.ObjectMeta, &oldPc.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.Value, oldPc.Value, field.NewPath("value")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	return allErrs
 }
 

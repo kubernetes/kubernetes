@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	registry "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -99,6 +100,31 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidPriorityClass(),
 			updateObj: mkValidPriorityClass(),
 		},
+		"preemptionPolicy: unchanged = valid": {
+			oldObj:    mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			updateObj: mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+		},
+		"preemptionPolicy: nil to set = invalid": {
+			oldObj:    mkValidPriorityClass(),
+			updateObj: mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"preemptionPolicy: set to different = invalid": {
+			oldObj:    mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			updateObj: mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptNever)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"preemptionPolicy: set to nil = invalid": {
+			oldObj:    mkValidPriorityClass(tweakPreemptionPolicy(core.PreemptLowerPriority)),
+			updateObj: mkValidPriorityClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
 		"value changed": {
 			oldObj:    mkValidPriorityClass(),
 			updateObj: mkValidPriorityClass(setValue(20)),
@@ -143,4 +169,10 @@ func mkValidPriorityClass(tweaks ...func(*scheduling.PriorityClass)) scheduling.
 		tweak(&pc)
 	}
 	return pc
+}
+
+func tweakPreemptionPolicy(policy core.PreemptionPolicy) func(*scheduling.PriorityClass) {
+	return func(pc *scheduling.PriorityClass) {
+		pc.PreemptionPolicy = &policy
+	}
 }

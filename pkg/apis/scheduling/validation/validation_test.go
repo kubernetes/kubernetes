@@ -173,7 +173,7 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 				PreemptionPolicy: &preemptNever,
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable"),
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "field is immutable").WithOrigin("immutable"),
 			},
 		},
 	}
