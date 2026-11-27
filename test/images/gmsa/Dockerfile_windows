@@ -1,0 +1,77 @@
+# Copyright 2026 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ARG BASEIMAGE
+ARG REGISTRY
+ARG OS_VERSION
+
+# Keep this toolbox preparation synchronized with ../busybox/Dockerfile_windows.
+# It provides the same utilities without executing a Windows container on the
+# Linux image builder.
+FROM --platform=linux/amd64 alpine:3.6 as prep
+
+ENV BUSYBOX_EXES="[ [[ ar arch ash awk base64 basename bash bunzip2 bzcat bzip2 cal cat chmod cksum clear cmp comm cp cpio cut date dc dd df diff dirname dos2unix dpkg-deb du echo ed egrep env expand expr factor false fgrep find fold fsync ftpget ftpput getopt grep groups gunzip gzip hd head hexdump id ipcalc kill killall less link ln logname ls lzcat lzma lzop lzopcat man md5sum mkdir mktemp mv nl od paste patch pgrep pidof pipe_progress pkill printenv printf ps pwd rev rm rmdir rpm rpm2cpio sed seq sh sha1sum sha256sum sha3sum sha512sum shred shuf sleep sort split ssl_client stat strings sum tac tail tar tee test timeout touch tr true truncate ttysize uname uncompress unexpand uniq unix2dos unlink unlzma unlzop unxz unzip usleep uudecode uuencode vi watch wc wget which whoami whois xargs xxd xz xzcat yes zcat"
+
+ADD https://github.com/kubernetes-sigs/windows-testing/raw/master/images/busybox/busybox.exe /busybox-dir/busybox.exe
+ADD https://curl.se/windows/latest.cgi?p=win64-mingw.zip /curl.zip
+ADD https://eternallybored.org/misc/netcat/netcat-win32-1.12.zip /netcat.zip
+ADD https://downloads.isc.org/isc/bind9/9.14.10/BIND9.14.10.x64.zip /bind.zip
+ADD https://wikidll.com/download/24194/vcruntime140.zip /vcruntime140.zip
+
+RUN cd /busybox-dir/ && \
+    for busybox_binary in $BUSYBOX_EXES; do ln -s busybox.exe $busybox_binary.exe; done && \
+    mkdir Files && \
+    cp busybox.exe Files/busybox.exe
+
+RUN mkdir /curl-full /curl-dir && \
+    unzip -d /curl-full/ /curl.zip && \
+    cp /curl-full/curl-*/bin/* /curl-full/curl-*/COPYING.txt /curl-dir/ && \
+    mkdir /netcat-dir && \
+    unzip /netcat.zip -d /netcat-dir/ && \
+    mkdir /bind-dir /dig-dir && \
+    unzip /bind.zip -d /bind-dir/ && \
+    cp /bind-dir/dig.exe /bind-dir/nslookup.exe /bind-dir/*.dll /dig-dir/ && \
+    unzip /vcruntime140.zip -d / && \
+    mkdir /tmp-dir
+
+FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
+FROM --platform=linux/amd64 e2eteam/powershell-helper:6.2.7-linux-cache as ps-helper
+FROM $BASEIMAGE
+
+COPY --from=prep /tmp-dir /tmp
+COPY --from=prep /busybox-dir /bin
+COPY --from=prep /curl-dir /curl
+COPY --from=prep /netcat-dir/nc64.exe /bin/nc.exe
+COPY --from=prep /dig-dir /dig
+COPY --from=prep /vcruntime140.dll /dig/vcruntime140.dll
+
+# Use one tool location on every supported Windows version. These copies are
+# redundant on Server Core 2025 but keep test commands independent of the base.
+COPY --from=servercore-helper /Windows/System32/nltest.exe /gmsa-tools/nltest.exe
+COPY --from=servercore-helper /Windows/System32/en-US/nltest.exe.mui /gmsa-tools/en-US/nltest.exe.mui
+COPY --from=servercore-helper /Windows/System32/ntdsapi.dll /gmsa-tools/ntdsapi.dll
+
+COPY --from=ps-helper ["/PowerShell", "/Program Files/PowerShell"]
+COPY --from=ps-helper ["/PowerShell/pwsh.exe", "/Program Files/PowerShell/Files/"]
+COPY --from=ps-helper /Users/ContainerAdministrator/AppData/Local/Microsoft/Windows/PowerShell/docker/ModuleAnalysisCache /Users/ContainerAdministrator/AppData/Local/Microsoft/Windows/PowerShell/docker/ModuleAnalysisCache
+
+USER ContainerAdministrator
+
+ENV PATH="C:\gmsa-tools;C:\dig\;C:\bin;C:\curl;C:\Windows\System32;C:\Windows;C:\Program Files\PowerShell;" \
+    ProgramFiles="C:\Program Files" \
+    LOCALAPPDATA="C:\Users\ContainerAdministrator\AppData\Local" \
+    PSModuleAnalysisCachePath="C:\Users\ContainerAdministrator\AppData\Local\Microsoft\Windows\PowerShell\docker\ModuleAnalysisCache" \
+    PSCORE="C:\Program Files\PowerShell\pwsh.exe"
+
+ENTRYPOINT ["cmd.exe", "/s", "/c"]
