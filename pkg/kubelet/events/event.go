@@ -95,6 +95,12 @@ const (
 	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
 	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 	CgroupV1                             = "CgroupV1"
+	// PodCheckpointStarted is recorded on a PodCheckpoint; SourcePodCheckpointing
+	// is recorded on the source Pod while capture is active.
+	PodCheckpointStarted   = "PodCheckpointStarted"
+	CheckpointSucceeded    = "CheckpointSucceeded"
+	CheckpointFailed       = "CheckpointFailed"
+	SourcePodCheckpointing = "SourcePodCheckpointing"
 )
 
 // Image manager event reason list

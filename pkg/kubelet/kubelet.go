@@ -122,6 +122,7 @@ import (
 	plugincache "k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
+	"k8s.io/kubernetes/pkg/kubelet/podcheckpoint"
 	"k8s.io/kubernetes/pkg/kubelet/preemption"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -1284,6 +1285,8 @@ func NewMainKubelet(ctx context.Context,
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
 
+	klet.podCheckpointManager = klet.newPodCheckpointManager(ctx)
+
 	// Generating the status funcs should be the last thing we do,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
@@ -1632,6 +1635,9 @@ type Kubelet struct {
 	// subpather to execute subpath actions
 	subpather subpath.Interface
 
+	// podCheckpointManager captures the PodCheckpoints assigned to this node.
+	podCheckpointManager podcheckpoint.Manager
+
 	// Manager of non-Runtime containers.
 	containerManager cm.ContainerManager
 
@@ -1829,6 +1835,11 @@ func (kl *Kubelet) setupDataDirs(logger klog.Logger) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
 		if err := utilfs.MkdirAll(kl.getCheckpointsDir(), 0700); err != nil {
 			return fmt.Errorf("error creating checkpoint directory: %v", err)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if err := utilfs.MkdirAll(kl.getPodCheckpointsDir(), 0700); err != nil {
+			return fmt.Errorf("error creating pod checkpoint directory: %w", err)
 		}
 	}
 	if selinux.GetEnabled() {
@@ -2108,6 +2119,8 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 		// Keep the previous detached behavior from context.Background while still
 		// propagating logging values for contextual logging.
 		go kl.fastStatusUpdateOnce(context.WithoutCancel(ctx))
+
+		go kl.podCheckpointManager.Run(ctx)
 
 		// Keep renewing the node lease until the kubelet exits.
 		// This intentionally does not use the kubelet context so lease renewal can
@@ -2480,6 +2493,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	if syncErr := result.Error(); wait.Interrupted(syncErr) {
 		return false, nil, syncErr
 	}
+	// Wait until the runtime reports no actions before capturing. Dynamic
+	// containers, volumes, and resource changes must finish their runtime sync
+	// before the checkpoint observes the Pod's state.
+	if result.Error() == nil && len(result.SyncResults) == 0 && kl.podCheckpointManager.SyncPod(ctx, pod, podStatus) {
+		kl.SyncPodNow(ctx, pod)
+		return false, nil, nil
+	}
 	kl.reasonCache.Update(pod.UID, result)
 
 	// If we just performed a RestartAllContainers reset, we want to immediately
@@ -2573,6 +2593,8 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		otelSpan.End()
 		logger.V(4).Info("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 	}()
+
+	kl.podCheckpointManager.AbandonPod(pod)
 
 	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, TerminatingPod)
 	if podStatusFn != nil {
@@ -4060,4 +4082,20 @@ func (p *allocatedStatsProvider) GetPods() []*v1.Pod {
 
 func (p *allocatedStatsProvider) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return p.podManager.GetPodByName(namespace, name)
+}
+
+func (kl *Kubelet) newPodCheckpointManager(ctx context.Context) podcheckpoint.Manager {
+	return podcheckpoint.NewManager(ctx, podcheckpoint.Config{
+		KubeClient:           kl.kubeClient,
+		NodeName:             kl.nodeName,
+		Recorder:             kl.recorder,
+		PodProvider:          kl,
+		ContainerRuntime:     kl.containerRuntime,
+		ProbeManager:         kl.probeManager,
+		StatusManager:        kl.statusManager,
+		SourcesReady:         kl.sourcesReady,
+		KubeletConfiguration: &kl.kubeletConfiguration,
+		CheckpointsDir:       kl.getPodCheckpointsDir(),
+		Mounter:              kl.mounter,
+	})
 }

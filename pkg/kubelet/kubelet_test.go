@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -488,6 +489,7 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 	kubelet.kubeletConfiguration.LocalStorageCapacityIsolation = localStorageCapacityIsolation
+	kubelet.podCheckpointManager = &fakePodCheckpointManager{}
 	return &TestKubelet{
 		kubelet:              kubelet,
 		fakeRuntime:          fakeRuntime,
@@ -2022,6 +2024,105 @@ func TestCheckpointContainer(t *testing.T) {
 
 		})
 	}
+}
+
+// fakePodCheckpointManager reports a capture for each queued result.
+type fakePodCheckpointManager struct {
+	// mu guards the fields below, because pod workers call the fake concurrently.
+	mu        sync.Mutex
+	captures  []bool
+	synced    []types.UID
+	abandoned []types.UID
+}
+
+func (*fakePodCheckpointManager) Run(context.Context) {}
+
+func (m *fakePodCheckpointManager) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.synced = append(m.synced, pod.UID)
+	if len(m.captures) == 0 {
+		return false
+	}
+	captured := m.captures[0]
+	m.captures = m.captures[1:]
+	return captured
+}
+
+func (m *fakePodCheckpointManager) AbandonPod(pod *v1.Pod) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.abandoned = append(m.abandoned, pod.UID)
+}
+
+func TestSyncPodResyncsAfterCheckpointCapture(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, tc := range []struct {
+		name string
+		// runtimeActions are the actions the runtime sync took.
+		runtimeActions []*kubecontainer.SyncResult
+		wantCapture    bool
+	}{
+		{name: "runtime idle", wantCapture: true},
+		{name: "runtime acted", runtimeActions: []*kubecontainer.SyncResult{kubecontainer.NewSyncResult(kubecontainer.StartContainer, "app")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			pod := podWithUIDNameNsSpec("pod-uid", "source", "ns", v1.PodSpec{NodeName: "testNode", Containers: []v1.Container{{Name: "app"}}})
+			kl.podManager.SetPods([]*v1.Pod{pod})
+			podStatus := &kubecontainer.PodStatus{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
+			checkpoints := &fakePodCheckpointManager{captures: []bool{true, false}}
+			kl.podCheckpointManager = checkpoints
+			syncs := 0
+			kl.podWorkers = &fakePodWorkers{
+				syncPodFn: func(context.Context, kubetypes.SyncPodType, *v1.Pod, *v1.Pod, *kubecontainer.PodStatus, int64) (bool, func(), error) {
+					syncs++
+					return false, nil, nil
+				},
+				cache: kl.podCache,
+				t:     t,
+			}
+			fakeRuntime := testKubelet.fakeRuntime
+			if tc.runtimeActions != nil {
+				fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{SyncResults: tc.runtimeActions}
+			}
+
+			_, _, err := kl.SyncPod(tCtx, kubetypes.SyncPodSync, pod, nil, podStatus, 0)
+			require.NoError(t, err)
+			fakeRuntime.Lock()
+			require.Contains(t, fakeRuntime.CalledFunctions, "SyncPod", "the runtime sync runs before a capture")
+			fakeRuntime.Unlock()
+			if !tc.wantCapture {
+				require.Empty(t, checkpoints.synced, "a capture waits until the runtime sync takes no actions")
+				require.Zero(t, syncs)
+				return
+			}
+			require.Equal(t, []types.UID{pod.UID}, checkpoints.synced)
+			require.Equal(t, 1, syncs, "a capture must trigger a sync with a newer status")
+
+			_, _, err = kl.SyncPod(tCtx, kubetypes.SyncPodSync, pod, nil, podStatus, 0)
+			require.NoError(t, err)
+			require.Equal(t, []types.UID{pod.UID, pod.UID}, checkpoints.synced)
+			require.Equal(t, 1, syncs, "only a capture triggers another sync")
+		})
+	}
+}
+
+func TestSyncTerminatingPodAbandonsCheckpointRequest(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pod := podWithUIDNameNsSpec("pod-uid", "source", "ns", v1.PodSpec{NodeName: "testNode", Containers: []v1.Container{{Name: "app"}}})
+	checkpoints := &fakePodCheckpointManager{}
+	kl.podCheckpointManager = checkpoints
+	gracePeriod := int64(0)
+	require.NoError(t, kl.SyncTerminatingPod(tCtx, pod, &kubecontainer.PodStatus{ID: pod.UID}, &gracePeriod, nil))
+	require.Equal(t, []types.UID{pod.UID}, checkpoints.abandoned)
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
