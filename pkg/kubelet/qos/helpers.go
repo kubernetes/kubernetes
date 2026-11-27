@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -46,23 +47,26 @@ func minRegularContainerMemory(pod *v1.Pod) int64 {
 	return memoryValue
 }
 
-// remainingPodMemReqPerContainer calculates the remaining pod memory request per
-// container by:
+// remainingPodMemReqPerContainer calculates the share of the remaining pod memory
+// request that container is credited with, by:
 // 1. Taking the total pod memory requests
 // 2. Subtracting total container memory requests and any DRA memory allocations from pod memory requests
-// 3. Dividing the remainder by the number of containers.
+// 3. Dividing the remainder by the number of containers that run at the same time as container.
 // This gives us the additional memory request that is not allocated to any
-// containers in the pod. This value will be divided equally among all containers to
-// calculate oom score adjustment.
+// containers in the pod. This value will be divided equally among the containers
+// that compete for it, to calculate oom score adjustment.
 // See https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#oom-score-adjustment
 // for more details.
 // pod.Spec.Resources must be non-nil. Returns 0 if the pod-level memory request is unset.
-func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
+func remainingPodMemReqPerContainer(pod *v1.Pod, container *v1.Container) int64 {
 	var remainingMemory int64
 	if pod.Spec.Resources.Requests.Memory().IsZero() {
 		return remainingMemory
 	}
-	numContainers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
+	numContainers := numCompetingContainers(pod, container)
+	if numContainers == 0 {
+		return remainingMemory
+	}
 	// Aggregated requests of all containers (including DRA if enabled).
 	opts := resourcehelper.PodResourcesOptions{
 		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
@@ -72,4 +76,35 @@ func remainingPodMemReqPerContainer(pod *v1.Pod) int64 {
 	remainingMemory = max(remainingMemory, 0)
 	remainingMemoryPerContainer := remainingMemory / int64(numContainers)
 	return remainingMemoryPerContainer
+}
+
+// numCompetingContainers returns the number of containers that run at the same time as
+// container, and that therefore share the part of the pod's memory request which no
+// container asked for. The regular containers and the restartable init containers all run
+// together. A non-restartable init container runs before every regular container and
+// before every restartable init container declared after it, so it shares that memory
+// only with the restartable init containers declared before it, which is the same set
+// AggregateContainerRequests charges to it.
+func numCompetingContainers(pod *v1.Pod, container *v1.Container) int {
+	for i := range pod.Spec.InitContainers {
+		if pod.Spec.InitContainers[i].Name != container.Name {
+			continue
+		}
+		if podutil.IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+			break
+		}
+		return 1 + numRestartableInitContainers(pod.Spec.InitContainers[:i])
+	}
+	return len(pod.Spec.Containers) + numRestartableInitContainers(pod.Spec.InitContainers)
+}
+
+// numRestartableInitContainers returns how many of containers are restartable init containers.
+func numRestartableInitContainers(containers []v1.Container) int {
+	var n int
+	for i := range containers {
+		if podutil.IsRestartableInitContainer(&containers[i]) {
+			n++
+		}
+	}
+	return n
 }
