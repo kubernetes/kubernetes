@@ -3146,23 +3146,26 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 			},
 		},
 		{
-			name:      "failed preemption clears NNN for evaluated and skipped pods",
-			podGroups: []*schedulingv1beta1.PodGroup{makeGangPodGroup("pg", 2)},
+			name:      "failed preemption clears NNN for pods that fit, failed filter, or were skipped",
+			podGroups: []*schedulingv1beta1.PodGroup{makeGangPodGroup("pg", 3)},
 			pods: []*v1.Pod{
 				makePod("p1", "pg", "node1"),
 				makePod("p2", "pg", "node1"),
+				makePod("p3", "pg", "node1"),
 			},
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{
-					"p1": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
 				},
 				podGroupPostFilterStatus: fwk.NewStatus(fwk.Unschedulable, "no preemption victims found"),
 			},
 			expectPostFilterCalled:    true,
-			expectedSkippedFilterPods: sets.New("p2"),
+			expectedSkippedFilterPods: sets.New("p3"),
 			expectedNominatingInfos: map[string]*fwk.NominatingInfo{
 				"p1": clearNominatedNode,
 				"p2": clearNominatedNode,
+				"p3": clearNominatedNode,
 			},
 		},
 		{
@@ -3284,11 +3287,38 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 					"p1": {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
 				},
 			},
-			expectPostFilterCalled: true,
+			expectPostFilterCalled:    true,
+			expectedSkippedFilterPods: sets.New("p3"),
 			expectedNominatingInfos: map[string]*fwk.NominatingInfo{
 				"p1": {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
 				"p2": clearNominatedNode,
 				"p3": clearNominatedNode,
+			},
+		},
+		{
+			name:       "failed gang CompositePodGroup scheduling clears NNN even for child that fit on its own",
+			tasEnabled: true,
+			cpgEnabled: true,
+			rootCPG:    st.MakeCompositePodGroup().Name("cpg").Namespace("default").MinGroupCount(2).Priority(100).Obj(),
+			podGroups: []*schedulingv1beta1.PodGroup{
+				makeChildPodGroup("pg1", 1, "cpg"),
+				makeChildPodGroup("pg2", 1, "cpg"),
+			},
+			pods: []*v1.Pod{
+				makePod("p1", "pg1", "node1"),
+				makePod("p2", "pg2", "node1"),
+			},
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Unschedulable, "insufficient cpu"),
+				},
+				podGroupPostFilterStatus: fwk.NewStatus(fwk.Unschedulable, "no preemption victims found"),
+			},
+			expectPostFilterCalled: true,
+			expectedNominatingInfos: map[string]*fwk.NominatingInfo{
+				"p1": clearNominatedNode,
+				"p2": clearNominatedNode,
 			},
 		},
 	}
@@ -3450,13 +3480,18 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 			if tt.plugin.podGroupPostFilterCalled != tt.expectPostFilterCalled {
 				t.Errorf("Expected PodGroupPostFilter called = %v, got %v", tt.expectPostFilterCalled, tt.plugin.podGroupPostFilterCalled)
 			}
-			tt.plugin.mu.Lock()
-			for podName := range tt.expectedSkippedFilterPods {
-				if tt.plugin.filterCalledPods.Has(podName) {
-					t.Errorf("Expected pod %q to be skipped before Filter, but Filter ran for it", podName)
+			expectedFilterPods := sets.New[string]()
+			for _, pod := range tt.pods {
+				if !tt.expectedSkippedFilterPods.Has(pod.Name) {
+					expectedFilterPods.Insert(pod.Name)
 				}
 			}
+			tt.plugin.mu.Lock()
+			gotFilterPods := tt.plugin.filterCalledPods.Clone()
 			tt.plugin.mu.Unlock()
+			if diff := cmp.Diff(expectedFilterPods, gotFilterPods, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Unexpected pods evaluated by Filter (-want, +got):\n%s", diff)
+			}
 			mu.Lock()
 			gotNominatingInfos := maps.Clone(capturedNominatingInfos)
 			mu.Unlock()
