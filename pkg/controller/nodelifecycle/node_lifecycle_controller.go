@@ -304,7 +304,7 @@ type Controller struct {
 	largeClusterThreshold       int32
 	unhealthyZoneThreshold      float32
 
-	nodeUpdateQueue workqueue.TypedInterface[string]
+	nodeUpdateQueue workqueue.TypedRateLimitingInterface[string]
 	podUpdateQueue  workqueue.TypedRateLimitingInterface[podUpdateItem]
 }
 
@@ -373,7 +373,13 @@ func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*C
 		secondaryEvictionLimiterQPS: opts.SecondaryEvictionLimiterQPS,
 		largeClusterThreshold:       opts.LargeClusterThreshold,
 		unhealthyZoneThreshold:      opts.UnhealthyZoneThreshold,
-		nodeUpdateQueue:             workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "node_lifecycle_controller"}),
+		nodeUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "node_lifecycle_controller",
+			},
+		),
 		podUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
 			workqueue.TypedRateLimitingQueueConfig[podUpdateItem]{
@@ -520,7 +526,6 @@ func (nc *Controller) Run(ctx context.Context) {
 }
 
 func (nc *Controller) doNodeProcessingPassWorker(ctx context.Context) {
-	logger := klog.FromContext(ctx)
 	for {
 		obj, shutdown := nc.nodeUpdateQueue.Get()
 		// "nodeUpdateQueue" will be shutdown when "stopCh" closed;
@@ -528,19 +533,32 @@ func (nc *Controller) doNodeProcessingPassWorker(ctx context.Context) {
 		if shutdown {
 			return
 		}
-		nodeName := obj
-		if err := nc.doNoScheduleTaintingPass(ctx, nodeName); err != nil {
-			logger.Error(err, "Failed to taint NoSchedule on node, requeue it", "node", klog.KRef("", nodeName))
-			// TODO(k82cn): Add nodeName back to the queue
-		}
-		// TODO: re-evaluate whether there are any labels that need to be
-		// reconcile in 1.19. Remove this function if it's no longer necessary.
-		if err := nc.reconcileNodeLabels(ctx, nodeName); err != nil {
-			logger.Error(err, "Failed to reconcile labels for node, requeue it", "node", klog.KRef("", nodeName))
-			// TODO(yujuhong): Add nodeName back to the queue
-		}
-		nc.nodeUpdateQueue.Done(nodeName)
+		nc.processNodeUpdate(ctx, obj)
 	}
+}
+
+// processNodeUpdate reconciles the NoSchedule taints and the labels of one node
+// and requeues the node with rate limiting if either step fails.
+func (nc *Controller) processNodeUpdate(ctx context.Context, nodeName string) {
+	logger := klog.FromContext(ctx)
+	defer nc.nodeUpdateQueue.Done(nodeName)
+
+	var errs []error
+	if err := nc.doNoScheduleTaintingPass(ctx, nodeName); err != nil {
+		logger.Error(err, "Failed to taint NoSchedule on node, requeue it", "node", klog.KRef("", nodeName))
+		errs = append(errs, err)
+	}
+	// TODO: re-evaluate whether there are any labels that need to be
+	// reconcile in 1.19. Remove this function if it's no longer necessary.
+	if err := nc.reconcileNodeLabels(ctx, nodeName); err != nil {
+		logger.Error(err, "Failed to reconcile labels for node, requeue it", "node", klog.KRef("", nodeName))
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		nc.nodeUpdateQueue.AddRateLimited(nodeName)
+		return
+	}
+	nc.nodeUpdateQueue.Forget(nodeName)
 }
 
 func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName string) error {
