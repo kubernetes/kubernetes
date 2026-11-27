@@ -417,7 +417,7 @@ func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions
 	case metav1.ResourceVersionMatchExact:
 		withRev = int64(parsedRV)
 	case "": // legacy case
-		if opts.Recursive && opts.Predicate.Limit > 0 && parsedRV > 0 {
+		if opts.Predicate.Limit > 0 && parsedRV > 0 {
 			withRev = int64(parsedRV)
 		}
 	default:

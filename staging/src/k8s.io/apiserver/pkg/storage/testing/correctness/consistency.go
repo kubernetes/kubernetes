@@ -90,7 +90,7 @@ func ListReadConsistency(keyPrefix string, versioner storage.Versioner, opts sto
 		}
 		return ConsistencyExact, parsedRV, "", nil
 	case "": // legacy case
-		if opts.Recursive && opts.Predicate.Limit > 0 && parsedRV > 0 {
+		if opts.Predicate.Limit > 0 && parsedRV > 0 {
 			return ConsistencyExact, parsedRV, "", nil
 		}
 		return ConsistencyNotOlderThan, parsedRV, "", nil
