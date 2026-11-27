@@ -807,6 +807,65 @@ var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(fe
 		})
 	})
 
+	// Regression test for https://github.com/kubernetes/kubernetes/issues/143946.
+	// KEP-3721 says the last definition of a duplicated key wins.
+	framework.It("should publish the last definition of a duplicated key", func(ctx context.Context) {
+		podName := "filekeyref-duplicate-key-" + string(uuid.NewUUID())
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						Name:    "setup-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `printf "DUP_KEY='first'\nDUP_KEY='second'\n" > /data/config.env`},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "config",
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    "use-envfile",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `echo "DUP_KEY=[${DUP_KEY-unset}]"`},
+						Env: []v1.EnvVar{
+							{
+								Name: "DUP_KEY",
+								ValueFrom: &v1.EnvVarSource{
+									FileKeyRef: &v1.FileKeySelector{
+										VolumeName: "config",
+										Path:       "config.env",
+										Key:        "DUP_KEY",
+									},
+								},
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				Volumes: []v1.Volume{
+					{
+						Name: "config",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+		}
+
+		e2epodoutput.TestContainerOutput(ctx, f, "consume FileKeyRef with duplicated key", pod, 0, []string{
+			"DUP_KEY=[second]",
+		})
+	})
+
 	// optional only covers a missing file or key. A syntax error in the file
 	// must still fail the container, so that a typo cannot silently drop a value.
 	framework.It("should fail when the file has invalid syntax even if the key is optional", func(ctx context.Context) {
