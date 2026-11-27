@@ -58,6 +58,10 @@ const (
 	ImageGarbageCollectedTotalReasonSpace = "space"
 )
 
+// errImageInUse means that GC skipped an image because a container started using
+// it after GC listed the containers.
+var errImageInUse = goerrors.New("image is in use by a container that is being started")
+
 // PostImageGCHook allows external sources to react to GC collect events.
 // `remainingImages` is a list of images that were left on the system after garbage
 // collection finished.
@@ -128,6 +132,9 @@ type realImageGCManager struct {
 	// Recorder for Kubernetes events.
 	recorder record.EventRecorder
 
+	// useTracker holds the images of containers that are being started.
+	useTracker *UseTracker
+
 	// Reference to this node.
 	nodeRef *v1.ObjectReference
 
@@ -189,7 +196,7 @@ type imageRecord struct {
 }
 
 // NewImageGCManager instantiates a new ImageGCManager object.
-func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, postGCHooks []PostImageGCHook, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider) (ImageGCManager, error) {
+func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, postGCHooks []PostImageGCHook, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider, useTracker *UseTracker) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -210,6 +217,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, p
 		nodeRef:       nodeRef,
 		postGCHooks:   postGCHooks,
 		tracer:        tracer,
+		useTracker:    useTracker,
 	}
 
 	return im, nil
@@ -318,6 +326,7 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 			delete(im.imageRecords, image)
 		}
 	}
+	im.useTracker.forgetAbsent(currentImages)
 
 	return imagesInUse, nil
 }
@@ -440,8 +449,10 @@ func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evicti
 		logger.V(5).Info("Evaluating image ID for possible garbage collection based on image age", "imageID", image.id)
 		// Evaluate whether image is older than MaxAge.
 		if freeTime.Sub(image.lastUsed) > im.policy.MaxAge {
-			if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonAge); err != nil {
-				deletionErrors = append(deletionErrors, err)
+			if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonAge, freeTime); err != nil {
+				if !goerrors.Is(err, errImageInUse) {
+					deletionErrors = append(deletionErrors, err)
+				}
 				remainingImages = append(remainingImages, image)
 				continue
 			}
@@ -503,8 +514,10 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 			continue
 		}
 
-		if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonSpace); err != nil {
-			deletionErrors = append(deletionErrors, err)
+		if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonSpace, freeTime); err != nil {
+			if !goerrors.Is(err, errImageInUse) {
+				deletionErrors = append(deletionErrors, err)
+			}
 			imagesLeft = append(imagesLeft, image.id)
 			continue
 		}
@@ -521,20 +534,22 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 	return imagesLeft, spaceFreed, nil
 }
 
-func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo, reason string) error {
-	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
-	// Remove image. Continue despite errors.
-	var err error
+// freeImage removes the image unless a container started using it after
+// snapshotTime, the time GC listed the containers, in which case it returns
+// errImageInUse.
+func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo, reason string, snapshotTime time.Time) error {
+	imageKey := useTrackerKey(image.id, image.runtimeHandlerUsedToPullImage)
 	logger := klog.FromContext(ctx)
+	if !im.useTracker.startRemoval(imageKey, snapshotTime) {
+		logger.V(2).Info("Not removing image, a container started using it", "imageID", image.id, "runtimeHandler", image.runtimeHandlerUsedToPullImage)
+		return errImageInUse
+	}
+	defer im.useTracker.finishRemoval(imageKey)
+
 	logger.Info("Removing image to free bytes", "imageID", image.id, "size", image.size, "runtimeHandler", image.runtimeHandlerUsedToPullImage)
-	err = im.runtime.RemoveImage(ctx, container.ImageSpec{Image: image.id, RuntimeHandler: image.runtimeHandlerUsedToPullImage})
+	err := im.runtime.RemoveImage(ctx, container.ImageSpec{Image: image.id, RuntimeHandler: image.runtimeHandlerUsedToPullImage})
 	if err != nil {
 		return err
-	}
-
-	imageKey := image.id
-	if isRuntimeClassInImageCriAPIEnabled {
-		imageKey = getImageTuple(image.id, image.runtimeHandlerUsedToPullImage)
 	}
 
 	im.imageRecordsLock.Lock()

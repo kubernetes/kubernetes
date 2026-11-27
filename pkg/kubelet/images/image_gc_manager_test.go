@@ -54,6 +54,7 @@ func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provide
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
 		tracer:        noopoteltrace.NewTracerProvider().Tracer(""),
+		useTracker:    NewUseTracker(),
 	}, fakeRuntime
 }
 
@@ -692,6 +693,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		statsProvider: mockStatsProvider,
 		recorder:      recorder,
 		tracer:        noopoteltrace.NewTracerProvider().Tracer(""),
+		useTracker:    NewUseTracker(),
 	}
 
 	// Initial state: 95% usage, of which 5% is garbage images.
@@ -739,6 +741,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
+		useTracker:    NewUseTracker(),
 	}
 
 	fakeRuntime.ImageList = []container.Image{
@@ -793,6 +796,7 @@ func TestGarbageCollectImageTooOld(t *testing.T) {
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
+		useTracker:    NewUseTracker(),
 	}
 
 	fakeRuntime.ImageList = []container.Image{
@@ -848,6 +852,7 @@ func TestGarbageCollectImageMaxAgeDisabled(t *testing.T) {
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
 		recorder:      &record.FakeRecorder{},
+		useTracker:    NewUseTracker(),
 	}
 
 	assert := assert.New(t)
@@ -941,10 +946,87 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, nil, tc.imageGCPolicy, noopoteltrace.NewTracerProvider()); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, nil, tc.imageGCPolicy, noopoteltrace.NewTracerProvider(), NewUseTracker()); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
 		}
+	}
+}
+
+// removeHookRuntime runs beforeRemove before each image removal.
+type removeHookRuntime struct {
+	*containertest.FakeRuntime
+	beforeRemove func(imageID string)
+}
+
+func (r *removeHookRuntime) RemoveImage(ctx context.Context, image container.ImageSpec) error {
+	r.beforeRemove(image.Image)
+	return r.FakeRuntime.RemoveImage(ctx, image)
+}
+
+// A container that starts from an unused image while GC is removing other
+// images must keep its image, even though GC listed the containers before it
+// existed.
+func TestGarbageCollectSkipsImagesOfStartingContainers(t *testing.T) {
+	policy := ImageGCPolicy{MaxAge: time.Minute}
+	freeOldImages := func(ctx context.Context, manager *realImageGCManager) error {
+		freeTime := time.Now()
+		images, err := manager.imagesInEvictionOrder(ctx, freeTime)
+		if err != nil {
+			return err
+		}
+		_, err = manager.freeOldImages(ctx, images, freeTime, freeTime.Add(-2*policy.MaxAge))
+		return err
+	}
+	deleteUnusedImages := func(ctx context.Context, manager *realImageGCManager) error {
+		return manager.DeleteUnusedImages(ctx)
+	}
+
+	testCases := []struct {
+		name string
+		gc   func(context.Context, *realImageGCManager) error
+		// createdBeforeGCReachesImage releases the image before GC gets to it,
+		// like a container that was created while GC removed other images.
+		createdBeforeGCReachesImage bool
+	}{
+		{name: "by disk usage, container still starting", gc: deleteUnusedImages},
+		{name: "by disk usage, container created", gc: deleteUnusedImages, createdBeforeGCReachesImage: true},
+		{name: "by age, container still starting", gc: freeOldImages},
+		{name: "by age, container created", gc: freeOldImages, createdBeforeGCReachesImage: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := ktesting.Init(t)
+			manager, fakeRuntime := newRealImageGCManager(policy, statstest.NewMockProvider(t))
+			// Detect image 0 first so that GC removes it before image 1.
+			fakeRuntime.ImageList = []container.Image{makeImage(0, 1024)}
+			_, err := manager.detectImages(ctx, time.Now().Add(-time.Hour))
+			require.NoError(t, err)
+			fakeRuntime.ImageList = append(fakeRuntime.ImageList, makeImage(1, 1024))
+			startingImage := imageID(1)
+
+			var release func()
+			manager.runtime = &removeHookRuntime{
+				FakeRuntime: fakeRuntime,
+				beforeRemove: func(imageID string) {
+					if release != nil || imageID == startingImage {
+						return
+					}
+					release = manager.useTracker.Acquire(startingImage, "")
+					fakeRuntime.Lock()
+					fakeRuntime.AllPodList = []*containertest.FakePod{{Pod: &container.Pod{Containers: []*container.Container{makeContainer(1)}}}}
+					fakeRuntime.Unlock()
+					if tc.createdBeforeGCReachesImage {
+						release()
+					}
+				},
+			}
+
+			require.NoError(t, tc.gc(ctx, manager))
+			require.NotNil(t, release, "GC removed no image")
+			assert.Equal(t, []container.Image{makeImage(1, 1024)}, fakeRuntime.ImageList)
+		})
 	}
 }
