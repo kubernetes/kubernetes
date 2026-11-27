@@ -1597,6 +1597,18 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 			wantPartially: 1,
 			want:          map[string][3]string{"memory": {"40Gi", "10Gi", "30Gi"}},
 		},
+		"explicit driver name takes precedence within a device and allocation": {
+			capacity: map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+				"memory":                 {Value: qty("1Gi")},
+				"gpu.example.com/memory": {Value: qty("40Gi")},
+			},
+			consumed: map[resourcev1.QualifiedName]resource.Quantity{
+				"memory":                 qty("1Gi"),
+				"gpu.example.com/memory": qty("10Gi"),
+			},
+			wantPartially: 1,
+			want:          map[string][3]string{"gpu.example.com/memory": {"40Gi", "10Gi", "30Gi"}},
+		},
 		// AdminAccess does not consume capacity.
 		"adminAccess claim is not counted": {
 			capacity:    map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{"memory": {Value: qty("40Gi")}},
@@ -1647,6 +1659,48 @@ func TestCalculatePoolStatus_ShareableSummary(t *testing.T) {
 			}
 			if !maps.Equal(got, tc.want) {
 				t.Errorf("capacity {total,consumed,available} = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCalculatePoolStatus_ShareableCapacityAliases(t *testing.T) {
+	const driver = "gpu.example.com"
+	slice := makeSlice("shareable", driver, "pool-0", "node-0", 2)
+	for i := range slice.Spec.Devices {
+		slice.Spec.Devices[i].AllowMultipleAllocations = ptr.To(true)
+	}
+	slice.Spec.Devices[0].Capacity = map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+		"memory":                   {Value: qty("40Gi")},
+		"other.example.com/memory": {Value: qty("5Gi")},
+	}
+	slice.Spec.Devices[1].Capacity = map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+		driver + "/memory": {Value: qty("60Gi")},
+	}
+	first := makeAllocatedClaim("c0", "ns", driver, "pool-0", "device-0")
+	first.Status.Allocation.Devices.Results[0].ConsumedCapacity = map[resourcev1.QualifiedName]resource.Quantity{
+		"memory": qty("10Gi"),
+	}
+	for _, key := range []resourcev1.QualifiedName{"memory", driver + "/memory"} {
+		t.Run(string(key), func(t *testing.T) {
+			second := makeAllocatedClaim("c1", "ns", driver, "pool-0", "device-1")
+			second.Status.Allocation.Devices.Results[0].ConsumedCapacity = map[resourcev1.QualifiedName]resource.Quantity{
+				key: qty("20Gi"),
+			}
+			pool := requireSinglePool(t, runCalculatePoolStatus(t, makeRequest(driver), []*resourcev1.ResourceSlice{slice}, []*resourcev1.ResourceClaim{first, second}))
+			if pool.ShareableSummary == nil {
+				t.Fatal("expected a shareable summary")
+			}
+			got := map[string][3]string{}
+			for _, c := range pool.ShareableSummary.Capacity {
+				got[c.Name] = [3]string{c.Total.String(), c.Consumed.String(), c.Available.String()}
+			}
+			want := map[string][3]string{
+				"memory":                   {"100Gi", "30Gi", "70Gi"},
+				"other.example.com/memory": {"5Gi", "0", "5Gi"},
+			}
+			if !maps.Equal(got, want) {
+				t.Errorf("capacity {total, consumed, available} = %v, want %v", got, want)
 			}
 		})
 	}
