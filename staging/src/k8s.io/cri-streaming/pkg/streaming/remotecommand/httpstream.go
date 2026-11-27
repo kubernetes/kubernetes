@@ -66,17 +66,105 @@ func NewOptions(req *http.Request) (*Options, error) {
 	}, nil
 }
 
+// connection is the transport connection of a session: an SPDY
+// httpstream.Connection or a WebSocket wsstream.Conn.
+type connection interface {
+	io.Closer
+	// CloseChan returns a channel that is closed once the connection has been
+	// closed by either side.
+	CloseChan() <-chan bool
+}
+
 // connectionContext contains the connection and streams used when
 // forwarding an attach or execute session into a container.
 type connectionContext struct {
-	conn         io.Closer
+	conn         connection
 	stdinStream  io.ReadCloser
 	stdoutStream io.WriteCloser
 	stderrStream io.WriteCloser
+	errorStream  io.WriteCloser
 	writeStatus  func(status *streamStatusError) error
 	resizeStream io.ReadCloser
 	resizeChan   chan TerminalSize
 	tty          bool
+	// stopInput discards any further input from the client.
+	stopInput func()
+	// endOutput tells the client that nothing more will be written.
+	endOutput func()
+}
+
+// finishTimeout bounds how long the server waits for the client to close the
+// connection once the command has finished. The output still to be delivered
+// at that point is at most what the socket buffers on the way to the client
+// hold, tens of megabytes at the outside, which a client reading at 100 KB/s
+// drains in a few minutes. Only a client that neither reads nor closes for
+// this long is cut off.
+var finishTimeout = 15 * time.Minute
+
+// finish reports the status of the command to the client and waits for the
+// client to close the connection.
+//
+// The connection must not be closed by the server while output may still be
+// in flight. The client keeps sending frames (pings, stream control) while it
+// reads, and data arriving on a socket the server has already closed makes
+// the kernel reset the connection and discard whatever is left in its send
+// buffer. A client that reads more slowly than the command wrote therefore
+// received a truncated stream, and since the status was discarded with it,
+// no error either. So the server only signals the end of the session, by
+// closing the streams the client reads from (SPDY) or by sending a close
+// frame (WebSocket), and closes the connection once the client has: client-go
+// closes it after it has read everything, and a WebSocket client's reply to
+// the close frame ends the read loop as well. The wait ends early if the
+// request context is done, and after finishTimeout at the latest. An idle
+// timeout shorter than that, if one is configured, ends it sooner for a client
+// that goes quiet; the default of four hours does not.
+//
+// The frames written here (status, stream close and reset) and the ones the
+// deferred connection close sends afterwards go to a socket the peer may have
+// stopped reading, so finish first sets a write deadline of finishTimeout on
+// the connection. On SPDY that bounds those writes like the wait. On
+// WebSocket it does not yet: wsstream moves the connection's deadline to the
+// idle timeout on every frame it writes, so there the idle timeout bounds
+// them, as it bounded the status write before. The command's own writes
+// before this point are bounded by the idle timeout only, as before.
+func (ctx *connectionContext) finish(reqCtx context.Context, status *streamStatusError) {
+	deadline := time.Now().Add(finishTimeout)
+	ctx.setWriteDeadline(deadline)
+	ctx.stopInput()
+	_ = ctx.writeStatus(status)
+	ctx.endOutput()
+	timer := time.NewTimer(time.Until(deadline))
+	defer timer.Stop()
+	select {
+	case <-ctx.conn.CloseChan():
+	case <-reqCtx.Done():
+	case <-timer.C:
+	}
+}
+
+// setWriteDeadline sets a write deadline on the connection, best effort: the
+// WebSocket connection takes a timeout directly, a SPDY stream sets the
+// deadline on the connection it belongs to.
+func (ctx *connectionContext) setWriteDeadline(t time.Time) {
+	type timeoutSetter interface {
+		SetWriteDeadline(time.Duration)
+	}
+	type deadlineSetter interface {
+		SetWriteDeadline(time.Time) error
+	}
+	if d, ok := ctx.conn.(timeoutSetter); ok {
+		d.SetWriteDeadline(time.Until(t))
+		return
+	}
+	for _, s := range []io.WriteCloser{ctx.errorStream, ctx.stdoutStream, ctx.stderrStream} {
+		if sr, ok := s.(streamAndReply); ok {
+			s = sr.Stream
+		}
+		if d, ok := s.(deadlineSetter); ok {
+			_ = d.SetWriteDeadline(t)
+			return
+		}
+	}
 }
 
 // streamAndReply holds both a Stream and a channel that is closed when the stream's reply frame is
@@ -183,6 +271,24 @@ func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 
 	ctx.conn = conn
 	ctx.tty = opts.TTY
+	ctx.stopInput = func() {
+		// A reset, unlike a close, also drops what the client sends on the
+		// stream from now on instead of queueing it.
+		for _, s := range []io.ReadCloser{ctx.stdinStream, ctx.resizeStream} {
+			if stream, ok := s.(httpstream.Stream); ok {
+				_ = stream.Reset()
+			}
+		}
+	}
+	ctx.endOutput = func() {
+		// Closing a stream sends its FIN after everything written to it, so the
+		// client reads EOF once it has consumed all the output.
+		for _, s := range []io.WriteCloser{ctx.stdoutStream, ctx.stderrStream, ctx.errorStream} {
+			if s != nil {
+				_ = s.Close()
+			}
+		}
+	}
 
 	return ctx, true
 }
@@ -213,6 +319,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(StreamType)
 			switch streamType {
 			case StreamTypeError:
+				ctx.errorStream = stream
 				ctx.writeStatus = v4WriteStatusFunc(stream) // write json errors
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			case StreamTypeStdin:
@@ -264,6 +371,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(StreamType)
 			switch streamType {
 			case StreamTypeError:
+				ctx.errorStream = stream
 				ctx.writeStatus = v1WriteStatusFunc(stream)
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			case StreamTypeStdin:
@@ -315,6 +423,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(StreamType)
 			switch streamType {
 			case StreamTypeError:
+				ctx.errorStream = stream
 				ctx.writeStatus = v1WriteStatusFunc(stream)
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			case StreamTypeStdin:
@@ -363,6 +472,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(StreamType)
 			switch streamType {
 			case StreamTypeError:
+				ctx.errorStream = stream
 				ctx.writeStatus = v1WriteStatusFunc(stream)
 
 				// This defer statement shouldn't be here, but due to previous refactoring, it ended up in

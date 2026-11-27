@@ -53,7 +53,7 @@ type Options struct {
 // conns contains the connection and streams used when
 // forwarding an attach or execute session into a container.
 type conns struct {
-	conn         io.Closer
+	conn         *wsstream.Conn
 	stdinStream  io.ReadCloser
 	stdoutStream io.WriteCloser
 	stderrStream io.WriteCloser
@@ -61,6 +61,51 @@ type conns struct {
 	resizeStream io.ReadCloser
 	resizeChan   chan remotecommand.TerminalSize
 	tty          bool
+}
+
+// finishTimeout bounds how long the server waits for the client to close the
+// connection once the command has finished. The output still to be delivered
+// at that point is at most what the socket buffers on the way to the client
+// hold, tens of megabytes at the outside, which a client reading at 100 KB/s
+// drains in a few minutes. Only a client that neither reads nor closes for
+// this long is cut off.
+var finishTimeout = 15 * time.Minute
+
+// finish reports the status to the client and waits for the client to close
+// the connection.
+//
+// Closing the connection right after the status let the kernel reset it as
+// soon as the client's next frame arrived, discarding the output still in the
+// socket's send buffer: a client reading more slowly than the command wrote
+// got a truncated stream. So the server only signals the end of the session.
+// It closes its input channels, so that anything the client still sends is
+// discarded rather than queued, writes the status, sends the WebSocket close
+// frame and waits for the client to close the connection: client-go does so
+// once it has read everything, and any client's reply to the close frame ends
+// the read loop as well. The wait ends early if the request context is done,
+// and after finishTimeout at the latest; the connection's idle timeout,
+// defaultIdleConnectionTimeout, is longer and does not end it sooner. The
+// write deadline of finishTimeout set first does not yet bound the frames
+// written here for a peer that has stopped reading: wsstream moves the
+// connection's deadline to the idle timeout on every frame it writes, which
+// overrides it, as it overrides writeErrorDeadline in writeStatus.
+func (c *conns) finish(ctx context.Context, status *apierrors.StatusError) {
+	deadline := time.Now().Add(finishTimeout)
+	c.conn.SetWriteDeadline(time.Until(deadline))
+	for _, s := range []io.ReadCloser{c.stdinStream, c.resizeStream} {
+		if s != nil {
+			_ = s.Close()
+		}
+	}
+	_ = c.writeStatus(status)
+	_ = c.conn.CloseWrite()
+	timer := time.NewTimer(time.Until(deadline))
+	defer timer.Stop()
+	select {
+	case <-c.conn.CloseChan():
+	case <-ctx.Done():
+	case <-timer.C:
+	}
 }
 
 // Create WebSocket server streams to respond to a WebSocket client. Creates the streams passed

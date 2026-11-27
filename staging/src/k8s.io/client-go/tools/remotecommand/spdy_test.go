@@ -451,6 +451,10 @@ func TestStreamRandomData(t *testing.T) {
 		defer ctx.conn.Close()
 
 		io.Copy(ctx.stdoutStream, ctx.stdinStream) //nolint:errcheck
+		// A v4 server writes the command's status before it closes.
+		if err := ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
+		}
 	}))
 
 	defer server.Close()

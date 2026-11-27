@@ -18,6 +18,7 @@ package remotecommand
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -117,8 +118,18 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 		stdinStream:  streams[stdinChannel],
 		stdoutStream: streams[stdoutChannel],
 		stderrStream: streams[stderrChannel],
+		errorStream:  streams[errorChannel],
 		tty:          opts.TTY,
 		resizeStream: streams[resizeChannel],
+		stopInput: func() {
+			// Closing a read channel discards what the client still sends on it.
+			for _, s := range []io.ReadCloser{streams[stdinChannel], streams[resizeChannel]} {
+				_ = s.Close()
+			}
+		},
+		endOutput: func() {
+			_ = conn.CloseWrite()
+		},
 	}
 
 	switch negotiatedProtocol {
