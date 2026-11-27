@@ -215,6 +215,7 @@ var (
 		"EnableControllerAttachDetach",
 		"EnableDebugFlagsHandler",
 		"EnableDebuggingHandlers",
+		"EnableNodeLease",
 		"EnableSystemLogQuery",
 		"EnableProfilingHandler",
 		"EnableServer",

@@ -31,6 +31,7 @@ crashLoopBackOff:
 enableControllerAttachDetach: true
 enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
+enableNodeLease: true
 enableProfilingHandler: true
 enableServer: true
 enableSystemLogHandler: true
