@@ -18,6 +18,7 @@ package resource
 
 import (
 	"bytes"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	math "math"
@@ -1128,6 +1129,30 @@ func (q Quantity) MarshalJSON() ([]byte, error) {
 	return result, nil
 }
 
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (q Quantity) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if q.s.validFor(q.Format) {
+		return enc.WriteToken(jsontext.String(q.s.str))
+	}
+	result := make([]byte, int64QuantityExpectedBytes)
+	result[0] = '"'
+	number, suffix := q.CanonicalizeBytes(result[1:1])
+	// if the same slice was returned to us that we passed in, avoid another allocation by copying number into
+	// the source slice and writing that
+	if len(number) > 0 && &number[0] == &result[1] && (len(number)+len(suffix)+2) <= int64QuantityExpectedBytes {
+		number = append(number, suffix...)
+		number = append(number, '"')
+		return enc.WriteValue(result[:1+len(number)])
+	}
+	// if CanonicalizeBytes needed more space than our slice provided, we may need to allocate again so use
+	// append
+	result = result[:1]
+	result = append(result, number...)
+	result = append(result, suffix...)
+	result = append(result, '"')
+	return enc.WriteValue(result)
+}
+
 func (q Quantity) MarshalCBOR() ([]byte, error) {
 	// The call to String() should never return the string "<nil>" because the receiver's
 	// address will never be nil.
@@ -1162,6 +1187,19 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	// This copy is safe because parsed will not be referred to again.
 	*q = parsed
 	return nil
+}
+
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+// It accepts the same input as UnmarshalJSON, including unquoted numbers.
+//
+// This function is unsafe to call concurrently with method calls from other
+// goroutines (even to read-only methods).
+func (q *Quantity) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	value, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	return q.UnmarshalJSON(value)
 }
 
 // UnmarshalCBOR implements the cbor.Unmarshaler interface.

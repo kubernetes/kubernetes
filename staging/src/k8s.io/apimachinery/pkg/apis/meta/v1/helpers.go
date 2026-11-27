@@ -19,6 +19,7 @@ package v1
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 
@@ -297,6 +298,26 @@ func (f FieldsV1) MarshalJSON() ([]byte, error) {
 	return raw, nil
 }
 
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (f FieldsV1) MarshalJSONTo(enc *jsontext.Encoder) error {
+	raw := f.GetRawBytes()
+	if len(raw) == 0 {
+		return enc.WriteToken(jsontext.Null)
+	}
+	if f.getContentType() == fieldsV1InvalidOrValidCBORObject {
+		var u map[string]interface{}
+		if err := cbor.Unmarshal(raw, &u); err != nil {
+			return fmt.Errorf("metav1.FieldsV1 cbor invalid: %w", err)
+		}
+		b, err := utiljson.Marshal(u)
+		if err != nil {
+			return err
+		}
+		return enc.WriteValue(b)
+	}
+	return enc.WriteValue(raw)
+}
+
 // UnmarshalJSON implements json.Unmarshaler
 func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	if f == nil {
@@ -304,6 +325,21 @@ func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	}
 	if !bytes.Equal(b, []byte("null")) {
 		f.SetRawBytes(b)
+	}
+	return nil
+}
+
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+func (f *FieldsV1) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if f == nil {
+		return errors.New("metav1.FieldsV1: UnmarshalJSONFrom on nil pointer")
+	}
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	if val.Kind() != jsontext.KindNull {
+		f.SetRawBytes(val)
 	}
 	return nil
 }

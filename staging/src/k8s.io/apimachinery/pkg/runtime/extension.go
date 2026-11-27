@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"bytes"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 
@@ -72,6 +73,22 @@ func (re *RawExtension) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+func (re *RawExtension) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if re == nil {
+		return errors.New("runtime.RawExtension: UnmarshalJSONFrom on nil pointer")
+	}
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	if val.Kind() == jsontext.KindNull {
+		return nil
+	}
+	re.Raw = append(re.Raw[0:0], val...)
+	return nil
+}
+
 var (
 	cborNull          = []byte{0xf6}
 	cborSelfDescribed = []byte{0xd9, 0xd9, 0xf7}
@@ -118,6 +135,36 @@ func (re RawExtension) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(u)
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (re RawExtension) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if re.Raw == nil {
+		if re.Object != nil {
+			return writeJSON(enc, re.Object)
+		}
+		return enc.WriteToken(jsontext.Null)
+	}
+
+	contentType := re.guessContentType()
+	if contentType == ContentTypeJSON {
+		return enc.WriteValue(re.Raw)
+	}
+
+	u, err := rawToUnstructured(re.Raw, contentType)
+	if err != nil {
+		return err
+	}
+	return writeJSON(enc, u)
+}
+
+// writeJSON encodes v with the json/v1 semantics that MarshalJSON uses.
+func writeJSON(enc *jsontext.Encoder, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return enc.WriteValue(b)
 }
 
 func (re RawExtension) MarshalCBOR() ([]byte, error) {

@@ -17,9 +17,12 @@ limitations under the License.
 package resource
 
 import (
+	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 	"math/rand"
@@ -34,6 +37,7 @@ import (
 	inf "gopkg.in/inf.v0"
 	"sigs.k8s.io/randfill"
 
+	"k8s.io/apimachinery/pkg/internal/encodingtest"
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/utils/ptr"
 )
@@ -2034,6 +2038,11 @@ func TestQuantityMutate(t *testing.T) {
 				func(q *Quantity, _ Quantity) { _, _ = q.MarshalJSON() },
 			},
 		},
+		"MarshalJSONTo": {
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, _ Quantity) { _ = q.MarshalJSONTo(jsontext.NewEncoder(io.Discard)) },
+			},
+		},
 		"MarshalTo": {
 			calls: []func(q *Quantity, y Quantity){
 				func(q *Quantity, _ Quantity) { _, _ = q.MarshalTo(make([]byte, q.Size())) },
@@ -2172,6 +2181,15 @@ func TestQuantityMutate(t *testing.T) {
 				func(q *Quantity, y Quantity) {
 					b, _ := y.MarshalJSON()
 					_ = q.UnmarshalJSON(b)
+				},
+			},
+		},
+		"UnmarshalJSONFrom": {
+			mutatesQuantity: true,
+			calls: []func(q *Quantity, y Quantity){
+				func(q *Quantity, y Quantity) {
+					b, _ := y.MarshalJSON()
+					_ = q.UnmarshalJSONFrom(jsontext.NewDecoder(bytes.NewReader(b)))
 				},
 			},
 		},
@@ -2739,6 +2757,67 @@ func TestJSON(t *testing.T) {
 			t.Errorf("Expected equal: %v, %v (json was '%v')", q, q2, string(b))
 		}
 	}
+}
+
+func quantityMarshalJSONCases() []encodingtest.MarshalCase[Quantity] {
+	// A Quantity whose cached string doesn't match its format must be re-canonicalized.
+	staleCache := MustParse("1Gi")
+	staleCache.Format = DecimalSI
+
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.MarshalCase[Quantity]{
+		{Quantity{}, `"0"`},
+		{MustParse("1Gi"), `"1Gi"`},
+		{MustParse("1500m"), `"1500m"`},
+		{MustParse("1e3"), `"1e3"`},
+		{MustParse("-1"), `"-1"`},
+		{*NewQuantity(5, DecimalSI), `"5"`},
+		{*NewQuantity(1<<30, BinarySI), `"1Gi"`},
+		{*NewMilliQuantity(100, DecimalSI), `"100m"`},
+		{*NewScaledQuantity(3, Kilo), `"3k"`},
+		{*NewQuantity(math.MaxInt64, DecimalSI), `"9223372036854775807"`},
+		{staleCache, `"1073741824"`},
+	}
+}
+
+func TestQuantityMarshalJSON(t *testing.T) {
+	encodingtest.MarshalJSON(t, quantityMarshalJSONCases())
+}
+
+func BenchmarkQuantityMarshalJSONVariants(b *testing.B) {
+	encodingtest.BenchmarkMarshalJSON(b, quantityMarshalJSONCases())
+}
+
+func quantityUnmarshalJSONCases() []encodingtest.UnmarshalCase[Quantity] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.UnmarshalCase[Quantity]{
+		{`"1Gi"`, MustParse("1Gi")},
+		{`"100m"`, MustParse("100m")},
+		{`"-1"`, MustParse("-1")},
+		{`5`, MustParse("5")},
+		{`-1`, MustParse("-1")},
+		{`0.5`, MustParse("0.5")},
+		{`1e3`, MustParse("1e3")},
+		{`" 5 "`, MustParse("5")},
+		{`null`, Quantity{}},
+	}
+}
+
+func TestQuantityUnmarshalJSON(t *testing.T) {
+	encodingtest.UnmarshalJSON(t, quantityUnmarshalJSONCases())
+	encodingtest.UnmarshalJSONErrors[Quantity](t, []string{
+		`""`,
+		`"abc"`,
+		`"1Xi"`,
+		`"5 5"`,
+		`true`,
+		`{}`,
+		`[]`,
+	})
+}
+
+func BenchmarkQuantityUnmarshalJSONVariants(b *testing.B) {
+	encodingtest.BenchmarkUnmarshalJSON(b, quantityUnmarshalJSONCases())
 }
 
 func TestJSONWhitespace(t *testing.T) {

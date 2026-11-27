@@ -17,10 +17,14 @@ limitations under the License.
 package intstr
 
 import (
+	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -96,6 +100,37 @@ func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 	return json.Unmarshal(value, &intstr.IntVal)
 }
 
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+func (intstr *IntOrString) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	switch val.Kind() {
+	case jsontext.KindString:
+		intstr.Type = String
+		// Unescaped strings (the common case) need no unquoting.
+		if raw := val[1 : len(val)-1]; !bytes.ContainsRune(raw, '\\') {
+			intstr.StrVal = string(raw)
+			return nil
+		}
+		return jsonv2.Unmarshal(val, &intstr.StrVal)
+	case jsontext.KindNull:
+		// Same as UnmarshalJSON: null leaves the value as is, but marks it as int.
+		intstr.Type = Int
+		return nil
+	case jsontext.KindNumber:
+		intstr.Type = Int
+		i, err := strconv.ParseInt(string(val), 10, 32)
+		if err != nil {
+			return &json.UnmarshalTypeError{Value: "number " + string(val), Type: reflect.TypeFor[int32]()}
+		}
+		intstr.IntVal = int32(i)
+		return nil
+	}
+	return &json.UnmarshalTypeError{Value: val.Kind().String(), Type: reflect.TypeFor[IntOrString]()}
+}
+
 func (intstr *IntOrString) UnmarshalCBOR(value []byte) error {
 	if err := cbor.Unmarshal(value, &intstr.StrVal); err == nil {
 		intstr.Type = String
@@ -141,6 +176,18 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 		return json.Marshal(intstr.StrVal)
 	default:
 		return []byte{}, fmt.Errorf("impossible IntOrString.Type")
+	}
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (intstr IntOrString) MarshalJSONTo(enc *jsontext.Encoder) error {
+	switch intstr.Type {
+	case Int:
+		return enc.WriteToken(jsontext.Int(int64(intstr.IntVal)))
+	case String:
+		return enc.WriteToken(jsontext.String(intstr.StrVal))
+	default:
+		return fmt.Errorf("impossible IntOrString.Type")
 	}
 }
 

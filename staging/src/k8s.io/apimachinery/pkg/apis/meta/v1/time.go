@@ -18,6 +18,9 @@ package v1
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
+	"reflect"
 	"time"
 
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
@@ -118,6 +121,31 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+func (t *Time) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	switch val.Kind() {
+	case jsontext.KindNull:
+		t.Time = time.Time{}
+		return nil
+	case jsontext.KindString:
+		var s string
+		if err := jsonv2.Unmarshal(val, &s); err != nil {
+			return err
+		}
+		pt, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			return err
+		}
+		t.Time = pt.Local()
+		return nil
+	}
+	return &json.UnmarshalTypeError{Value: val.Kind().String(), Type: reflect.TypeFor[Time]()}
+}
+
 func (t *Time) UnmarshalCBOR(b []byte) error {
 	var s *string
 	if err := cbor.Unmarshal(b, &s); err != nil {
@@ -170,6 +198,14 @@ func (t Time) MarshalJSON() ([]byte, error) {
 	buf = t.UTC().AppendFormat(buf, time.RFC3339)
 	buf = append(buf, '"')
 	return buf, nil
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (t Time) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if t.IsZero() {
+		return enc.WriteToken(jsontext.Null)
+	}
+	return enc.WriteToken(jsontext.String(t.UTC().Format(time.RFC3339)))
 }
 
 func (t Time) MarshalCBOR() ([]byte, error) {

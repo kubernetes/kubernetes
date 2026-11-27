@@ -18,6 +18,9 @@ package v1
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
+	"reflect"
 	"time"
 )
 
@@ -44,9 +47,36 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// UnmarshalJSONFrom implements the [json/v2.UnmarshalerFrom] interface.
+func (d *Duration) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	val, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	// Unlike Time, null is rejected, as in UnmarshalJSON.
+	if val.Kind() != jsontext.KindString {
+		return &json.UnmarshalTypeError{Value: val.Kind().String(), Type: reflect.TypeFor[Duration]()}
+	}
+	var s string
+	if err := jsonv2.Unmarshal(val, &s); err != nil {
+		return err
+	}
+	pd, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	d.Duration = pd
+	return nil
+}
+
 // MarshalJSON implements the json.Marshaler interface.
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
+}
+
+// MarshalJSONTo implements the [json/v2.MarshalerTo] interface.
+func (d Duration) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return enc.WriteToken(jsontext.String(d.Duration.String()))
 }
 
 // ToUnstructured implements the value.UnstructuredConverter interface.

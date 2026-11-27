@@ -17,140 +17,98 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/internal/encodingtest"
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
-	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
 )
 
-type TimeHolder struct {
-	T Time `json:"t"`
-}
-
 func TestTimeMarshalYAML(t *testing.T) {
-	cases := []struct {
-		input  Time
-		result string
-	}{
-		{Time{}, "t: null\n"},
-		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: \"1998-05-05T05:05:05Z\"\n"},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: \"1998-05-05T05:05:05Z\"\n"},
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	cases := []encodingtest.MarshalCase[Time]{
+		{Time{}, "null\n"},
+		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "\"1998-05-05T05:05:05Z\"\n"},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "\"1998-05-05T05:05:05Z\"\n"},
 	}
 
-	for _, c := range cases {
-		input := TimeHolder{c.input}
-		result, err := yaml.Marshal(&input)
-		if err != nil {
-			t.Errorf("Failed to marshal input: '%v': %v", input, err)
-		}
-		if string(result) != c.result {
-			t.Errorf("Failed to marshal input: '%v': expected %+v, got %q", input, c.result, string(result))
-		}
-	}
+	encodingtest.MarshalYAML(t, cases)
 }
 
 func TestTimeUnmarshalYAML(t *testing.T) {
-	cases := []struct {
-		input  string
-		result Time
-	}{
-		{"t: null\n", Time{}},
-		{"t: 1998-05-05T05:05:05Z\n", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	cases := []encodingtest.UnmarshalCase[Time]{
+		{"null\n", Time{}},
+		{"1998-05-05T05:05:05Z\n", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 
-	for _, c := range cases {
-		var result TimeHolder
-		if err := yaml.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if result.T != c.result {
-			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
-		}
+	encodingtest.UnmarshalYAML(t, cases)
+}
+
+func timeMarshalJSONCases() []encodingtest.MarshalCase[Time] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.MarshalCase[Time]{
+		{Time{}, "null"},
+		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "\"1998-05-05T05:05:05Z\""},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "\"1998-05-05T05:05:05Z\""},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.FixedZone("x", 2*3600)), `"1998-05-05T03:05:05Z"`},
+		{Date(999, time.May, 5, 5, 5, 5, 0, time.UTC), `"0999-05-05T05:05:05Z"`},
+	}
+}
+
+func timeUnmarshalJSONCases() []encodingtest.UnmarshalCase[Time] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.UnmarshalCase[Time]{
+		{"null", Time{}},
+		{"\"1998-05-05T05:05:05Z\"", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{"\"1998-05-05T05:05:05.123456789Z\"", Time{Date(1998, time.May, 5, 5, 5, 5, 123456789, time.UTC).Local()}},
+		{`"1998-05-05T05:05:05+02:00"`, Time{Date(1998, time.May, 5, 3, 5, 5, 0, time.UTC).Local()}},
+		{`"1998-05-05T05:05:05\u005a"`, Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 }
 
 func TestTimeMarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  Time
-		result string
-	}{
-		{Time{}, "{\"t\":null}"},
-		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "{\"t\":\"1998-05-05T05:05:05Z\"}"},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "{\"t\":\"1998-05-05T05:05:05Z\"}"},
-	}
-
-	for _, c := range cases {
-		input := TimeHolder{c.input}
-		result, err := json.Marshal(&input)
-		if err != nil {
-			t.Errorf("Failed to marshal input: '%v': %v", input, err)
-		}
-		if string(result) != c.result {
-			t.Errorf("Failed to marshal input: '%v': expected %+v, got %q", input, c.result, string(result))
-		}
-	}
+	encodingtest.MarshalJSON(t, timeMarshalJSONCases())
 }
 
 func TestTimeUnmarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  string
-		result Time
-	}{
-		{"{\"t\":null}", Time{}},
-		{"{\"t\":\"1998-05-05T05:05:05Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
-		{"{\"t\":\"1998-05-05T05:05:05.123456789Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 123456789, time.UTC).Local()}},
-	}
+	encodingtest.UnmarshalJSON(t, timeUnmarshalJSONCases())
+	encodingtest.UnmarshalJSONErrors[Time](t, []string{
+		`5`,
+		`true`,
+		`{}`,
+		`[]`,
+		`""`,
+		`"garbage"`,
+		`"1998-05-05"`,
+	})
+}
 
-	for _, c := range cases {
-		var result TimeHolder
-		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
-		}
-		if result.T != c.result {
-			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
-		}
-	}
+func BenchmarkTimeMarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkMarshalJSON(b, timeMarshalJSONCases())
+}
+
+func BenchmarkTimeUnmarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkUnmarshalJSON(b, timeUnmarshalJSONCases())
 }
 
 func TestTimeMarshalJSONUnmarshalYAML(t *testing.T) {
-	cases := []struct {
-		input Time
-	}{
-		{Time{}},
-		{Date(1998, time.May, 5, 5, 5, 5, 50, time.Local).Rfc3339Copy()},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.Local).Rfc3339Copy()},
+	inputs := []Time{
+		{},
+		Date(1998, time.May, 5, 5, 5, 5, 50, time.Local).Rfc3339Copy(),
+		Date(1998, time.May, 5, 5, 5, 5, 0, time.Local).Rfc3339Copy(),
 	}
 
-	for i, c := range cases {
-		input := TimeHolder{c.input}
-		jsonMarshalled, err := json.Marshal(&input)
-		if err != nil {
-			t.Errorf("%d-1: Failed to marshal input: '%v': %v", i, input, err)
-		}
-
-		var result TimeHolder
-		err = yaml.Unmarshal(jsonMarshalled, &result)
-		if err != nil {
-			t.Errorf("%d-2: Failed to unmarshal '%+v': %v", i, string(jsonMarshalled), err)
-		}
-
-		iN, iO := input.T.Zone()
-		oN, oO := result.T.Zone()
-		if iN != oN || iO != oO {
-			t.Errorf("%d-3: Time zones differ before and after serialization %s:%d %s:%d", i, iN, iO, oN, oO)
-		}
-
-		if input.T.UnixNano() != result.T.UnixNano() {
-			t.Errorf("%d-4: Failed to marshal input '%#v': got %#v", i, input, result)
-		}
-	}
+	encodingtest.JSONToYAML(t, inputs, func(a, b Time) bool {
+		aN, aO := a.Zone()
+		bN, bO := b.Zone()
+		return aN == bN && aO == bO && a.UnixNano() == b.UnixNano()
+	})
 }
 
 func TestTimeMarshalCBOR(t *testing.T) {

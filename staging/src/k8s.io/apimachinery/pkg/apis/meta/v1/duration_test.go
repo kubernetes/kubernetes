@@ -17,137 +17,103 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
-	"sigs.k8s.io/yaml"
+	"k8s.io/apimachinery/pkg/internal/encodingtest"
 )
 
-type DurationHolder struct {
-	D Duration `json:"d"`
-}
-
 func TestDurationMarshalYAML(t *testing.T) {
-	cases := []struct {
-		input  Duration
-		result string
-	}{
-		{Duration{5 * time.Second}, "d: 5s\n"},
-		{Duration{2 * time.Minute}, "d: 2m0s\n"},
-		{Duration{time.Hour + 3*time.Millisecond}, "d: 1h0m0.003s\n"},
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	cases := []encodingtest.MarshalCase[Duration]{
+		{Duration{5 * time.Second}, "5s\n"},
+		{Duration{2 * time.Minute}, "2m0s\n"},
+		{Duration{time.Hour + 3*time.Millisecond}, "1h0m0.003s\n"},
 	}
 
-	for _, c := range cases {
-		input := DurationHolder{c.input}
-		result, err := yaml.Marshal(&input)
-		if err != nil {
-			t.Errorf("Failed to marshal input: %q: %v", input, err)
-		}
-		if string(result) != c.result {
-			t.Errorf("Failed to marshal input: %q: expected %q, got %q", input, c.result, string(result))
-		}
-	}
+	encodingtest.MarshalYAML(t, cases)
 }
 
 func TestDurationUnmarshalYAML(t *testing.T) {
-	cases := []struct {
-		input  string
-		result Duration
-	}{
-		{"d: 0s\n", Duration{}},
-		{"d: 5s\n", Duration{5 * time.Second}},
-		{"d: 2m0s\n", Duration{2 * time.Minute}},
-		{"d: 1h0m0.003s\n", Duration{time.Hour + 3*time.Millisecond}},
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	cases := []encodingtest.UnmarshalCase[Duration]{
+		{"0s\n", Duration{}},
+		{"5s\n", Duration{5 * time.Second}},
+		{"2m0s\n", Duration{2 * time.Minute}},
+		{"1h0m0.003s\n", Duration{time.Hour + 3*time.Millisecond}},
 
 		// Units with zero values can optionally be dropped
-		{"d: 2m\n", Duration{2 * time.Minute}},
-		{"d: 1h0.003s\n", Duration{time.Hour + 3*time.Millisecond}},
+		{"2m\n", Duration{2 * time.Minute}},
+		{"1h0.003s\n", Duration{time.Hour + 3*time.Millisecond}},
 	}
 
-	for _, c := range cases {
-		var result DurationHolder
-		if err := yaml.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input %q: %v", c.input, err)
-		}
-		if result.D != c.result {
-			t.Errorf("Failed to unmarshal input %q: expected %q, got %q", c.input, c.result, result)
-		}
+	encodingtest.UnmarshalYAML(t, cases)
+}
+
+func durationMarshalJSONCases() []encodingtest.MarshalCase[Duration] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.MarshalCase[Duration]{
+		{Duration{5 * time.Second}, `"5s"`},
+		{Duration{2 * time.Minute}, `"2m0s"`},
+		{Duration{time.Hour + 3*time.Millisecond}, `"1h0m0.003s"`},
+		{Duration{}, `"0s"`},
+		{Duration{-90 * time.Second}, `"-1m30s"`},
+		{Duration{1}, `"1ns"`},
+		{Duration{math.MaxInt64}, `"2562047h47m16.854775807s"`},
+		{Duration{math.MinInt64}, `"-2562047h47m16.854775808s"`},
 	}
 }
 
 func TestDurationMarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  Duration
-		result string
-	}{
-		{Duration{5 * time.Second}, `{"d":"5s"}`},
-		{Duration{2 * time.Minute}, `{"d":"2m0s"}`},
-		{Duration{time.Hour + 3*time.Millisecond}, `{"d":"1h0m0.003s"}`},
-	}
+	encodingtest.MarshalJSON(t, durationMarshalJSONCases())
+}
 
-	for _, c := range cases {
-		input := DurationHolder{c.input}
-		result, err := json.Marshal(&input)
-		if err != nil {
-			t.Errorf("Failed to marshal input: %q: %v", input, err)
-		}
-		if string(result) != c.result {
-			t.Errorf("Failed to marshal input: %q: expected %q, got %q", input, c.result, string(result))
-		}
+func durationUnmarshalJSONCases() []encodingtest.UnmarshalCase[Duration] {
+	//nolint:govet // Unkeyed fields are fine for test cases.
+	return []encodingtest.UnmarshalCase[Duration]{
+		{`"0s"`, Duration{}},
+		{`"5s"`, Duration{5 * time.Second}},
+		{`"2m0s"`, Duration{2 * time.Minute}},
+		{`"1h0m0.003s"`, Duration{time.Hour + 3*time.Millisecond}},
+
+		// Units with zero values can optionally be dropped
+		{`"2m"`, Duration{2 * time.Minute}},
+		{`"1h0.003s"`, Duration{time.Hour + 3*time.Millisecond}},
+		{`"-1m30s"`, Duration{-90 * time.Second}},
+		{`"1.5h"`, Duration{90 * time.Minute}},
 	}
 }
 
 func TestDurationUnmarshalJSON(t *testing.T) {
-	cases := []struct {
-		input  string
-		result Duration
-	}{
-		{`{"d":"0s"}`, Duration{}},
-		{`{"d":"5s"}`, Duration{5 * time.Second}},
-		{`{"d":"2m0s"}`, Duration{2 * time.Minute}},
-		{`{"d":"1h0m0.003s"}`, Duration{time.Hour + 3*time.Millisecond}},
+	encodingtest.UnmarshalJSON(t, durationUnmarshalJSONCases())
+	encodingtest.UnmarshalJSONErrors[Duration](t, []string{
+		`null`,
+		`5`,
+		`true`,
+		`{}`,
+		`""`,
+		`"5"`,
+		`"1d"`,
+		`"2562048h"`,
+	})
+}
 
-		// Units with zero values can optionally be dropped
-		{`{"d":"2m"}`, Duration{2 * time.Minute}},
-		{`{"d":"1h0.003s"}`, Duration{time.Hour + 3*time.Millisecond}},
-	}
+func BenchmarkDurationUnmarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkUnmarshalJSON(b, durationUnmarshalJSONCases())
+}
 
-	for _, c := range cases {
-		var result DurationHolder
-		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal input %q: %v", c.input, err)
-		}
-		if result.D != c.result {
-			t.Errorf("Failed to unmarshal input %q: expected %q, got %q", c.input, c.result, result)
-		}
-	}
+func BenchmarkDurationMarshalJSON(b *testing.B) {
+	encodingtest.BenchmarkMarshalJSON(b, durationMarshalJSONCases())
 }
 
 func TestDurationMarshalJSONUnmarshalYAML(t *testing.T) {
-	cases := []struct {
-		input Duration
-	}{
-		{Duration{}},
-		{Duration{5 * time.Second}},
-		{Duration{2 * time.Minute}},
-		{Duration{time.Hour + 3*time.Millisecond}},
+	inputs := []Duration{
+		{},
+		{5 * time.Second},
+		{2 * time.Minute},
+		{time.Hour + 3*time.Millisecond},
 	}
 
-	for i, c := range cases {
-		input := DurationHolder{c.input}
-		jsonMarshalled, err := json.Marshal(&input)
-		if err != nil {
-			t.Errorf("%d-1: Failed to marshal input: '%v': %v", i, input, err)
-		}
-
-		var result DurationHolder
-		if err := yaml.Unmarshal(jsonMarshalled, &result); err != nil {
-			t.Errorf("%d-2: Failed to unmarshal '%+v': %v", i, string(jsonMarshalled), err)
-		}
-
-		if input.D != result.D {
-			t.Errorf("%d-4: Failed to marshal input '%#v': got %#v", i, input, result)
-		}
-	}
+	encodingtest.JSONToYAML(t, inputs, nil)
 }
