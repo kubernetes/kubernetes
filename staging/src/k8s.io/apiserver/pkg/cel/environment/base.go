@@ -149,18 +149,12 @@ var baseOpts = []VersionedOptions{
 			ext.Sets(),
 		},
 	},
-	// IP Library
-	{
-		IntroducedVersion: version.MajorMinor(1, 30),
-		EnvOptions: []cel.EnvOption{
-			UnversionedLib(library.IP),
-		},
-	},
-	// CIDR Library v0
+	// IP and CIDR Library v0 (replaced by ext.Network in 1.38)
 	{
 		IntroducedVersion: version.MajorMinor(1, 30),
 		RemovedVersion:    version.MajorMinor(1, 38),
 		EnvOptions: []cel.EnvOption{
+			UnversionedLib(library.IP),
 			library.CIDR(library.CIDRVersion(0)),
 		},
 	},
@@ -205,11 +199,11 @@ var baseOpts = []VersionedOptions{
 			library.Lists(library.ListsVersion(1)),
 		},
 	},
-	// CIDR Library v1
+	// Network Library (IP and CIDR)
 	{
 		IntroducedVersion: version.MajorMinor(1, 38),
 		EnvOptions: []cel.EnvOption{
-			library.CIDR(library.CIDRVersion(1)),
+			ext.Network(ext.NetworkVersion(1)),
 		},
 	},
 	StrictCostOpt,
@@ -272,7 +266,7 @@ var (
 	baseEnvsSingleflight = &singleflight.Group{}
 )
 
-// UnversionedLib wraps library initialization calls like ext.Sets() or library.IP()
+// UnversionedLib wraps library initialization calls like ext.Sets() or library.URLs()
 // to force compilation errors if the call evolves to include a varadic variable option.
 //
 // This provides automatic detection of a problem that is hard to catch in review--

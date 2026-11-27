@@ -62,6 +62,10 @@ func TestLibraryCoverage(t *testing.T) {
 	})
 
 	tracked := map[string]*versionTracker{}
+	// replacedBy maps an upstream CEL library to the legacy Kubernetes CEL libraries it replaces.
+	replacedBy := map[string][]string{
+		"cel.lib.ext.network": {"kubernetes.net.ip", "kubernetes.net.cidr"},
+	}
 
 	for _, vop := range vops {
 		if vop.RemovedVersion != nil {
@@ -97,6 +101,23 @@ func TestLibraryCoverage(t *testing.T) {
 					}
 				}
 				versionTracking.removed = nil
+				for _, legacyName := range replacedBy[name] {
+					legacyTracking, ok := tracked[legacyName]
+					if !ok {
+						continue
+					}
+					if legacyTracking.added != nil {
+						t.Errorf("Did not expect %s library to be added at version %v while replaced library %s (added at %v) is still present.", name, vop.IntroducedVersion, legacyName, legacyTracking.added)
+					}
+					if legacyTracking.removed != nil {
+						if legacyTracking.removed.LessThan(vop.IntroducedVersion) {
+							t.Errorf("Did not expect gap when replacing %s with %s. %s was removed in %v and %s was not added until %v.", legacyName, name, legacyName, legacyTracking.removed, name, vop.IntroducedVersion)
+						} else if vop.IntroducedVersion.LessThan(legacyTracking.removed) {
+							t.Errorf("Did not expect overlap when replacing %s with %s. %s was added at %v while %s is scheduled to be removed at %v.", legacyName, name, name, vop.IntroducedVersion, legacyName, legacyTracking.removed)
+						}
+						legacyTracking.removed = nil
+					}
+				}
 			}
 			if vop.RemovedVersion != nil {
 				if versionTracking.removed != nil {
