@@ -423,6 +423,54 @@ func TestCheckInvalidErr(t *testing.T) {
 	})
 }
 
+func TestCheckWrappedInvalidErr(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "multiple causes",
+			err: errors.NewInvalid(schema.GroupKind{Kind: "Pod"}, "test", field.ErrorList{
+				field.Required(field.NewPath("spec", "containers"), "required"),
+				field.Invalid(field.NewPath("metadata", "name"), "test", "invalid name"),
+			}),
+			want: "The Pod \"test\" is invalid: \n* spec.containers: Required value: required\n* metadata.name: Invalid value: \"test\": invalid name\n",
+		},
+		{
+			name: "no details",
+			err:  &errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonInvalid}},
+			want: "The request is invalid",
+		},
+		{
+			name: "message without details",
+			err:  &errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonInvalid, Message: "validation failed"}},
+			want: "The request is invalid: validation failed",
+		},
+		{
+			name: "empty causes",
+			err:  errors.NewInvalid(schema.GroupKind{Kind: "Pod"}, "test", nil),
+			want: "The Pod \"test\" is invalid",
+		},
+		{
+			name: "generic unprocessable entity",
+			err:  &errors.StatusError{ErrStatus: metav1.Status{Code: http.StatusUnprocessableEntity, Message: "webhook denied request"}},
+			want: "error: outer: inner: webhook denied request",
+		},
+		{
+			name: "non-status error",
+			err:  goerrors.New("validation failed"),
+			want: "error: outer: inner: validation failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", tt.err))
+			testCheckError(t, []checkErrTestCase{{err, tt.want, DefaultErrorExitCode}})
+		})
+	}
+}
+
 func TestCheckNoResourceMatchError(t *testing.T) {
 	testCheckError(t, []checkErrTestCase{
 		{
