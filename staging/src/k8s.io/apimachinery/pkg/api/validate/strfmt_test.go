@@ -413,6 +413,126 @@ func TestK8sUUID(t *testing.T) {
 	}
 }
 
+func TestCIDR(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:  "valid: IPv4",
+		input: "10.9.8.0/24",
+	}, {
+		name:  "valid: IPv4 single address",
+		input: "10.9.8.7/32",
+	}, {
+		name:  "valid: IPv4 all addresses",
+		input: "0.0.0.0/0",
+	}, {
+		name:  "valid: IPv6",
+		input: "2001:db8::/64",
+	}, {
+		name:  "valid: IPv6 single address",
+		input: "2001:db8::1/128",
+	}, {
+		name:  "valid: IPv6 all addresses",
+		input: "::/0",
+	}, {
+		// Existing fields accept non-canonical IPv6, so this must too.
+		name:  "valid: IPv6 non-canonical",
+		input: "2001:DB8:0:0::/64",
+	}, {
+		name:  "invalid: empty",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: not a CIDR",
+		input: "not-a-cidr",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "not-a-cidr", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: IP without prefix length",
+		input: "10.9.8.0",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "10.9.8.0", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: IPv4 prefix length too long",
+		input: "10.9.8.0/33",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "10.9.8.0/33", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: IPv6 prefix length too long",
+		input: "2001:db8::/129",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "2001:db8::/129", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: negative prefix length",
+		input: "10.9.8.0/-1",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "10.9.8.0/-1", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: surrounding whitespace",
+		input: " 10.9.8.0/24 ",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, " 10.9.8.0/24 ", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: IPv6 zone",
+		input: "fe80::%eth0/64",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "fe80::%eth0/64", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: leading 0s in IPv4 octets",
+		input: "010.009.008.000/24",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "010.009.008.000/24", "must not have leading 0s in IP or prefix length").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: leading 0s in prefix length",
+		input: "10.9.8.0/024",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "10.9.8.0/024", "must not have leading 0s in IP or prefix length").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: IPv4-mapped IPv6",
+		input: "::ffff:10.9.8.0/120",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "::ffff:10.9.8.0/120", "must not have an IPv4-mapped IPv6 address").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: IPv4 bits set beyond prefix length",
+		input: "10.9.8.7/24",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "10.9.8.7/24", "must not have bits set beyond the prefix length").WithOrigin("format=k8s-cidr"),
+		},
+	}, {
+		name:  "invalid: IPv6 bits set beyond prefix length",
+		input: "2001:db8::1/64",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "2001:db8::1/64", "must not have bits set beyond the prefix length").WithOrigin("format=k8s-cidr"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailExact()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := CIDR(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
 func TestLabelValue(t *testing.T) {
 	ctx := context.Background()
 	fldPath := field.NewPath("test")

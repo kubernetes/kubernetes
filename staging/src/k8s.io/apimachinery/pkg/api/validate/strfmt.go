@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -199,6 +200,26 @@ func UUID[T ~string](_ context.Context, op operation.Operation, fldPath *field.P
 		}
 	}
 	return nil
+}
+
+// CIDR verifies that the specified value is a valid IPv4 or IPv6 CIDR value
+// in "subnet" form (e.g. "10.9.8.0/24" or "2001:db8::/64").
+//
+// This matches the strict validation that existing CIDR fields apply to new
+// values: leading 0s, IPv4-mapped IPv6 addresses and bits set beyond the
+// prefix length are rejected. Values that predate strict validation are
+// preserved by declarative validation ratcheting, which skips unchanged
+// values, so there is no need for a "sloppy" mode here. Non-canonical IPv6
+// values (e.g. "2001:DB8::/64") are accepted, as they are for existing fields.
+func CIDR[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	allErrs := validation.IsValidCIDRForLegacyField(fldPath, (string)(*value), true, nil)
+	for i := range allErrs {
+		allErrs[i] = allErrs[i].WithOrigin("format=k8s-cidr")
+	}
+	return allErrs
 }
 
 // ResourcePoolName verifies that the specified value is one or more valid "long name"
