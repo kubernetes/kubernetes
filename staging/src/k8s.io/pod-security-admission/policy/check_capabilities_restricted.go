@@ -44,6 +44,8 @@ Must include "ALL"
 **Restricted Fields:**
 spec.containers[*].securityContext.capabilities.add
 spec.initContainers[*].securityContext.capabilities.add
+spec.containers[*].securityContext.capabilities.ambient
+spec.initContainers[*].securityContext.capabilities.ambient
 
 **Allowed Values:**
 undefined / empty
@@ -81,6 +83,7 @@ func capabilitiesRestricted_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1
 		containersMissingDropAll  []string
 		containersAddingForbidden []string
 		forbiddenCapabilities     = sets.NewString()
+		forbiddenFields           = sets.NewString()
 	)
 
 	visitContainers(podSpec, func(container *corev1.Container) {
@@ -101,10 +104,16 @@ func capabilitiesRestricted_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1
 		}
 
 		addedForbidden := false
-		for _, c := range container.SecurityContext.Capabilities.Add {
-			if c != capabilityNetBindService {
-				addedForbidden = true
-				forbiddenCapabilities.Insert(string(c))
+		for fieldName, caps := range map[string][]corev1.Capability{
+			"securityContext.capabilities.add":     container.SecurityContext.Capabilities.Add,
+			"securityContext.capabilities.ambient": container.SecurityContext.Capabilities.Ambient,
+		} {
+			for _, c := range caps {
+				if c != capabilityNetBindService {
+					addedForbidden = true
+					forbiddenCapabilities.Insert(string(c))
+					forbiddenFields.Insert(fieldName)
+				}
 			}
 		}
 		if addedForbidden {
@@ -120,10 +129,10 @@ func capabilitiesRestricted_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1
 	}
 	if len(containersAddingForbidden) > 0 {
 		forbiddenDetails = append(forbiddenDetails, fmt.Sprintf(
-			`%s %s must not include %s in securityContext.capabilities.add`,
+			`%s %s must not include %s in %s`,
 			pluralize("container", "containers", len(containersAddingForbidden)),
 			joinQuote(containersAddingForbidden),
-			joinQuote(forbiddenCapabilities.List())))
+			joinQuote(forbiddenCapabilities.List()), strings.Join(forbiddenFields.List(), " or ")))
 	}
 	if len(forbiddenDetails) > 0 {
 		return CheckResult{

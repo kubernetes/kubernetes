@@ -327,6 +327,8 @@ spec:
       capabilities:
         add:
         - addValue
+        ambient:
+        - ambientValue
         drop:
         - dropValue
       cgroupOptions:
@@ -573,6 +575,8 @@ spec:
       capabilities:
         add:
         - addValue
+        ambient:
+        - ambientValue
         drop:
         - dropValue
       cgroupOptions:
@@ -825,6 +829,8 @@ spec:
       capabilities:
         add:
         - addValue
+        ambient:
+        - ambientValue
         drop:
         - dropValue
       cgroupOptions:
