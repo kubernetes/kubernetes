@@ -273,7 +273,8 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithP
 
 	f.It("Controller Manager should not create/delete replicas across restart", f.WithProvider("gce", "aws") /* Requires master ssh access. */, func(ctx context.Context) {
 
-		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
+		nodes, err := framework.WaitForControlPlaneNodes(ctx, f.ClientSet)
+		framework.ExpectNoError(err, "waiting for control plane nodes")
 
 		// checks if there is at least one control-plane node
 		gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)
@@ -312,7 +313,8 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithP
 	})
 
 	f.It("Scheduler should continue assigning pods to nodes across restart", f.WithProvider("gce", "aws") /* Requires master ssh access. */, func(ctx context.Context) {
-		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
+		nodes, err := framework.WaitForControlPlaneNodes(ctx, f.ClientSet)
+		framework.ExpectNoError(err, "waiting for control plane nodes")
 
 		// checks if there is at least one control-plane node
 		gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)

@@ -113,7 +113,8 @@ func doEtcdFailure(ctx context.Context, f *framework.Framework, failCommand, fix
 }
 
 func masterExec(ctx context.Context, f *framework.Framework, cmd string) {
-	nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
+	nodes, err := framework.WaitForControlPlaneNodes(ctx, f.ClientSet)
+	framework.ExpectNoError(err, "waiting for control plane nodes")
 	// checks if there is at least one control-plane node
 
 	gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(),
