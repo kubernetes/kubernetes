@@ -30,9 +30,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	grpchealth "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/status"
 
 	cert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/probe"
@@ -173,7 +176,32 @@ func (e errorNotServeServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream 
 	})
 }
 
+type longMessageServerMock struct {
+	grpchealth.UnimplementedHealthServer
+}
+
+func (longMessageServerMock) Check(context.Context, *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {
+	return nil, status.Error(codes.Unknown, strings.Repeat("x", 1<<20))
+}
+
 func TestGrpcProber_Probe(t *testing.T) {
+	t.Run("Should: limit the output when the status message is long", func(t *testing.T) {
+		s := New()
+		lis, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		grpcServer := grpc.NewServer()
+		defer grpcServer.Stop()
+		grpchealth.RegisterHealthServer(grpcServer, &longMessageServerMock{})
+		go func() {
+			_ = grpcServer.Serve(lis)
+		}()
+		p, o, err := s.Probe(t.Context(), "127.0.0.1", "", lis.Addr().(*net.TCPAddr).Port, 10*time.Second, ProbeOptions{})
+		require.NoError(t, err)
+		assert.Equal(t, probe.Failure, p)
+		assert.Less(t, len(o), maxHeaderListSize)
+	})
 	t.Run("Should: fail fast when the connection is refused", func(t *testing.T) {
 		s := New()
 		lis, err := net.Listen("tcp", "127.0.0.1:0")

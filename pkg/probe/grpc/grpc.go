@@ -35,6 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 )
 
+const (
+	// The status message of a failed check is a response header and goes into the probe output.
+	maxHeaderListSize = 10 * 1 << 10 // 10KB
+)
+
 // ProbeOptions contains options for configuring a gRPC probe.
 type ProbeOptions struct {
 	UseTLS bool
@@ -73,6 +78,7 @@ func (p grpcProber) Probe(ctx context.Context, host, service string, port int, t
 	opts := []grpc.DialOption{
 		grpc.WithUserAgent(fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor)),
 		grpc.WithTransportCredentials(transportCreds),
+		grpc.WithMaxHeaderListSize(maxHeaderListSize),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return probe.ProbeDialer().DialContext(ctx, "tcp", addr)
 		}),
