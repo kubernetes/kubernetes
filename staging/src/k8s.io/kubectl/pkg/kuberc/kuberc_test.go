@@ -2634,6 +2634,59 @@ func TestApplyAlias(t *testing.T) {
 			},
 			expectedErr: fmt.Errorf("invalid alias flag nonexistentflag in alias myalias"),
 		},
+		{
+			name: "alias original command annotation preserves arguments containing alias name as substring",
+			nestedCmds: []fakeCmds[string]{
+				{
+					name: "command1",
+					flags: []fakeFlag[string]{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"pod",
+				"my-pod-test",
+			},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Aliases: []config.AliasOverride{
+						{
+							Name:    "pod",
+							Command: "command1",
+							PrependArgs: []string{
+								"pods",
+							},
+							Options: []config.CommandOptionDefault{
+								{
+									Name:    "firstflag",
+									Default: "changed",
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFlags: []fakeFlag[string]{
+				{
+					name:  "firstflag",
+					value: "changed",
+				},
+			},
+			expectedCmd: "pod",
+			expectedArgs: []string{
+				"pods",
+				"my-pod-test",
+			},
+		},
 	}
 
 	for _, test := range tests {
