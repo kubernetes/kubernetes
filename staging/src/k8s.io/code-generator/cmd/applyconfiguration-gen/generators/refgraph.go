@@ -154,15 +154,22 @@ var excludeTypes = map[types.Name]struct{}{
 }
 
 // requiresApplyConfiguration returns true if a type applyConfig should be generated for the given type.
-// types applyConfig are only generated for struct types that contain fields with json tags.
+// types applyConfig are only generated for struct types that contain fields with json tags and do not
+// have custom JSON serialization (MarshalJSON or UnmarshalJSON).
 func requiresApplyConfiguration(t *types.Type) bool {
 	for t.Kind == types.Alias {
+		if hasCustomJSONSerialization(t) {
+			return false
+		}
 		t = t.Underlying
 	}
 	if t.Kind != types.Struct {
 		return false
 	}
 	if _, ok := excludeTypes[t.Name]; ok {
+		return false
+	}
+	if hasCustomJSONSerialization(t) {
 		return false
 	}
 	var hasJSONTaggedMembers bool
@@ -172,4 +179,16 @@ func requiresApplyConfiguration(t *types.Type) bool {
 		}
 	}
 	return hasJSONTaggedMembers
+}
+
+func hasCustomJSONSerialization(t *types.Type) bool {
+	if t.Kind == types.Pointer {
+		t = t.Elem
+	}
+	if t.Methods == nil {
+		return false
+	}
+	_, isMarshaler := t.Methods["MarshalJSON"]
+	_, isUnmarshaler := t.Methods["UnmarshalJSON"]
+	return isMarshaler || isUnmarshaler
 }
