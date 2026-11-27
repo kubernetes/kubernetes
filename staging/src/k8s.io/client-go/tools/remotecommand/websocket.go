@@ -269,6 +269,7 @@ func (c *wsStreamCreator) readDemuxLoop(bufferSize int, period time.Duration, de
 	c.logger.V(5).Info("Websocket read starts", "deadline", deadline)
 	if err := c.conn.SetReadDeadline(time.Now().Add(deadline)); err != nil {
 		c.logger.Error(err, "Websocket initial setting read deadline failed")
+		c.closeAllStreamReaders(err)
 		return
 	}
 	go h.start()
