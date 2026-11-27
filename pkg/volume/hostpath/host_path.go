@@ -19,7 +19,9 @@ package hostpath
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 
 	"k8s.io/klog/v2"
 
@@ -417,11 +419,34 @@ func typeMatchedOrError(path string, hu hostutil.HostUtils, expectedType *v1.Hos
 	return nil
 }
 
+// hostPathRoot returns a root directory and a path relative to the filesystem root
+// for confinement via os.Root when creating hostPath *OrCreate paths.
+func hostPathRoot(pathname string) (root, rel string, err error) {
+	pathname = filepath.Clean(pathname)
+	if !filepath.IsAbs(pathname) {
+		return "", "", fmt.Errorf("hostPath must be absolute: %q", pathname)
+	}
+	rel = strings.TrimPrefix(pathname, string(filepath.Separator))
+	if rel == "" {
+		return "", "", fmt.Errorf("invalid hostPath: %q", pathname)
+	}
+	return string(filepath.Separator), rel, nil
+}
+
 // makeDir creates a new directory.
 // If pathname already exists as a directory, no error is returned.
 // If pathname already exists as a file, an error is returned.
 func makeDir(pathname string) error {
-	err := os.MkdirAll(pathname, os.FileMode(0755))
+	rootPath, rel, err := hostPathRoot(pathname)
+	if err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	err = root.MkdirAll(rel, os.FileMode(0755))
 	if err != nil {
 		if !os.IsExist(err) {
 			return err
@@ -433,9 +458,18 @@ func makeDir(pathname string) error {
 // makeFile creates an empty file.
 // If pathname already exists, whether a file or directory, no error is returned.
 func makeFile(pathname string) error {
-	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	rootPath, rel, err := hostPathRoot(pathname)
+	if err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	f, err := root.OpenFile(rel, os.O_CREATE, os.FileMode(0644))
 	if f != nil {
-		f.Close()
+		_ = f.Close()
 	}
 	if err != nil {
 		if !os.IsExist(err) {
