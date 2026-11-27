@@ -17,12 +17,15 @@ limitations under the License.
 package dns
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	netutils "k8s.io/utils/net"
@@ -295,64 +299,75 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 	}
 }
 
-func TestFormDNSNameserversFitsLimits(t *testing.T) {
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      string("testNode"),
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	testClusterDNSDomain := "TEST"
-
-	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:         "",
-			Name:        "test_pod",
-			Namespace:   "testNS",
-			Annotations: map[string]string{},
-		},
-	}
-
-	testCases := []struct {
-		desc               string
-		nameservers        []string
-		expectedNameserver []string
-		expectedEvent      bool
+func TestGetPodDNSNameserverLimits(t *testing.T) {
+	host := []string{"192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4"}
+	custom := &v1.PodDNSConfig{Nameservers: []string{host[2]}}
+	tests := []struct {
+		name               string
+		inherited          []string
+		config             *v1.PodDNSConfig
+		want               []string
+		wantEvent, wantLog bool
 	}{
-		{
-			desc:               "valid: 1 nameserver",
-			nameservers:        []string{"127.0.0.1"},
-			expectedNameserver: []string{"127.0.0.1"},
-			expectedEvent:      false,
-		},
-		{
-			desc:               "valid: 3 nameservers",
-			nameservers:        []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
-			expectedNameserver: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
-			expectedEvent:      false,
-		},
-		{
-			desc:               "invalid: 4 nameservers, trimmed to 3",
-			nameservers:        []string{"127.0.0.1", "10.0.0.10", "8.8.8.8", "1.2.3.4"},
-			expectedNameserver: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
-			expectedEvent:      true,
-		},
+		{name: "one server", inherited: host[:1], want: host[:1]},
+		{name: "three after merge", inherited: host[:2], config: custom, want: host[:3]},
+		{name: "inherited overflow", inherited: host, want: host[:3], wantLog: true},
+		{name: "only custom searches", inherited: host, config: &v1.PodDNSConfig{Searches: []string{"example.com"}}, want: host[:3], wantLog: true},
+		{name: "pod repeats omitted server", inherited: host, config: &v1.PodDNSConfig{Nameservers: host[3:]}, want: host[:3], wantLog: true},
+		{name: "new pod server omitted", inherited: host[:3], config: &v1.PodDNSConfig{Nameservers: host[3:]}, want: host[:3], wantEvent: true},
 	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := record.NewFakeRecorder(2)
+			c := NewConfigurer(recorder, nil, nil, nil, "", "resolv.conf")
+			c.getHostDNSConfig = func(klog.Logger, string) (*runtimeapi.DNSConfig, error) {
+				return &runtimeapi.DNSConfig{Servers: tc.inherited}, nil
+			}
+			var logs bytes.Buffer
+			ctx := klog.NewContext(t.Context(), textlogger.NewLogger(textlogger.NewConfig(textlogger.Output(&logs))))
+			pod := &v1.Pod{Spec: v1.PodSpec{DNSPolicy: v1.DNSDefault, DNSConfig: tc.config}}
+			config, err := c.GetPodDNS(ctx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, config.Servers)
+			event := fetchEvent(recorder)
+			if tc.wantEvent {
+				assert.Contains(t, event, "Warning DNSConfigForming")
+			} else {
+				assert.Empty(t, event)
+			}
+			assert.Equal(t, tc.wantLog, strings.Contains(logs.String(), "Nameserver limits exceeded"))
+		})
+	}
+}
 
-	for _, tc := range testCases {
-		logger, _ := ktesting.NewTestContext(t)
-		appliedNameservers := configurer.formDNSNameserversFitsLimits(logger, tc.nameservers, pod)
-		assert.EqualValues(t, tc.expectedNameserver, appliedNameservers, tc.desc)
-		event := fetchEvent(recorder)
-		if tc.expectedEvent && len(event) == 0 {
-			t.Errorf("%s: formDNSNameserversFitsLimits(%v) expected event, got no event.", tc.desc, tc.nameservers)
-		} else if !tc.expectedEvent && len(event) > 0 {
-			t.Errorf("%s: formDNSNameserversFitsLimits(%v) expected no event, got event: %v", tc.desc, tc.nameservers, event)
+func TestInheritedNameserverLogRateLimit(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		recorder := record.NewFakeRecorder(5)
+		c := NewConfigurer(recorder, nil, nil, nil, "", "resolv.conf")
+		c.getHostDNSConfig = func(klog.Logger, string) (*runtimeapi.DNSConfig, error) {
+			return &runtimeapi.DNSConfig{Servers: []string{"192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4"}}, nil
 		}
-	}
+		var logs bytes.Buffer
+		ctx := klog.NewContext(t.Context(), textlogger.NewLogger(textlogger.NewConfig(textlogger.Output(&logs))))
+		check := func(name string, dnsConfig *v1.PodDNSConfig, wantLog, wantEvent bool) {
+			t.Helper()
+			logs.Reset()
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name}, Spec: v1.PodSpec{DNSPolicy: v1.DNSDefault, DNSConfig: dnsConfig}}
+			_, err := c.GetPodDNS(ctx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, wantLog, strings.Contains(logs.String(), "Nameserver limits exceeded"), name)
+			assert.Equal(t, wantEvent, fetchEvent(recorder) != "", name)
+		}
+
+		custom := &v1.PodDNSConfig{Nameservers: []string{"192.0.2.5"}}
+		check("custom-first", custom, false, true)
+		check("first", nil, true, false)
+		time.Sleep(time.Hour - time.Second)
+		check("second", nil, false, false)
+		check("custom", custom, false, true)
+		time.Sleep(time.Second)
+		check("third", nil, true, false)
+	})
 }
 
 func TestMergeDNSOptions(t *testing.T) {
