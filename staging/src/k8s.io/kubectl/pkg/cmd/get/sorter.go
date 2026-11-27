@@ -89,6 +89,14 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 		}
 		list.Items = outputList
 		return nil
+	case *unstructured.StableUnstructured:
+		// StableUnstructured has no Items struct field, so meta.SetList does not work.
+		items, err := stableItems(objs)
+		if err != nil {
+			return err
+		}
+		list.SetItems(items)
+		return nil
 	}
 	return meta.SetList(obj, objs)
 }
@@ -426,8 +434,11 @@ func NewTableSorter(table *metav1.Table, field string) (*TableSorter, error) {
 	}, nil
 }
 func findJSONPathResults(parser *jsonpath.JSONPath, from runtime.Object) ([][]reflect.Value, error) {
-	if unstructuredObj, ok := from.(*unstructured.Unstructured); ok {
-		return parser.FindResults(unstructuredObj.Object)
+	switch u := from.(type) {
+	case *unstructured.Unstructured:
+		return parser.FindResults(u.Object)
+	case runtime.Unstructured:
+		return parser.FindResults(u.UnstructuredContent())
 	}
 	return parser.FindResults(reflect.ValueOf(from).Elem().Interface())
 }
