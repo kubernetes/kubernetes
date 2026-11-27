@@ -18,8 +18,12 @@ package create
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -194,6 +198,95 @@ func TestEditOptionsInitializedByComplete(t *testing.T) {
 			t.Errorf("unexpected error message: %v", err)
 		}
 	})
+
+	t.Run("editOptions inherit dry-run strategy and field manager", func(t *testing.T) {
+		cmd := NewCmdCreate(tf, ioStreams)
+		cmd.Flags().Set("dry-run", "server") // nolint:errcheck
+
+		o := NewCreateOptions(ioStreams)
+		o.EditBeforeCreate = true
+		o.fieldManager = "custom-manager"
+		o.FilenameOptions.Filenames = []string{"../../../testdata/redis-master-controller.yaml"}
+		if err := o.Complete(tf, cmd, []string{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if o.editOptions == nil {
+			t.Fatal("expected editOptions to be initialized")
+		}
+		if o.editOptions.DryRunStrategy != cmdutil.DryRunServer {
+			t.Errorf("expected dry-run strategy %v, got %v", cmdutil.DryRunServer, o.editOptions.DryRunStrategy)
+		}
+		if o.editOptions.FieldManager != "custom-manager" {
+			t.Errorf("expected field manager %q, got %q", "custom-manager", o.editOptions.FieldManager)
+		}
+	})
+}
+
+func TestCreateEditWithDryRun(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	tests := []struct {
+		name          string
+		dryRun        string
+		wantOutput    string
+		expectRequest bool
+	}{
+		{
+			name:       "client",
+			dryRun:     "client",
+			wantOutput: "replicationcontroller/edited-master created (dry run)\n",
+		},
+		{
+			name:          "server",
+			dryRun:        "server",
+			wantOutput:    "replicationcontroller/edited-master created (server dry run)\n",
+			expectRequest: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			requested := false
+			tf.UnstructuredClient = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					requested = true
+					if got := req.URL.Query().Get("dryRun"); got != "All" {
+						t.Errorf("expected dryRun=All, got %q", got)
+					}
+					rc := &corev1.ReplicationController{
+						ObjectMeta: metav1.ObjectMeta{Name: "edited-master", Namespace: "test"},
+					}
+					return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rc)}, nil
+				}),
+			}
+
+			editor := filepath.Join(t.TempDir(), "editor.sh")
+			if err := os.WriteFile(editor, []byte("#!/bin/sh\nsed -i.bak 's/redis-master/edited-master/' \"$1\"\n"), 0o755); err != nil {
+				t.Fatalf("failed to write editor script: %v", err)
+			}
+			t.Setenv("KUBE_EDITOR", editor)
+
+			ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
+			cmd := NewCmdCreate(tf, ioStreams)
+			cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml") // nolint:errcheck
+			cmd.Flags().Set("edit", "true")                                               // nolint:errcheck
+			cmd.Flags().Set("dry-run", tc.dryRun)                                         // nolint:errcheck
+			cmd.Run(cmd, []string{})
+
+			if requested != tc.expectRequest {
+				t.Errorf("expected request: %v, got: %v", tc.expectRequest, requested)
+			}
+			if got := buf.String(); got != tc.wantOutput {
+				t.Errorf("unexpected output: got %q, want %q", got, tc.wantOutput)
+			}
+		})
+	}
 }
 
 func TestMissingFilenameError(t *testing.T) {

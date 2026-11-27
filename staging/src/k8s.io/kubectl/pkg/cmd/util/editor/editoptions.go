@@ -72,6 +72,8 @@ type EditOptions struct {
 
 	EditMode EditMode
 
+	DryRunStrategy cmdutil.DryRunStrategy
+
 	CmdNamespace    string
 	ApplyAnnotation bool
 	ChangeCause     string
@@ -211,6 +213,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 		return o.PrintFlags.ToPrinter()
 	}
 
@@ -730,14 +733,19 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-		obj, err := resource.NewHelper(info.Client, info.Mapping).
-			WithFieldManager(o.FieldManager).
-			WithFieldValidation(o.ValidationDirective).
-			Create(info.Namespace, true, info.Object)
-		if err != nil {
-			return err
+		// Client-side dry-run must not send anything to the server; server-side
+		// dry-run sends the create but asks the server not to persist it.
+		if o.DryRunStrategy != cmdutil.DryRunClient {
+			obj, err := resource.NewHelper(info.Client, info.Mapping).
+				DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+				WithFieldManager(o.FieldManager).
+				WithFieldValidation(o.ValidationDirective).
+				Create(info.Namespace, true, info.Object)
+			if err != nil {
+				return err
+			}
+			info.Refresh(obj, true) //nolint:errcheck
 		}
-		info.Refresh(obj, true)
 		printer, err := o.ToPrinter("created")
 		if err != nil {
 			return err
