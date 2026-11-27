@@ -180,8 +180,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			host := req.URL.Hostname()
 			path := req.URL.Path
 			scheme := req.URL.Scheme
-			headers := p.HTTPGet.HTTPHeaders
-			loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", probeType)
+			loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "probeType", probeType)
 		}
 		// Abort the request if the context is canceled.
 		req = req.WithContext(ctx)
