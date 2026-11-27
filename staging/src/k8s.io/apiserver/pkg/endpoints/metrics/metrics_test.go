@@ -513,6 +513,66 @@ func TestCleanListScope(t *testing.T) {
 			ctx:           request.WithRequestInfo(context.TODO(), &request.RequestInfo{IsResourceRequest: true}),
 			expectedScope: "cluster",
 		},
+		{
+			name: "pod name selector takes precedence over node selector",
+			ctx: request.WithRequestInfo(context.TODO(), &request.RequestInfo{
+				IsResourceRequest: true,
+				Resource:          "pods",
+			}),
+			opts: &metainternalversion.ListOptions{
+				FieldSelector: fields.ParseSelectorOrDie("metadata.name=pod1"),
+			},
+			expectedScope: "resource",
+		},
+		{
+			name: "pods with node name field selector",
+			ctx: request.WithRequestInfo(context.TODO(), &request.RequestInfo{
+				IsResourceRequest: true,
+				Resource:          "pods",
+			}),
+			opts: &metainternalversion.ListOptions{
+				FieldSelector: fields.ParseSelectorOrDie("spec.nodeName=node1"),
+			},
+			expectedScope: "indexed",
+		},
+		{
+			name: "resource slices with node name field selector",
+			ctx: request.WithRequestInfo(context.TODO(), &request.RequestInfo{
+				IsResourceRequest: true,
+				Resource:          "resourceslices",
+			}),
+			opts: &metainternalversion.ListOptions{
+				FieldSelector: fields.ParseSelectorOrDie("spec.nodeName=node1"),
+			},
+			expectedScope: "indexed",
+		},
+		{
+			name: "other resource with node name field selector",
+			ctx: request.WithRequestInfo(context.TODO(), &request.RequestInfo{
+				IsResourceRequest: true,
+				Resource:          "deployments",
+			}),
+			opts: &metainternalversion.ListOptions{
+				FieldSelector: fields.ParseSelectorOrDie("spec.nodeName=node1"),
+			},
+			expectedScope: "indexed",
+		},
+		{
+			name: "other field selector remains cluster scope",
+			ctx:  request.WithRequestInfo(context.TODO(), &request.RequestInfo{IsResourceRequest: true}),
+			opts: &metainternalversion.ListOptions{
+				FieldSelector: fields.ParseSelectorOrDie("status.phase=Running"),
+			},
+			expectedScope: "cluster",
+		},
+		{
+			name: "namespace scope takes precedence over node selector",
+			ctx:  request.WithNamespace(context.TODO(), "foo"),
+			opts: &metainternalversion.ListOptions{
+				FieldSelector: fields.ParseSelectorOrDie("spec.nodeName=node1"),
+			},
+			expectedScope: "namespace",
+		},
 	}
 
 	for _, scenario := range scenarios {
