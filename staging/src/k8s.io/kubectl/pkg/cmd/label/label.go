@@ -162,6 +162,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 	}
 
 	flags.AddFlags(cmd)
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("selector", completion.LabelSelectorCompletionFunc(f, "")))
 
 	return cmd
 }

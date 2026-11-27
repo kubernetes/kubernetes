@@ -187,6 +187,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 		},
 	}
 	o.AddFlags(cmd)
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc("selector", completion.LabelSelectorCompletionFunc(f, "pods")))
 	return cmd
 }
 
