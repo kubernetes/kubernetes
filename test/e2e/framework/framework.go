@@ -463,6 +463,7 @@ func (f *Framework) AfterEach(ctx context.Context) {
 		// if delete-namespace set to false, namespace will always be preserved.
 		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
 		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentSpecReport().Failed()) {
+			var namespacesToWait []string
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
 				if err := f.ClientSet.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{}); err != nil {
@@ -475,6 +476,29 @@ func (f *Framework) AfterEach(ctx context.Context) {
 						}
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
+					}
+				} else {
+					namespacesToWait = append(namespacesToWait, ns.Name)
+				}
+			}
+			// Wait for namespace deletion in [Serial] tests so terminating pods
+			// and other namespaced resources do not leak into subsequent [Serial] tests.
+			if ginkgo.CurrentSpecReport().IsSerial && len(namespacesToWait) > 0 {
+				timeout := DefaultNamespaceDeletionTimeout
+				if f.NamespaceDeletionTimeout != 0 {
+					timeout = f.NamespaceDeletionTimeout
+				}
+				if err := WaitForNamespacesDeleted(ctx, f.ClientSet, namespacesToWait, timeout); err != nil {
+					for _, nsName := range namespacesToWait {
+						_, getErr := f.ClientSet.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
+						if getErr == nil {
+							nsDeletionErrors[nsName] = err
+							if !ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure && f.DumpAllNamespaceInfo != nil {
+								f.DumpAllNamespaceInfo(ctx, f, nsName)
+							}
+						} else if !apierrors.IsNotFound(getErr) {
+							nsDeletionErrors[nsName] = fmt.Errorf("%w (get error: %v)", err, getErr)
+						}
 					}
 				}
 			}
