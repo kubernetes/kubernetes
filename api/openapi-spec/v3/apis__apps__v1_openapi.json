@@ -2449,7 +2449,8 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "image"
         ],
         "type": "object"
       },
@@ -2776,8 +2777,7 @@
           }
         },
         "required": [
-          "name",
-          "value"
+          "name"
         ],
         "type": "object"
       },
@@ -3635,6 +3635,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "name"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.PodOS": {
@@ -4144,6 +4147,9 @@
             "description": "spec is the specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.PortworxVolumeSource": {
@@ -4188,8 +4194,7 @@
           }
         },
         "required": [
-          "weight",
-          "preference"
+          "weight"
         ],
         "type": "object"
       },
@@ -4831,9 +4836,6 @@
             "type": "integer"
           }
         },
-        "required": [
-          "seconds"
-        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.StorageOSVolumeSource": {
@@ -4884,8 +4886,7 @@
           }
         },
         "required": [
-          "name",
-          "value"
+          "name"
         ],
         "type": "object"
       },
