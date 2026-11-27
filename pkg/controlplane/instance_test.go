@@ -28,6 +28,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -57,11 +58,13 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	netutils "k8s.io/utils/net"
@@ -795,4 +798,53 @@ var gvrToStorageVersionHash = map[string]string{
 	"events.k8s.io/v1/events":                                           "r2yiGXH7wu8=",
 	"flowcontrol.apiserver.k8s.io/v1/flowschemas":                       "GJVAJZSZBIw=",
 	"flowcontrol.apiserver.k8s.io/v1/prioritylevelconfigurations":       "Kir5PVfvNeI=",
+}
+
+// TestResourcesWithTTL verifies that options.ResourcesWithTTL and
+// kubeapiserver.DefaultWatchCacheSizes stay in sync with the actual REST stores
+// that configure a storage TTLFunc across all GA, beta, and alpha APIs.
+func TestResourcesWithTTL(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
+	_, config, _ := setUp(t)
+	config.ControlPlane.Extra.EventTTL = 1 * time.Hour
+
+	client, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providers, err := config.Complete().StorageProviders(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	allVersionsConfig := DefaultAPIResourceConfigSource()
+	allVersionsConfig.EnableVersions(betaAPIGroupVersionsDisabledByDefault...)
+	allVersionsConfig.EnableVersions(alphaAPIGroupVersionsDisabledByDefault...)
+
+	actualResourcesWithTTL := sets.New[schema.GroupResource]()
+	for _, provider := range providers {
+		groupName := provider.GroupName()
+		apiGroupInfo, err := provider.NewRESTStorage(allVersionsConfig, config.ControlPlane.Generic.RESTOptionsGetter)
+		if err != nil {
+			t.Fatalf("error creating REST storage for %s: %v", groupName, err)
+		}
+
+		for _, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource, storage := range resourcesInVersion {
+				t.Cleanup(storage.Destroy)
+				s, ok := storage.(interface{ HasTTL() bool })
+				if ok && s.HasTTL() {
+					baseResource, _, _ := strings.Cut(resource, "/")
+					actualResourcesWithTTL.Insert(schema.GroupResource{Group: groupName, Resource: baseResource})
+				}
+			}
+		}
+	}
+
+	assert.Equal(t, actualResourcesWithTTL, options.ResourcesWithTTL(), "options.ResourcesWithTTL() must match REST stores with TTLFunc set")
+	assert.Equal(t, actualResourcesWithTTL, sets.KeySet(kubeapiserver.DefaultWatchCacheSizes()), "kubeapiserver.DefaultWatchCacheSizes() must match REST stores with TTLFunc set")
 }

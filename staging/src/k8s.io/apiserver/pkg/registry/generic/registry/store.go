@@ -472,6 +472,11 @@ func (e *Store) GetDeleteStrategy() rest.RESTDeleteStrategy {
 	return e.DeleteStrategy
 }
 
+// HasTTL reports whether the store configures a storage TTL for persisted objects.
+func (e *Store) HasTTL() bool {
+	return e.TTLFunc != nil
+}
+
 // GetCorruptObjDeleter returns the unsafe corrupt object deleter
 func (e *Store) GetCorruptObjDeleter() rest.GracefulDeleter {
 	return e.corruptObjDeleter
