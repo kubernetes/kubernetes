@@ -101,6 +101,11 @@ type ContainerGC interface {
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
 type KillPodFunc func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error
 
+// StartPodEvictionFunc submits an eviction to the pod worker and returns the
+// termination completion channel and the time to wait for it. If pending is
+// non-nil, the request only shortens that in-flight eviction.
+type StartPodEvictionFunc func(pod *v1.Pod, gracePeriodOverride int64, fn func(*v1.PodStatus), pending <-chan struct{}) (<-chan struct{}, time.Duration)
+
 // MirrorPodFunc returns the mirror pod for the given static pod and
 // whether it was known to the pod manager.
 type MirrorPodFunc func(*v1.Pod) (*v1.Pod, bool)

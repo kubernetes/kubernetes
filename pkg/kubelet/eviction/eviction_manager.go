@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -38,6 +39,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -67,9 +69,8 @@ type managerImpl struct {
 	//  used to track time
 	clock clock.WithTicker
 	// config is how the manager is configured
-	config Config
-	// the function to invoke to kill a pod
-	killPodFunc KillPodFunc
+	config           Config
+	startPodEviction StartPodEvictionFunc
 	// the interface that knows how to do image gc
 	imageGC ImageGC
 	// the interface that knows how to do container gc
@@ -106,6 +107,15 @@ type managerImpl struct {
 	thresholdsLastUpdated time.Time
 	// whether can support local storage capacity isolation
 	localStorageCapacityIsolation bool
+	// Only the monitoring loop can start or shorten an in-flight eviction.
+	pendingEviction *pendingEviction
+}
+
+type pendingEviction struct {
+	pod       *v1.Pod
+	done      <-chan struct{}
+	timeout   clock.Timer
+	shortened bool
 }
 
 // ensure it implements the required interface
@@ -115,7 +125,7 @@ var _ Manager = &managerImpl{}
 func NewManager(
 	summaryProvider stats.SummaryProvider,
 	config Config,
-	killPodFunc KillPodFunc,
+	startPodEviction StartPodEvictionFunc,
 	imageGC ImageGC,
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
@@ -125,7 +135,7 @@ func NewManager(
 ) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:                         clock,
-		killPodFunc:                   killPodFunc,
+		startPodEviction:              startPodEviction,
 		imageGC:                       imageGC,
 		containerGC:                   containerGC,
 		config:                        config,
@@ -189,9 +199,13 @@ func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttrib
 // Start starts the control loop to observe and response to low compute resources.
 func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
 	logger := klog.FromContext(ctx)
+	thresholdChanged := make(chan struct{}, 1)
 	thresholdHandler := func(message string) {
 		logger.Info(message)
-		_, _ = m.synchronize(ctx, diskInfoProvider, podFunc)
+		select {
+		case thresholdChanged <- struct{}{}:
+		default:
+		}
 	}
 	logger.Info("Eviction manager: starting control loop")
 	if m.config.KernelMemcgNotification || runtime.GOOS == "windows" {
@@ -209,26 +223,47 @@ func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvid
 	}
 	// start the eviction manager monitoring
 	go func() {
+		defer func() {
+			if m.pendingEviction != nil {
+				m.pendingEviction.timeout.Stop()
+			}
+		}()
 		for {
 			if err := ctx.Err(); err != nil {
 				logger.Info("Eviction manager: monitoring loop exiting", "err", err)
 				return
 			}
 			evictedPods, err := m.synchronize(ctx, diskInfoProvider, podFunc)
-			if evictedPods != nil && err == nil {
-				logger.Info("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjSlice(evictedPods))
-				m.waitForPodsCleanup(logger, podCleanedUpFunc, evictedPods)
-			} else {
-				if err != nil {
-					logger.Error(err, "Eviction manager: failed to synchronize")
-				}
-				select {
-				case <-ctx.Done():
-					logger.Info("Eviction manager: monitoring loop exiting", "err", ctx.Err())
-					return
-				case <-time.After(monitoringInterval):
-				}
+			if err != nil {
+				logger.Error(err, "Eviction manager: failed to synchronize")
 			}
+			if len(evictedPods) > 0 {
+				m.waitForPodsCleanup(ctx, podCleanedUpFunc, evictedPods)
+				continue
+			}
+
+			pending := m.pendingEviction
+			var done <-chan struct{}
+			var timeout <-chan time.Time
+			if pending != nil {
+				done, timeout = pending.done, pending.timeout.C()
+			}
+			select {
+			case <-ctx.Done():
+				logger.Info("Eviction manager: monitoring loop exiting", "err", ctx.Err())
+				return
+			case <-thresholdChanged:
+				continue
+			case <-time.After(monitoringInterval):
+				continue
+			case <-done:
+				logger.Info("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pending.pod))
+			case <-timeout:
+				m.reportEvictionTimeout(logger, pending.pod)
+			}
+			pending.timeout.Stop()
+			m.pendingEviction = nil
+			m.waitForPodsCleanup(ctx, podCleanedUpFunc, []*v1.Pod{pending.pod})
 		}
 	}()
 }
@@ -370,9 +405,23 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 	m.lastObservations = observations
 	m.Unlock()
 
-	// evict pods if there is a resource usage violation from local volume temporary storage
-	// If eviction happens in localStorageEviction function, skip the rest of eviction action
-	if m.localStorageCapacityIsolation {
+	// Keep observing pressure while the soft eviction runs, but only consider
+	// hard thresholds and keep the same victim until its eviction finishes.
+	if pending := m.pendingEviction; pending != nil {
+		if pending.shortened {
+			return nil, nil
+		}
+		select {
+		case <-pending.done:
+			return nil, nil
+		case <-pending.timeout.C():
+			m.reportEvictionTimeout(logger, pending.pod)
+			m.pendingEviction = nil
+			return []*v1.Pod{pending.pod}, nil
+		default:
+		}
+		thresholds = slices.DeleteFunc(thresholds, func(t evictionapi.Threshold) bool { return !isHardEvictionThreshold(t) })
+	} else if m.localStorageCapacityIsolation {
 		if evictedPods := m.localStorageEviction(logger, activePods, statsFunc); len(evictedPods) > 0 {
 			return evictedPods, nil
 		}
@@ -395,8 +444,28 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
-	if m.reclaimNodeLevelResources(ctx, thresholdToReclaim.Signal, resourceToReclaim) {
+	reclaimThresholds := m.config.Thresholds
+	if m.pendingEviction != nil {
+		reclaimThresholds = []evictionapi.Threshold{thresholdToReclaim}
+	}
+	if m.reclaimNodeLevelResources(ctx, thresholdToReclaim.Signal, resourceToReclaim, reclaimThresholds) {
 		logger.Info("Eviction manager: able to reduce resource pressure without evicting pods.", "resourceName", resourceToReclaim)
+		return nil, nil
+	}
+
+	if pending := m.pendingEviction; pending != nil {
+		select {
+		case <-pending.done:
+			return nil, nil
+		default:
+		}
+		logger.Info("Eviction manager: shortening pod eviction grace period", "pod", klog.KObj(pending.pod), "resourceName", resourceToReclaim)
+		// The pod worker serializes requests for this pod and signals the
+		// original completion channel when termination ends.
+		_, timeout := m.startPodEviction(pending.pod, immediateEvictionGracePeriodSeconds, nil, pending.done)
+		pending.timeout.Stop()
+		pending.timeout = m.clock.NewTimer(timeout)
+		pending.shortened = true
 		return nil, nil
 	}
 
@@ -449,6 +518,9 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 		}
 		if m.evictPod(logger, pod, gracePeriodOverride, message, annotations, condition) {
 			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
+			if m.pendingEviction != nil {
+				return nil, nil
+			}
 			return []*v1.Pod{pod}, nil
 		}
 	}
@@ -456,13 +528,17 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 	return nil, nil
 }
 
-func (m *managerImpl) waitForPodsCleanup(logger klog.Logger, podCleanedUpFunc PodCleanedUpFunc, pods []*v1.Pod) {
+func (m *managerImpl) waitForPodsCleanup(ctx context.Context, podCleanedUpFunc PodCleanedUpFunc, pods []*v1.Pod) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjSlice(pods))
 	timeout := m.clock.NewTimer(podCleanupTimeout)
 	defer timeout.Stop()
 	ticker := m.clock.NewTicker(podCleanupPollFreq)
 	defer ticker.Stop()
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-timeout.C():
 			logger.Info("Eviction manager: timed out waiting for pods to be cleaned up", "pods", klog.KObjSlice(pods))
 			return
@@ -481,7 +557,7 @@ func (m *managerImpl) waitForPodsCleanup(logger klog.Logger, podCleanedUpFunc Po
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
-func (m *managerImpl) reclaimNodeLevelResources(ctx context.Context, signalToReclaim evictionapi.Signal, resourceToReclaim v1.ResourceName) bool {
+func (m *managerImpl) reclaimNodeLevelResources(ctx context.Context, signalToReclaim evictionapi.Signal, resourceToReclaim v1.ResourceName, reclaimThresholds []evictionapi.Threshold) bool {
 	logger := klog.FromContext(ctx)
 	nodeReclaimFuncs := m.signalToNodeReclaimFuncs[signalToReclaim]
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
@@ -504,7 +580,7 @@ func (m *managerImpl) reclaimNodeLevelResources(ctx context.Context, signalToRec
 
 		// evaluate all thresholds independently of their grace period to see if with
 		// the new observations, we think we have met min reclaim goals
-		thresholds := thresholdsMet(logger, m.config.Thresholds, observations, true)
+		thresholds := thresholdsMet(logger, reclaimThresholds, observations, true)
 		debugLogThresholdsWithObservation(logger, "thresholds after resource reclaim - ignoring grace period", thresholds, observations)
 
 		if len(thresholds) == 0 {
@@ -663,9 +739,8 @@ func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverr
 	// record that we are evicting the pod
 	//nolint:forbidigo // Legacy usage
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, "%s", evictMsg)
-	// this is a blocking call and should only return when the pod and its containers are killed.
 	logger.V(3).Info("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
-	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
+	done, timeout := m.startPodEviction(pod, gracePeriodOverride, func(status *v1.PodStatus) {
 		status.Phase = v1.PodFailed
 		status.Reason = Reason
 		status.Message = evictMsg
@@ -673,11 +748,30 @@ func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverr
 			condition.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.DisruptionTarget)
 			podutil.UpdatePodCondition(status, condition)
 		}
-	})
-	if err != nil {
-		logger.Error(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
-	} else {
+	}, nil)
+	select {
+	case <-done:
 		logger.Info("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
+		return true
+	default:
+	}
+	if gracePeriodOverride > immediateEvictionGracePeriodSeconds {
+		m.pendingEviction = &pendingEviction{pod: pod, done: done, timeout: m.clock.NewTimer(timeout)}
+		return true
+	}
+
+	timer := m.clock.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-done:
+		logger.Info("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
+	case <-timer.C():
+		m.reportEvictionTimeout(logger, pod)
 	}
 	return true
+}
+
+func (m *managerImpl) reportEvictionTimeout(logger klog.Logger, pod *v1.Pod) {
+	m.recorder.Eventf(pod, v1.EventTypeWarning, events.ExceededGracePeriod, "Container runtime did not kill the pod within specified grace period.")
+	logger.Error(fmt.Errorf("timeout waiting to kill pod"), "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
 }

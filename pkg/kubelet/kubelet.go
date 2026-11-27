@@ -1149,7 +1149,7 @@ func NewMainKubelet(ctx context.Context,
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
-		killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
+		startPodEviction(ctx, klet.podWorkers), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
 
 	klet.evictionManager = evictionManager
 	handlers := []lifecycle.PodAdmitHandler{}

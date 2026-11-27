@@ -411,7 +411,7 @@ func newTestKubeletWithImageList(
 	}
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{},
-		killPodNow(tCtx, kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
+		startPodEviction(tCtx, kubelet.podWorkers), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
 
 	kubelet.evictionManager = evictionManager
 	handlers := []lifecycle.PodAdmitHandler{}
