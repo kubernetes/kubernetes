@@ -126,7 +126,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 	if typeParams.Tags.GenerateClient || hasTypeMetaField(t) {
 		g.generateIsApplyConfiguration(typeParams.ApplyConfig.ApplyConfiguration, sw)
 	}
-	g.generateWithFuncs(t, typeParams, sw, nil, &[]string{})
+	g.generateWithFuncs(t, typeParams, sw, nil, &[]string{}, sets.New[string]())
 	g.generateGetters(t, typeParams, sw, nil)
 	return sw.Error()
 }
@@ -190,7 +190,20 @@ func (g *applyConfigurationGenerator) generateGetters(t *types.Type, typeParams 
 }
 
 func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams,
-	generated *[]string) {
+	generated *[]string, shadowed sets.Set[string]) {
+	// Fields declared on this type that are included in the apply configuration
+	// shadow fields promoted from its embedded types with the same name (see
+	// the Go spec's rules for selectors).
+	directNames := sets.New[string]()
+	for _, member := range t.Members {
+		if member.Embedded || blocklisted(t, member) {
+			continue
+		}
+		if _, ok := lookupJSONTags(member); ok {
+			directNames.Insert(member.Name)
+		}
+	}
+
 	for _, member := range t.Members {
 		if blocklisted(t, member) {
 			continue
@@ -200,6 +213,10 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 			memberType = &types.Type{Kind: types.Pointer, Elem: memberType}
 		}
 		if jsonTags, ok := lookupJSONTags(member); ok {
+			if !member.Embedded && shadowed.Has(member.Name) {
+				klog.V(5).Infof("With%s is shadowed by a field on an outer type, skipping\n", member.Name)
+				continue
+			}
 			if slices.Contains(*generated, member.Name) {
 				klog.V(5).Infof("With%s already generated on %s, skipping\n", member.Name, t.Name)
 				continue
@@ -213,7 +230,7 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 				EmbeddedIn: embed,
 			}
 			if memberParams.Member.Embedded {
-				g.generateWithFuncs(member.Type, typeParams, sw, &memberParams, generated)
+				g.generateWithFuncs(member.Type, typeParams, sw, &memberParams, generated, shadowed.Union(directNames))
 				if !jsonTags.inline {
 					// non-inlined embeds are nillable and need a "ensure exists" utility function
 					sw.Do(ensureEmbedExists, memberParams)

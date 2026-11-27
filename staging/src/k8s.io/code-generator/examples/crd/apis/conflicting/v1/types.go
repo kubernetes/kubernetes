@@ -33,6 +33,8 @@ type TestType struct {
 	Status TestTypeStatus `json:"status,omitempty"`
 
 	TestEmbeddedType `json:"embedded"`
+
+	Shadowed TestTypeWithShadowedField `json:"shadowed,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -61,4 +63,12 @@ type TestTypeEmbeddedStatus struct {
 type TestEmbeddedType struct {
 	Kind      string `json:"kind"`
 	Namespace string `json:"namespace"`
+}
+
+// TestTypeWithShadowedField has a field that shadows a field promoted from an
+// inlined embedded type. The direct field must win, matching Go's field
+// promotion rules and encoding/json.
+type TestTypeWithShadowedField struct {
+	TestEmbeddedType `json:",inline"`
+	Kind             string `json:"kind"`
 }
