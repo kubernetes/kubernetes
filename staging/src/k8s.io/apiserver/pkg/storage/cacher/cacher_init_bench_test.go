@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -59,8 +60,11 @@ func BenchmarkCacherInit(b *testing.B) {
 		for _, concurrentDecode := range []bool{false, true} {
 			name := fmt.Sprintf("RangeStream=%v/ConcurrentDecode=%v", rangeStream, concurrentDecode)
 			b.Run(name, func(b *testing.B) {
+				if !concurrentDecode {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(b, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 38))
+					featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, false)
+				}
 				featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
-				featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, concurrentDecode)
 
 				b.ResetTimer()
 				b.ReportAllocs()
