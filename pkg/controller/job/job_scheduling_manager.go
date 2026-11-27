@@ -138,14 +138,20 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 	}
 
 	// Case 2 - manage both Workload and PodGroup (root Job).
-	// Runs before the Workload lookup so a suspended Job's PodGroup is
-	// deleted even when its Workload is gone.
+	// Look up the Workload once and reuse it for suspend deletion and
+	// ensureWorkload. Delete the PodGroup before validating/creating so a
+	// suspended Job still drops its PodGroup when the Workload is gone or
+	// invalid.
+	wl, err := jm.getWorkload(job.Namespace, workloadbuilder.GenerateWorkloadName(job.Name, job.UID))
+	if err != nil {
+		return nil, err
+	}
 	if jobSuspended(job) {
-		if err := jm.deleteSuspendedRootPodGroup(ctx, job); err != nil {
+		if err := jm.deleteSuspendedRootPodGroup(ctx, job, wl); err != nil {
 			return nil, err
 		}
 	}
-	wl, err := jm.getOrCreateWorkload(ctx, job, canCreateWorkload(job, pods))
+	wl, err = jm.ensureWorkload(ctx, job, wl, canCreateWorkload(job, pods))
 	if err != nil || wl == nil {
 		return nil, err
 	}
@@ -429,12 +435,8 @@ func canCreatePodGroup(job *batch.Job, pods []*v1.Pod) bool {
 // The PodGroup is named after the Workload's template, which a reused Workload
 // may name differently from the Job. The Job's own template name covers a
 // Workload that is gone.
-func (jm *Controller) deleteSuspendedRootPodGroup(ctx context.Context, job *batch.Job) error {
+func (jm *Controller) deleteSuspendedRootPodGroup(ctx context.Context, job *batch.Job, wl *schedulingv1beta1.Workload) error {
 	workloadName := workloadbuilder.GenerateWorkloadName(job.Name, job.UID)
-	wl, err := jm.getWorkload(job.Namespace, workloadName)
-	if err != nil {
-		return err
-	}
 	templateName := podGroupTemplateName(job)
 	if wl != nil && len(wl.Spec.PodGroupTemplates) == 1 {
 		templateName = wl.Spec.PodGroupTemplates[0].Name
@@ -499,16 +501,12 @@ func (jm *Controller) deleteSuspendedPodGroup(ctx context.Context, job *batch.Jo
 	return nil
 }
 
-// getOrCreateWorkload returns the Workload for this root Job, looked up by the
-// deterministic name. An unsupported object at that name blocks the Job.
-// Returns (nil, nil) when no Workload exists and canCreate is false.
-func (jm *Controller) getOrCreateWorkload(ctx context.Context,
-	job *batch.Job, canCreate bool) (*schedulingv1beta1.Workload, error) {
-	name := workloadbuilder.GenerateWorkloadName(job.Name, job.UID)
-	wl, err := jm.getWorkload(job.Namespace, name)
-	if err != nil {
-		return nil, err
-	}
+// ensureWorkload returns the Workload for this root Job. wl is the object
+// already looked up by the deterministic name (may be nil). An unsupported
+// object at that name blocks the Job. Returns (nil, nil) when no Workload
+// exists and canCreate is false.
+func (jm *Controller) ensureWorkload(ctx context.Context, job *batch.Job,
+	wl *schedulingv1beta1.Workload, canCreate bool) (*schedulingv1beta1.Workload, error) {
 	if wl == nil {
 		if !canCreate {
 			return nil, nil

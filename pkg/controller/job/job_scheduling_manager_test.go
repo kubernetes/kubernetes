@@ -833,6 +833,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 					return pg
 				}(),
 			},
+			wantWorkloadsInAPI: []string{workloadName},
 			wantPodGroupsInAPI: []string{podGroupName},
 		},
 		"suspended root Job whose Workload is invalid still deletes its PodGroup": {
@@ -847,6 +848,16 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingPodGroups:  []*schedulingv1beta1.PodGroup{makePodGroup(podGroupName, workloadName)},
 			wantErr:            true,
 			wantBlockReason:    ReasonInvalidSchedulingObjects,
+			wantWorkloadsInAPI: []string{workloadName},
+			wantPodGroupsInAPI: []string{},
+		},
+		"suspended root Job whose Workload controllerRef is not the Job still deletes its PodGroup": {
+			job:                suspendedJob,
+			existingWorkloads:  []*schedulingv1beta1.Workload{makeWorkload(workloadName, "someone-else")},
+			existingPodGroups:  []*schedulingv1beta1.PodGroup{makePodGroup(podGroupName, workloadName)},
+			wantErr:            true,
+			wantBlockReason:    ReasonInvalidSchedulingObjects,
+			wantWorkloadsInAPI: []string{workloadName},
 			wantPodGroupsInAPI: []string{},
 		},
 		"suspend deletes the PodGroup of a reused Workload whose template name differs from the Job's": {
