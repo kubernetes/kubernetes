@@ -30,6 +30,11 @@ type Duration struct {
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
 func (d *Duration) UnmarshalJSON(b []byte) error {
+	if len(b) == 4 && string(b) == "null" {
+		d.Duration = 0
+		return nil
+	}
+
 	var str string
 	err := json.Unmarshal(b, &str)
 	if err != nil {

@@ -56,6 +56,8 @@ func TestDurationUnmarshalYAML(t *testing.T) {
 		result Duration
 	}{
 		{"d: 0s\n", Duration{}},
+		{"d: null\n", Duration{}},
+		{"d:\n", Duration{}},
 		{"d: 5s\n", Duration{5 * time.Second}},
 		{"d: 2m0s\n", Duration{2 * time.Minute}},
 		{"d: 1h0m0.003s\n", Duration{time.Hour + 3*time.Millisecond}},
@@ -104,6 +106,7 @@ func TestDurationUnmarshalJSON(t *testing.T) {
 		result Duration
 	}{
 		{`{"d":"0s"}`, Duration{}},
+		{`{"d":null}`, Duration{}},
 		{`{"d":"5s"}`, Duration{5 * time.Second}},
 		{`{"d":"2m0s"}`, Duration{2 * time.Minute}},
 		{`{"d":"1h0m0.003s"}`, Duration{time.Hour + 3*time.Millisecond}},
