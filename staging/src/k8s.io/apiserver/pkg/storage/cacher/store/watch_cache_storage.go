@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"context"
 	"fmt"
 	"iter"
 	"sort"
@@ -30,11 +31,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func NewWatchCacheStorage(indexers *cache.Indexers) *WatchCacheStorage {
+func NewWatchCacheStorage(indexers *cache.Indexers, detectMutations bool) *WatchCacheStorage {
 	storage := &WatchCacheStorage{
 		store:     newBtreeStore(btreeDegree),
 		indexer:   newIndexer(ElementIndexers(indexers)),
 		snapshots: newSnapshotter(utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot)),
+	}
+	if detectMutations {
+		storage.mutationDetector = &mutationDetector{}
 	}
 	storage.latestSnapshot.Store(storage.store.Clone())
 	return storage
@@ -50,6 +54,18 @@ type WatchCacheStorage struct {
 	store     btreeStore
 	indexer   indexer
 	snapshots snapshotter
+
+	mutationDetector *mutationDetector
+}
+
+// CheckMutations checks for changes to tracked objects since they were cached.
+// The caller decides when and how often to run the check.
+//
+// This check is intended for CI and deliberately panics when it detects a mutation.
+func (w *WatchCacheStorage) CheckMutations(ctx context.Context) {
+	if w.mutationDetector != nil {
+		w.mutationDetector.checkMutations(ctx)
+	}
 }
 
 func (w *WatchCacheStorage) SnapshottingEnabled() bool {
@@ -175,6 +191,9 @@ func (w *WatchCacheStorage) UpdateStore(eventType watch.EventType, elem *Element
 	defer w.lock.Unlock()
 	switch eventType {
 	case watch.Added, watch.Modified:
+		if w.mutationDetector != nil {
+			w.mutationDetector.track(elem)
+		}
 		prev = w.store.addOrUpdateElem(elem, resourceVersion)
 		err = w.indexer.updateElem(elem.Key, prev, elem, resourceVersion)
 	case watch.Deleted:
@@ -210,6 +229,11 @@ func (w *WatchCacheStorage) CompactSnapshotsLocked(oldestRV uint64) {
 func (w *WatchCacheStorage) Replace(toReplace []*Element, version uint64) error {
 	w.lock.Lock()
 	defer w.lock.Unlock()
+	if w.mutationDetector != nil {
+		for _, elem := range toReplace {
+			w.mutationDetector.track(elem)
+		}
+	}
 	w.store.Replace(toReplace, version)
 	if err := w.indexer.Replace(toReplace, version); err != nil {
 		return err

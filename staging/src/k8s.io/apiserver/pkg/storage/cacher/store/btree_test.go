@@ -29,7 +29,7 @@ import (
 )
 
 func TestStoreListOrdered(t *testing.T) {
-	store := NewWatchCacheStorage(nil)
+	store := NewWatchCacheStorage(nil, false)
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)
@@ -49,7 +49,7 @@ func TestStoreListOrdered(t *testing.T) {
 }
 
 func TestStoreListPrefix(t *testing.T) {
-	store := NewWatchCacheStorage(nil)
+	store := NewWatchCacheStorage(nil, false)
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo3", "bar3", 1), 1)
 	require.NoError(t, err)
 	assert.Nil(t, prev)

@@ -18,7 +18,9 @@ package store
 
 import (
 	"fmt"
+	goruntime "runtime"
 	"testing"
+	"weak"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +38,7 @@ func TestWatchCacheStorageMarkConsistent(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(indexers)
+	s := NewWatchCacheStorage(indexers, false)
 
 	assert.True(t, s.SnapshottingEnabled())
 
@@ -79,7 +81,7 @@ func TestLatestSnapshot(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(indexers)
+	s := NewWatchCacheStorage(indexers, false)
 
 	before := s.LatestSnapshot()
 	assert.Equal(t, uint64(0), before.ResourceVersion())
@@ -123,7 +125,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(indexers)
+	s := NewWatchCacheStorage(indexers, false)
 
 	t.Log("Initially no snapshots exist, should return ResourceExpired error")
 	assert.False(t, s.CanServeExactRV(20))
@@ -193,7 +195,7 @@ func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
 // from the compacted one up to the latest one it observed.
 func TestWatchCacheStorageOldestExactRVAfterCompact(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
-	s := NewWatchCacheStorage(&cache.Indexers{})
+	s := NewWatchCacheStorage(&cache.Indexers{}, false)
 	write := func(rv int) {
 		_, err := s.UpdateStore(watch.Added, testStorageElement(fmt.Sprint(rv), "", rv), uint64(rv))
 		require.NoError(t, err)
@@ -217,6 +219,41 @@ func TestWatchCacheStorageOldestExactRVAfterCompact(t *testing.T) {
 	t.Log("Write after compact past last write")
 	write(40)
 	assert.Equal(t, "rv=22 keys=[10 20]", oldestExactSnapshot(t, s))
+}
+
+func TestMutationDetectorCompaction(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+	const (
+		key      = "/pods/ns/target"
+		addRV    = 42
+		deleteRV = 43
+	)
+	cacheStorage := NewWatchCacheStorage(nil, true)
+	element := &Element{
+		Key:    key,
+		Object: makePodFn("ns", "target", fmt.Sprint(addRV)),
+	}
+	_, err := cacheStorage.UpdateStore(watch.Added, element, addRV)
+	require.NoError(t, err)
+	elementRef := weak.Make(element)
+
+	// Drop the current entry so only the historical snapshot keeps the element alive.
+	_, err = cacheStorage.UpdateStore(watch.Deleted, &Element{Key: key}, deleteRV)
+	require.NoError(t, err)
+
+	// Verify that the historical snapshot keeps the element tracked across GC.
+	goruntime.GC()
+	cacheStorage.CheckMutations(t.Context())
+	_, tracked := cacheStorage.mutationDetector.baselines.Load(elementRef)
+	require.True(t, tracked, "the baseline should survive while the historical snapshot exists")
+
+	cacheStorage.Compact(deleteRV)
+	// Let GC clear the weak key so the next scan can remove its baseline.
+	goruntime.GC()
+	cacheStorage.CheckMutations(t.Context())
+	_, tracked = cacheStorage.mutationDetector.baselines.Load(elementRef)
+	require.False(t, tracked, "the baseline should be removed after compaction")
 }
 
 func oldestExactSnapshot(t *testing.T, s *WatchCacheStorage) string {
@@ -254,7 +291,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
 	indexers := &cache.Indexers{}
-	s := NewWatchCacheStorage(indexers)
+	s := NewWatchCacheStorage(indexers, false)
 
 	assert.True(t, s.SnapshottingEnabled(), "Expected snapshotting to be enabled when feature gate is active")
 
@@ -392,7 +429,7 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 }
 
 func TestStoreSingleKey(t *testing.T) {
-	store := NewWatchCacheStorage(testStoreIndexers())
+	store := NewWatchCacheStorage(testStoreIndexers(), false)
 	assertStoreEmpty(t, store, "foo", 0)
 
 	prev, err := store.UpdateStore(watch.Added, testStorageElement("foo", "bar", 1), 1)
@@ -431,7 +468,7 @@ func TestStoreSingleKey(t *testing.T) {
 }
 
 func TestStoreIndexerSingleKey(t *testing.T) {
-	store := NewWatchCacheStorage(testStoreIndexers())
+	store := NewWatchCacheStorage(testStoreIndexers(), false)
 	snap, err := store.GetByIndexSnapshot("by_val", "bar")
 	require.NoError(t, err)
 	assert.Equal(t, uint64(0), snap.ResourceVersion())
