@@ -224,14 +224,12 @@ func TestMemoryIdenticalConversion(t *testing.T) {
 		"Deployment.apps",
 		"Event.events.k8s.io",
 		"HorizontalPodAutoscaler.autoscaling",
-		"MutatingWebhookConfiguration.admissionregistration.k8s.io",
 		"Node",
 		"PodCertificateRequest.certificates.k8s.io",
 		"PriorityLevelConfiguration.flowcontrol.apiserver.k8s.io",
 		"ReplicaSet.apps",
 		"Secret",
 		"StatefulSet.apps",
-		"ValidatingWebhookConfiguration.admissionregistration.k8s.io",
 
 		// Legacy unserved groups/types that share internal hub types with newer groups:
 		"DaemonSet.extensions",
