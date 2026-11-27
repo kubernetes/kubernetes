@@ -767,6 +767,111 @@ func NewRevisionDeletePodFailure(t *testing.T, set *apps.StatefulSet, invariants
 	}
 }
 
+func TestUpdateStatefulSetCurrentReplicasSkipsNonCurrentRevisionDelete(t *testing.T) {
+	tests := []struct {
+		name                 string
+		podRevision          string
+		enableMaxUnavailable bool
+		parallel             bool
+		podReady             bool
+		wantCurrentReplicas  int32
+	}{
+		{
+			name:                "intermediate revision delete does not go negative",
+			podRevision:         "rev-2",
+			podReady:            true,
+			wantCurrentReplicas: 0,
+		},
+		{
+			name:                "current revision delete still decrements",
+			podRevision:         "rev-1",
+			podReady:            true,
+			wantCurrentReplicas: 0,
+		},
+		{
+			name:                 "maxUnavailable ordered: intermediate revision delete does not go negative",
+			podRevision:          "rev-2",
+			enableMaxUnavailable: true,
+			podReady:             true,
+			wantCurrentReplicas:  0,
+		},
+		{
+			name:                 "maxUnavailable parallel available: intermediate revision delete does not go negative",
+			podRevision:          "rev-2",
+			enableMaxUnavailable: true,
+			parallel:             true,
+			podReady:             true,
+			wantCurrentReplicas:  0,
+		},
+		{
+			name:                 "maxUnavailable parallel unavailable: intermediate revision delete does not go negative",
+			podRevision:          "rev-2",
+			enableMaxUnavailable: true,
+			parallel:             true,
+			podReady:             false,
+			wantCurrentReplicas:  0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, tc.enableMaxUnavailable)
+
+			set := newStatefulSet(1)
+			if tc.parallel {
+				set.Spec.PodManagementPolicy = apps.ParallelPodManagement
+			}
+			if tc.enableMaxUnavailable {
+				set.Spec.UpdateStrategy.RollingUpdate = &apps.RollingUpdateStatefulSetStrategy{
+					Partition:      ptr.To[int32](0),
+					MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+				}
+			}
+			client := fake.NewClientset(set)
+			om, _, sscIface := setupController(client)
+			ssc := sscIface.(*defaultStatefulSetControl)
+
+			currentRevision := newRevisionOrDie(set, 1)
+			currentRevision.Name = "rev-1"
+
+			updateSet := set.DeepCopy()
+			updateSet.Spec.Template.Spec.Containers[0].Image = "nginx-v3"
+			updateRevision := newRevisionOrDie(updateSet, 3)
+			updateRevision.Name = "rev-3"
+
+			now := time.Now()
+			pod := newStatefulSetPod(set, 0)
+			pod.Status.Phase = v1.PodRunning
+			readyStatus := v1.ConditionFalse
+			readyFor := time.Time{}
+			if tc.podReady {
+				readyStatus = v1.ConditionTrue
+				readyFor = now.Add(-time.Hour)
+			}
+			pod.Status.Conditions = []v1.PodCondition{{
+				Type:               v1.PodReady,
+				Status:             readyStatus,
+				LastTransitionTime: metav1.Time{Time: readyFor},
+			}}
+			setPodRevision(pod, tc.podRevision)
+			fakeResourceVersion(pod)
+			if err := om.podsIndexer.Add(pod); err != nil {
+				t.Fatalf("failed to add pod: %v", err)
+			}
+
+			status, err := ssc.updateStatefulSet(context.TODO(), set, currentRevision, updateRevision, 0, []*v1.Pod{pod}, now)
+			if err != nil {
+				t.Fatalf("updateStatefulSet returned error: %v", err)
+			}
+			if status.CurrentReplicas != tc.wantCurrentReplicas {
+				t.Fatalf("CurrentReplicas: want %d, got %d", tc.wantCurrentReplicas, status.CurrentReplicas)
+			}
+			if status.CurrentReplicas < 0 {
+				t.Fatalf("CurrentReplicas went negative: %d", status.CurrentReplicas)
+			}
+		})
+	}
+}
+
 func emptyInvariants(set *apps.StatefulSet, om *fakeObjectManager) error {
 	return nil
 }

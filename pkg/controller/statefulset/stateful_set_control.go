@@ -806,7 +806,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
 				return &status, err
 			}
-			status.CurrentReplicas--
+			if getPodRevision(replicas[target]) == status.CurrentRevision {
+				status.CurrentReplicas--
+			}
 			return &status, err
 		}
 
@@ -947,7 +949,9 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 				if err := ssc.podControl.DeleteStatefulPod(set, pod); err != nil {
 					return &status, err
 				}
-				status.CurrentReplicas--
+				if getPodRevision(pod) == status.CurrentRevision {
+					status.CurrentReplicas--
+				}
 			}
 		}
 
@@ -964,7 +968,9 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 					return &status, err
 				}
 				remainingBudget--
-				status.CurrentReplicas--
+				if getPodRevision(pod) == status.CurrentRevision {
+					status.CurrentReplicas--
+				}
 			}
 		}
 		return &status, nil
@@ -984,7 +990,9 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 				return &status, err
 			}
 			deletedPods++
-			status.CurrentReplicas--
+			if getPodRevision(replicas[target]) == status.CurrentRevision {
+				status.CurrentReplicas--
+			}
 		}
 	}
 	return &status, nil
