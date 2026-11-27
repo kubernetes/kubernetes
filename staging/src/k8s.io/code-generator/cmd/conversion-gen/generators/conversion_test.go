@@ -17,8 +17,11 @@ limitations under the License.
 package generators
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
+	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -230,5 +233,96 @@ func TestCanUseMemoryCopyConversion(t *testing.T) {
 				t.Errorf("canUseMemoryCopyConversion() = %v, want %v", gotOK, tt.want)
 			}
 		})
+	}
+}
+
+func TestCrossPackageGeneratedConversions(t *testing.T) {
+	const (
+		fooTypesPkg    = "k8s.io/api/foo/v1"
+		fooInternalPkg = "k8s.io/kubernetes/pkg/apis/foo"
+		fooOutputPkg   = "k8s.io/kubernetes/pkg/apis/foo/v1"
+		barTypesPkg    = "k8s.io/api/bar/v1"
+		barInternalPkg = "k8s.io/kubernetes/pkg/apis/bar"
+		barOutputPkg   = "k8s.io/kubernetes/pkg/apis/bar/v1"
+	)
+	str := builtin("string")
+	innerExt := structOf(fooTypesPkg, "Inner", field("Name", str))
+	innerInt := structOf(fooInternalPkg, "Inner", field("Name", str))
+	optedOutExt := structOf(fooTypesPkg, "OptedOut", field("Name", str))
+	optedOutExt.CommentLines = []string{"+k8s:conversion-gen=false"}
+	optedOutInt := structOf(fooInternalPkg, "OptedOut", field("Name", str))
+	manualExt := structOf(fooTypesPkg, "Manual", field("Name", str))
+	manualInt := structOf(fooInternalPkg, "Manual", field("Name", str))
+
+	universe := types.Universe{}
+	for _, typ := range []*types.Type{innerExt, innerInt, optedOutExt, optedOutInt, manualExt, manualInt} {
+		universe.Package(typ.Name.Package).Types[typ.Name.Name] = typ
+	}
+	c := &generator.Context{Namers: NameSystems(), Universe: universe}
+
+	manualConversions := conversionFuncMap{{manualExt, manualInt}: conversionFn()}
+	generated := conversionFuncMap{}
+	getGeneratedConversionFunctions(c, universe.Package(fooOutputPkg), universe.Package(fooTypesPkg), []string{fooInternalPkg}, manualConversions, generated)
+
+	want := conversionFuncMap{
+		{innerExt, innerInt}:   {Name: types.Name{Package: fooOutputPkg, Name: "Convert_v1_Inner_To_foo_Inner"}, Kind: types.DeclarationOf},
+		{innerInt, innerExt}:   {Name: types.Name{Package: fooOutputPkg, Name: "Convert_foo_Inner_To_v1_Inner"}, Kind: types.DeclarationOf},
+		{manualInt, manualExt}: {Name: types.Name{Package: fooOutputPkg, Name: "Convert_foo_Manual_To_v1_Manual"}, Kind: types.DeclarationOf},
+	}
+	if len(generated) != len(want) {
+		t.Errorf("got %d generated conversions, want %d: %v", len(generated), len(want), generated)
+	}
+	for pair, wantFn := range want {
+		gotFn, ok := generated[pair]
+		if !ok {
+			t.Errorf("missing generated conversion %v -> %v", pair.inType, pair.outType)
+			continue
+		}
+		if gotFn.Name != wantFn.Name || gotFn.Kind != wantFn.Kind {
+			t.Errorf("generated conversion %v -> %v = %v (%v), want %v (%v)", pair.inType, pair.outType, gotFn.Name, gotFn.Kind, wantFn.Name, wantFn.Kind)
+		}
+	}
+
+	// A type in another API group that references the foo types must call
+	// the functions generated into the foo output package.
+	outerExt := structOf(barTypesPkg, "Outer",
+		field("Inner", innerExt),
+		field("Pointer", &types.Type{Kind: types.Pointer, Elem: innerExt}),
+		field("Slice", &types.Type{Kind: types.Slice, Elem: innerExt}),
+		field("Map", &types.Type{Kind: types.Map, Key: str, Elem: innerExt}),
+	)
+	outerInt := structOf(barInternalPkg, "Outer",
+		field("Inner", innerInt),
+		field("Pointer", &types.Type{Kind: types.Pointer, Elem: innerInt}),
+		field("Slice", &types.Type{Kind: types.Slice, Elem: innerInt}),
+		field("Map", &types.Type{Kind: types.Map, Key: str, Elem: innerInt}),
+	)
+	g := NewGenConversion("zz_generated.conversion.go", barTypesPkg, barOutputPkg, manualConversions, generated, []string{barInternalPkg}, noEquality{}).(*genConversion)
+	for name, namer := range g.Namers(c) {
+		c.Namers[name] = namer
+	}
+	for _, tc := range []struct {
+		in, out *types.Type
+		wantFn  string
+	}{
+		{outerExt, outerInt, "Convert_v1_Inner_To_foo_Inner("},
+		{outerInt, outerExt, "Convert_foo_Inner_To_v1_Inner("},
+	} {
+		buffer := &bytes.Buffer{}
+		sw := generator.NewSnippetWriter(buffer, c, "$", "$")
+		g.generateFor(tc.in, tc.out, sw)
+		if err := sw.Error(); err != nil {
+			t.Fatalf("generateFor(%v, %v) failed: %v", tc.in, tc.out, err)
+		}
+		got := buffer.String()
+		if strings.Contains(got, "compileErrorOnMissingConversion") {
+			t.Errorf("generateFor(%v, %v) did not find the generated conversion function:\n%s", tc.in, tc.out, got)
+		}
+		if n := strings.Count(got, tc.wantFn); n != 4 {
+			t.Errorf("generateFor(%v, %v) calls %s %d times, want 4:\n%s", tc.in, tc.out, tc.wantFn, n, got)
+		}
+	}
+	if imports := strings.Join(g.Imports(c), "\n"); !strings.Contains(imports, `"`+fooOutputPkg+`"`) {
+		t.Errorf("expected an import of %q, got:\n%s", fooOutputPkg, imports)
 	}
 }
