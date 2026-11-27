@@ -275,6 +275,10 @@ type cpuAccumulator struct {
 	// number of CPUS. When a CPU is claimed, it's removed from `details`.
 	details topology.CPUDetails
 
+	// `nestedGroups` holds the CPUs of each nested uncore cache group of `topo` by layer,
+	// filled on first use.
+	nestedGroups map[int]map[int]cpuset.CPUSet
+
 	// `numCPUsNeeded` is the number of CPUs that the accumulator still needs to accumulate to reach
 	// the desired number of CPUs. When the cpuAccumulator is created, `numCPUsNeeded` is set to the
 	// total number of CPUs to accumulate. Every time a CPU is claimed, `numCPUsNeeded` is decreased
@@ -613,6 +617,279 @@ func (a *cpuAccumulator) takePartialUncore(uncoreID int) {
 	a.take(freeCPUs)
 }
 
+// alignsNestedUncoreCaches tells whether to pick CPUs by nested uncore cache groups.
+// Only when no core has SMT: CPUsPerCore() rounds a hybrid CPU down to 1, so the
+// CPU and core counts are compared instead.
+func (a *cpuAccumulator) alignsNestedUncoreCaches() bool {
+	return a.topo.NumCPUs == a.topo.NumCores && a.topo.CPUDetails.NestedUncoreCacheLayers() > 0
+}
+
+// takePartialUncoreByNestedCaches takes the CPUs still needed from the uncore cache
+// where they fit most cleanly into the nested groups. A tie goes to the first in
+// `uncores`, the one with the fewest free CPUs.
+func (a *cpuAccumulator) takePartialUncoreByNestedCaches(uncores []int) {
+	var best cpuset.CPUSet
+	var bestShared []int
+	wholeSizeSeen := map[int]bool{}
+	for _, uncoreID := range uncores {
+		free := a.details.CPUsInUncoreCaches(uncoreID)
+		if free.Size() < a.numCPUsNeeded {
+			continue
+		}
+		// wholly free uncore caches of one size are alike, try the first only
+		if size := a.topo.CPUDetails.CPUsInUncoreCaches(uncoreID).Size(); free.Size() == size {
+			if wholeSizeSeen[size] {
+				continue
+			}
+			wholeSizeSeen[size] = true
+		}
+		pick := a.selectByNestedUncoreCaches(0, free, a.numCPUsNeeded)
+		if shared := a.sharedNestedGroups(0, pick); bestShared == nil || cleaner(shared, bestShared) {
+			bestShared, best = shared, pick
+		}
+	}
+	a.logger.V(4).Info("takePartialUncore: tried the uncore caches by nested uncore caches",
+		"needed", a.numCPUsNeeded,
+		"claimed", bestShared != nil,
+		"cpus", best.String())
+	if bestShared != nil {
+		a.take(best)
+	}
+}
+
+// nestedUncoreGroups returns the CPUs of each nested uncore cache group of a layer,
+// by group id.
+func (a *cpuAccumulator) nestedUncoreGroups(layer int) map[int]cpuset.CPUSet {
+	if groups, ok := a.nestedGroups[layer]; ok {
+		return groups
+	}
+	if a.nestedGroups == nil {
+		a.nestedGroups = map[int]map[int]cpuset.CPUSet{}
+	}
+	a.nestedGroups[layer] = a.topo.CPUDetails.NestedUncoreCacheGroups(layer)
+	return a.nestedGroups[layer]
+}
+
+// sharedNestedGroups counts, per nested layer from `layer` on, the groups that cpus
+// touch but do not cover. Those stay shared or keep a hole.
+func (a *cpuAccumulator) sharedNestedGroups(layer int, cpus cpuset.CPUSet) []int {
+	details := a.topo.CPUDetails
+	var shared []int
+	for l := layer; l < details.NestedUncoreCacheLayers(); l++ {
+		touched := map[int]bool{}
+		for _, cpu := range cpus.UnsortedList() {
+			if ids := details[cpu].NestedUncoreCacheIDs; l < len(ids) {
+				touched[ids[l]] = true
+			}
+		}
+		groups := a.nestedUncoreGroups(l)
+		count := 0
+		for id := range touched {
+			if !groups[id].IsSubsetOf(cpus) {
+				count++
+			}
+		}
+		shared = append(shared, count)
+	}
+	return shared
+}
+
+// cleaner tells whether x is better than y. Outer layers decide first.
+func cleaner(x, y []int) bool {
+	for i := range x {
+		if x[i] != y[i] {
+			return x[i] < y[i]
+		}
+	}
+	return false
+}
+
+// selectByNestedUncoreCaches picks n of the free CPUs in scope (those of one group
+// of the layer above), aligned to the nested groups of the layer, with as few
+// groups as possible:
+//  1. take wholly free groups while n covers a whole group;
+//  2. put the rest in the group where it fits most cleanly in the layers below. On
+//     a tie prefer a partly used group (it fills a hole), then the one with the
+//     fewest free CPUs;
+//  3. if no group has room, split it over a few groups.
+func (a *cpuAccumulator) selectByNestedUncoreCaches(layer int, scope cpuset.CPUSet, n int) cpuset.CPUSet {
+	if n <= 0 || layer >= a.topo.CPUDetails.NestedUncoreCacheLayers() {
+		return lowestCPUs(scope, n)
+	}
+
+	type group struct {
+		id   int
+		free cpuset.CPUSet
+		size int
+	}
+	var groups []group
+	for id, cpus := range a.nestedUncoreGroups(layer) {
+		free := cpus.Intersection(scope)
+		if free.IsEmpty() {
+			continue
+		}
+		groups = append(groups, group{id: id, free: free, size: cpus.Size()})
+	}
+	// ascending number of free CPUs, then id
+	sort.SliceStable(groups, func(i, j int) bool {
+		if groups[i].free.Size() != groups[j].free.Size() {
+			return groups[i].free.Size() < groups[j].free.Size()
+		}
+		return groups[i].id < groups[j].id
+	})
+
+	result := cpuset.New()
+	taken := make([]bool, len(groups))
+	for i, g := range groups {
+		if g.free.Size() == g.size && n-result.Size() >= g.size {
+			result = result.Union(g.free)
+			taken[i] = true
+		}
+	}
+
+	for need := n - result.Size(); need > 0; need = n - result.Size() {
+		bestIdx := -1
+		var bestShared []int
+		var bestPick cpuset.CPUSet
+		wholeSizeSeen := map[int]bool{}
+		for i, g := range groups {
+			if taken[i] || g.free.Size() < need {
+				continue
+			}
+			// wholly free groups of one size are alike, try the first only
+			if g.free.Size() == g.size {
+				if wholeSizeSeen[g.size] {
+					continue
+				}
+				wholeSizeSeen[g.size] = true
+			}
+			pick := a.selectByNestedUncoreCaches(layer+1, g.free, need)
+			shared := a.sharedNestedGroups(layer, pick)
+			// a later group wins if it is cleaner, or as clean but partly used while the
+			// best is wholly free
+			better := bestIdx < 0 || cleaner(shared, bestShared) ||
+				(!cleaner(bestShared, shared) && g.free.Size() < g.size && groups[bestIdx].free.Size() == groups[bestIdx].size)
+			if better {
+				bestIdx, bestShared, bestPick = i, shared, pick
+			}
+		}
+		if bestIdx >= 0 {
+			return result.Union(bestPick)
+		}
+
+		// no group has room: split it over as few groups as possible
+		var frees []cpuset.CPUSet
+		for i, g := range groups {
+			if !taken[i] {
+				frees = append(frees, g.free)
+			}
+		}
+		if pick, ok := a.splitAcrossNestedGroups(layer, frees, need); ok {
+			return result.Union(pick)
+		}
+
+		// too many groups to search: use up the group with the most free CPUs
+		mostIdx := -1
+		for i, g := range groups {
+			if !taken[i] && (mostIdx < 0 || g.free.Size() > groups[mostIdx].free.Size()) {
+				mostIdx = i
+			}
+		}
+		if mostIdx < 0 {
+			return result.Union(lowestCPUs(scope.Difference(result), need))
+		}
+		taken[mostIdx] = true
+		result = result.Union(groups[mostIdx].free)
+	}
+	return result
+}
+
+// maxSplitGroups limits the search in splitAcrossNestedGroups, as the ways to split
+// grow fast.
+const maxSplitGroups = 3
+
+// splitAcrossNestedGroups picks need CPUs from groups of a layer when none has room
+// for all. It uses as few groups as possible and the cleanest way to divide the
+// CPUs. It returns false if more than maxSplitGroups groups are needed.
+func (a *cpuAccumulator) splitAcrossNestedGroups(layer int, frees []cpuset.CPUSet, need int) (cpuset.CPUSet, bool) {
+	order := make([]int, len(frees))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(i, j int) bool { return frees[order[i]].Size() > frees[order[j]].Size() })
+
+	k, sum := 0, 0
+	for _, i := range order {
+		k++
+		if sum += frees[i].Size(); sum >= need {
+			break
+		}
+	}
+	if sum < need || k > maxSplitGroups {
+		return cpuset.New(), false
+	}
+	// the groups with the most free CPUs, plus a few more to choose from
+	top := order[:min(len(order), k+maxSplitGroups)]
+
+	memo := map[[2]int]cpuset.CPUSet{}
+	pickFrom := func(group, n int) cpuset.CPUSet {
+		key := [2]int{group, n}
+		if pick, ok := memo[key]; ok {
+			return pick
+		}
+		memo[key] = a.selectByNestedUncoreCaches(layer+1, frees[group], n)
+		return memo[key]
+	}
+
+	var best cpuset.CPUSet
+	var bestShared []int
+	consider := func(pick cpuset.CPUSet) {
+		if shared := a.sharedNestedGroups(layer, pick); bestShared == nil || cleaner(shared, bestShared) {
+			best, bestShared = pick, shared
+		}
+	}
+	// divide tries the ways to give each chosen group at least one CPU
+	var divide func(chosen []int, remaining int, pick cpuset.CPUSet)
+	divide = func(chosen []int, remaining int, pick cpuset.CPUSet) {
+		group := chosen[0]
+		if len(chosen) == 1 {
+			if remaining >= 1 && remaining <= frees[group].Size() {
+				consider(pick.Union(pickFrom(group, remaining)))
+			}
+			return
+		}
+		later := 0
+		for _, g := range chosen[1:] {
+			later += frees[g].Size()
+		}
+		for n := max(1, remaining-later); n <= min(frees[group].Size(), remaining-len(chosen)+1); n++ {
+			divide(chosen[1:], remaining-n, pick.Union(pickFrom(group, n)))
+		}
+	}
+	var choose func(from int, chosen []int)
+	choose = func(from int, chosen []int) {
+		if len(chosen) == k {
+			divide(chosen, need, cpuset.New())
+			return
+		}
+		for i := from; i < len(top); i++ {
+			choose(i+1, append(slices.Clip(chosen), top[i]))
+		}
+	}
+	choose(0, nil)
+
+	return best, bestShared != nil
+}
+
+// lowestCPUs returns the n CPUs with the lowest ids in cpus.
+func lowestCPUs(cpus cpuset.CPUSet, n int) cpuset.CPUSet {
+	list := cpus.List()
+	if n >= len(list) {
+		return cpus
+	}
+	return cpuset.New(list[:n]...)
+}
+
 // First try to take full UncoreCache, if available and need is at least the size of the UncoreCache group.
 // Second try to take the partial UncoreCache if available and the request size can fit w/in the UncoreCache.
 func (a *cpuAccumulator) takeUncoreCache() {
@@ -624,6 +901,12 @@ func (a *cpuAccumulator) takeUncoreCache() {
 		if a.isSatisfied() {
 			return
 		}
+	}
+
+	// with nested uncore caches, use the UncoreCache where the request fits best
+	if a.alignsNestedUncoreCaches() {
+		a.takePartialUncoreByNestedCaches(uncores)
+		return
 	}
 
 	// take partial UncoreCache if the CPUs needed is less than free UncoreCache size

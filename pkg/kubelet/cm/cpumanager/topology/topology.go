@@ -18,6 +18,7 @@ package topology
 
 import (
 	"fmt"
+	"sort"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
@@ -98,6 +99,10 @@ type CPUInfo struct {
 	SocketID      int
 	CoreID        int
 	UncoreCacheID int
+	// NestedUncoreCacheIDs are the ids of the uncore caches nested inside UncoreCacheID,
+	// outermost first (for example an L2 shared by a few cores inside an L3 group).
+	// Nil if there are none.
+	NestedUncoreCacheIDs []int
 }
 
 // KeepOnly returns a new CPUDetails object with only the supplied cpus.
@@ -170,6 +175,34 @@ func (d CPUDetails) CPUsInUncoreCaches(ids ...int) cpuset.CPUSet {
 		}
 	}
 	return cpuset.New(cpuIDs...)
+}
+
+// NestedUncoreCacheLayers returns the number of nested uncore cache layers.
+func (d CPUDetails) NestedUncoreCacheLayers() int {
+	layers := 0
+	for _, info := range d {
+		if len(info.NestedUncoreCacheIDs) > layers {
+			layers = len(info.NestedUncoreCacheIDs)
+		}
+	}
+	return layers
+}
+
+// NestedUncoreCacheGroups returns the CPUs of each nested uncore cache group of a
+// layer (0 is the outermost), by group id.
+func (d CPUDetails) NestedUncoreCacheGroups(layer int) map[int]cpuset.CPUSet {
+	cpusByID := map[int][]int{}
+	for cpu, info := range d {
+		if layer < len(info.NestedUncoreCacheIDs) {
+			id := info.NestedUncoreCacheIDs[layer]
+			cpusByID[id] = append(cpusByID[id], cpu)
+		}
+	}
+	groups := make(map[int]cpuset.CPUSet, len(cpusByID))
+	for id, cpus := range cpusByID {
+		groups[id] = cpuset.New(cpus...)
+	}
+	return groups
 }
 
 // NUMANodes returns all of the NUMANode IDs associated with the CPUs in this
@@ -321,14 +354,42 @@ func (d CPUDetails) AreNUMANodesInSameSocket(numaNodes []int) bool {
 	return d.SocketsInNUMANodes(numaNodes...).Size() <= 1
 }
 
-func getUncoreCacheID(core cadvisorapi.Core) int {
-	if len(core.UncoreCaches) < 1 {
+// uncoreCacheLayers returns the id of the outermost uncore cache of a core and the
+// ids of the uncore caches nested inside it, outermost first. cadvisor reports a
+// cache shared by every core of the NUMA node in node.Caches, and one shared by
+// some of them in core.UncoreCaches. The cache with the highest level is the
+// outermost, lower levels of core.UncoreCaches are nested. If there is none, the
+// socket stands in for the outermost.
+func uncoreCacheLayers(node cadvisorapi.Node, core cadvisorapi.Core) (uncoreID int, nested []int) {
+	if len(core.UncoreCaches) < 1 && len(node.Caches) < 1 {
 		// In case cAdvisor is nil, failback to socket alignment since uncorecache is not shared
-		return core.SocketID
+		return core.SocketID, nil
 	}
-	// Even though cadvisor API returns a slice, we only expect either 0 or a 1 uncore caches,
-	// so everything past the first entry should be discarded or ignored
-	return core.UncoreCaches[0].Id
+
+	// the first cache of the highest level wins
+	var outer *cadvisorapi.Cache
+	for i := range core.UncoreCaches {
+		if outer == nil || core.UncoreCaches[i].Level > outer.Level {
+			outer = &core.UncoreCaches[i]
+		}
+	}
+	for i := range node.Caches {
+		if outer == nil || node.Caches[i].Level > outer.Level {
+			outer = &node.Caches[i]
+		}
+	}
+
+	var lower []cadvisorapi.Cache
+	for _, c := range core.UncoreCaches {
+		if c.Level < outer.Level {
+			lower = append(lower, c)
+		}
+	}
+	sort.SliceStable(lower, func(i, j int) bool { return lower[i].Level > lower[j].Level })
+	for _, c := range lower {
+		nested = append(nested, c.Id)
+	}
+	return outer.Id, nested
 }
 
 // Discover returns CPUTopology based on cadvisor node info
@@ -344,12 +405,14 @@ func Discover(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo) (*CPUTop
 		numPhysicalCores += len(node.Cores)
 		for _, core := range node.Cores {
 			if coreID, err := getUniqueCoreID(core.Threads); err == nil {
+				uncoreCacheID, nestedUncoreCacheIDs := uncoreCacheLayers(node, core)
 				for _, cpu := range core.Threads {
 					CPUDetails[cpu] = CPUInfo{
-						CoreID:        coreID,
-						SocketID:      core.SocketID,
-						NUMANodeID:    node.Id,
-						UncoreCacheID: getUncoreCacheID(core),
+						CoreID:               coreID,
+						SocketID:             core.SocketID,
+						NUMANodeID:           node.Id,
+						UncoreCacheID:        uncoreCacheID,
+						NestedUncoreCacheIDs: nestedUncoreCacheIDs,
 					}
 				}
 			} else {

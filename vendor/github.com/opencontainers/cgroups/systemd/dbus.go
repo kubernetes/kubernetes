@@ -84,7 +84,7 @@ func (d *dbusConnManager) newConnection() (*systemdDbus.Conn, error) {
 		// Exponential backoff (100ms * 2^attempt + ~12.5% jitter).
 		// At most we would expect 15 seconds of delay with 7 attempts.
 		delay := 100 * time.Millisecond << retry
-		delay += time.Duration(rand.Int64N(1 + (delay.Milliseconds() >> 3)))
+		delay += rand.N(delay/8 + 1)
 		time.Sleep(delay)
 	}
 	return nil, fmt.Errorf("dbus connection failed after several retries: %w", err)
