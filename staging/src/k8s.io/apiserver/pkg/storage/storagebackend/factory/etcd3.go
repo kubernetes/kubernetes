@@ -68,6 +68,14 @@ const (
 	// It is set to 20 seconds as times shorter than that will cause TLS connections to fail
 	// on heavily loaded arm64 CPUs (issue #64649)
 	dialTimeout = 20 * time.Second
+
+	// Sub-millisecond loopback RTT keeps gRPC's dynamic BDP estimator stuck at
+	// the 64 KiB default window, stalling high-volume watch streams on window
+	// updates and demoting etcd's 128-event watcher buffer into its 100ms
+	// unsynced resync loop. HTTP/2 windows only advertise flow-control credit,
+	// so idle connections do not pre-allocate buffer memory.
+	initialStreamWindowSize = 8 * 1024 * 1024
+	initialConnWindowSize   = 16 * 1024 * 1024
 )
 
 // TODO(negz): Stop using a package scoped logger. At the time of writing we're
@@ -308,6 +316,8 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 		}
 	}
 	dialOptions := []grpc.DialOption{
+		grpc.WithInitialWindowSize(initialStreamWindowSize),
+		grpc.WithInitialConnWindowSize(initialConnWindowSize),
 		// use chained interceptors so that the default (retry and backoff) interceptors are added.
 		// otherwise they will be overwritten by the metric interceptor.
 		//
