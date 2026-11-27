@@ -22,11 +22,18 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -38,8 +45,10 @@ type mockRangeRegistry struct {
 	err       error
 
 	updateCalled bool
+	updateCalls  int
 	updated      *api.RangeAllocation
 	updateErr    error
+	updateErrors []error
 }
 
 func (r *mockRangeRegistry) Get() (*api.RangeAllocation, error) {
@@ -49,8 +58,123 @@ func (r *mockRangeRegistry) Get() (*api.RangeAllocation, error) {
 
 func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 	r.updateCalled = true
+	r.updateCalls++
 	r.updated = alloc
+	if len(r.updateErrors) > 0 {
+		err := r.updateErrors[0]
+		r.updateErrors = r.updateErrors[1:]
+		return err
+	}
 	return r.updateErr
+}
+
+// TestRepairRunUntilRetriesInitialFailure verifies that a transient failure of
+// the initial repair is retried promptly rather than after the full repair
+// interval, which exceeds the post-start hook's one-minute timeout.
+func TestRepairRunUntilRetriesInitialFailure(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset()
+	calls := 0
+	fakeClient.PrependReactor("list", "services", func(clienttesting.Action) (bool, runtime.Object, error) {
+		calls++
+		if calls == 1 {
+			return true, nil, apierrors.NewTooManyRequests("storage is (re)initializing", 1)
+		}
+		return true, &corev1.ServiceList{}, nil
+	})
+	registry := &mockRangeRegistry{item: &api.RangeAllocation{Range: "100-200"}}
+	pr, _ := net.ParsePortRange(registry.item.Range)
+	r := NewRepair(3*time.Minute, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	t.Cleanup(func() {
+		select {
+		case <-stop:
+		default:
+			close(stop)
+		}
+		select {
+		case <-done:
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Error("repair did not stop after closing stopCh")
+		}
+	})
+	successes := 0
+	firstSuccess := make(chan struct{})
+	go func() {
+		defer close(done)
+		r.RunUntil(func() {
+			successes++
+			close(firstSuccess)
+		}, stop)
+	}()
+	select {
+	case <-firstSuccess:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("initial repair failure was not retried before the test timeout")
+	}
+	close(stop)
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("repair did not stop after closing stopCh")
+	}
+	if successes != 1 || calls != 2 || !registry.updateCalled {
+		t.Fatalf("expected one failed attempt, one successful retry and one callback, got attempts=%d, callbacks=%d, persisted=%t", calls, successes, registry.updateCalled)
+	}
+}
+
+// TestRepairFailedPersistDoesNotAdvanceLeaks verifies that retried attempts
+// that fail to persist do not advance the leak holdoff counters, which would
+// release a leaked-looking port before the observation period elapsed.
+func TestRepairFailedPersistDoesNotAdvanceLeaks(t *testing.T) {
+	conflict := apierrors.NewConflict(schema.GroupResource{Resource: "serviceallocations"}, "ports", fmt.Errorf("concurrent update"))
+	for _, failures := range []int{retry.DefaultBackoff.Steps - 1, retry.DefaultBackoff.Steps} {
+		t.Run(fmt.Sprintf("failed writes=%d", failures), func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset()
+			pr, _ := net.ParsePortRange("100-200")
+			previous, err := portallocator.NewInMemory(*pr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Allocated but not referenced by any Service: a leak candidate.
+			if err := previous.Allocate(111); err != nil {
+				t.Fatal(err)
+			}
+			snapshot := &api.RangeAllocation{}
+			if err := previous.Snapshot(snapshot); err != nil {
+				t.Fatal(err)
+			}
+			registry := &mockRangeRegistry{item: snapshot}
+			for range failures {
+				registry.updateErrors = append(registry.updateErrors, conflict)
+			}
+			r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+			if err := r.runOnce(); failures == retry.DefaultBackoff.Steps {
+				// All conflict retries exhausted: nothing persisted, nothing observed.
+				if !apierrors.IsConflict(err) || len(r.leaks) != 0 {
+					t.Fatalf("expected exhausted conflict retries without leak observations, got leaks=%v, err=%v", r.leaks, err)
+				}
+				if err := r.runOnce(); err != nil {
+					t.Fatal(err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if registry.updateCalls != failures+1 {
+				t.Fatalf("expected %d writes, got %d", failures+1, registry.updateCalls)
+			}
+			if got := r.leaks[111]; got != numRepairsBeforeLeakCleanup-2 {
+				t.Fatalf("expected exactly one leak observation, got count %d", got)
+			}
+			after, err := portallocator.NewFromSnapshot(registry.updated)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !after.Has(111) {
+				t.Fatal("failed persists advanced the leak holdoff and released the port early")
+			}
+		})
+	}
 }
 
 func TestRepair(t *testing.T) {

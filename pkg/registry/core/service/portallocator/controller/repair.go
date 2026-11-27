@@ -19,11 +19,10 @@ package controller
 import (
 	"context"
 	"fmt"
-	"sync"
+	"maps"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -79,13 +78,33 @@ func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
 	c.broadcaster.StartRecordingToSink(stopCh)
 	defer c.broadcaster.Shutdown()
 
-	var once sync.Once
+	// Retry the initial repair promptly: the default repair interval (3m)
+	// exceeds the post-start hook's one-minute timeout, so a single
+	// transient failure would otherwise be fatal for the apiserver.
+	if err := wait.PollUntilContextCancel(wait.ContextForChannel(stopCh), time.Second, true, func(context.Context) (bool, error) {
+		if err := c.runOnce(); err != nil {
+			runtime.HandleError(err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return
+	}
+	onFirstSuccess()
+
+	// The initial repair just ran; wait a full interval before the next
+	// one so leak observations keep their intended spacing.
+	timer := time.NewTimer(c.interval)
+	defer timer.Stop()
+	select {
+	case <-stopCh:
+		return
+	case <-timer.C:
+	}
 	wait.Until(func() {
 		if err := c.runOnce(); err != nil {
 			runtime.HandleError(err)
-			return
 		}
-		once.Do(onFirstSuccess)
 	}, c.interval, stopCh)
 }
 
@@ -141,9 +160,12 @@ func (c *Repair) doRunOnce() error {
 	// in separate etcd (or even non-etcd) instances.
 	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("unable to refresh the port block: %v", err)
+		return fmt.Errorf("unable to refresh the port block: %w", err)
 	}
 
+	// Failed attempts must not advance the leak holdoff, so work on a copy
+	// and commit it only after the rebuilt state has been persisted.
+	leaks := maps.Clone(c.leaks)
 	rebuilt, err := portallocator.NewInMemory(c.portRange)
 	if err != nil {
 		return fmt.Errorf("unable to create port allocator: %v", err)
@@ -168,7 +190,7 @@ func (c *Repair) doRunOnce() error {
 					c.recorder.Eventf(svc, nil, corev1.EventTypeWarning, "PortNotAllocated", "PortAllocation", "Port %d is not allocated; repairing", port)
 					runtime.HandleError(fmt.Errorf("the node port %d for service %s/%s is not allocated; repairing", port, svc.Name, svc.Namespace))
 				}
-				delete(c.leaks, port) // it is used, so it can't be leaked
+				delete(leaks, port) // it is used, so it can't be leaked
 			case portallocator.ErrAllocated:
 				// port is duplicate, reallocate
 				nodePortRepairPortErrors.WithLabelValues("duplicate").Inc()
@@ -194,7 +216,7 @@ func (c *Repair) doRunOnce() error {
 
 	// Check for ports that are left in the old set.  They appear to have been leaked.
 	stored.ForEach(func(port int) {
-		count, found := c.leaks[port]
+		count, found := leaks[port]
 		switch {
 		case !found:
 			// flag it to be cleaned up after any races (hopefully) are gone
@@ -203,7 +225,7 @@ func (c *Repair) doRunOnce() error {
 			fallthrough
 		case count > 0:
 			// pretend it is still in use until count expires
-			c.leaks[port] = count - 1
+			leaks[port] = count - 1
 			if err := rebuilt.Allocate(port); err != nil {
 				// do not increment the metric here, if it is a leak it will be detected once the counter gets to 0
 				runtime.HandleError(fmt.Errorf("the node port %d may have leaked, but can not be allocated: %v", port, err))
@@ -221,11 +243,10 @@ func (c *Repair) doRunOnce() error {
 	}
 
 	if err := c.alloc.CreateOrUpdate(snapshot); err != nil {
-		if errors.IsConflict(err) {
-			return err
-		}
-		return fmt.Errorf("unable to persist the updated port allocations: %v", err)
+		// %w keeps conflicts visible to RetryOnConflict in runOnce.
+		return fmt.Errorf("unable to persist the updated port allocations: %w", err)
 	}
+	c.leaks = leaks
 	return nil
 }
 
