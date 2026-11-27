@@ -3564,6 +3564,197 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	}
 }
 
+func TestNodeUpdateNeedsProcessing(t *testing.T) {
+	baseNode := func() *v1.Node {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "node0",
+				ResourceVersion: "1",
+				Labels: map[string]string{
+					v1.LabelOSStable:     "linux",
+					v1.LabelArchStable:   "amd64",
+					v1.LabelTopologyZone: "zone1",
+				},
+				Annotations: map[string]string{"a": "1"},
+			},
+			Spec: v1.NodeSpec{
+				Taints: []v1.Taint{
+					{Key: "example.com/dedicated", Value: "a", Effect: v1.TaintEffectNoSchedule},
+				},
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+					{
+						Type:               v1.NodeMemoryPressure,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+		}
+	}
+	// newVersion returns a modified copy of the node with a new resourceVersion.
+	newVersion := func(mutate func(node *v1.Node)) *v1.Node {
+		node := baseNode()
+		node.ResourceVersion = "2"
+		mutate(node)
+		return node
+	}
+
+	tests := []struct {
+		name     string
+		oldNode  *v1.Node
+		newNode  *v1.Node
+		expected bool
+	}{
+		{
+			name:     "resync of the same object",
+			oldNode:  baseNode(),
+			newNode:  baseNode(),
+			expected: true,
+		},
+		{
+			name:    "heartbeat only",
+			oldNode: baseNode(),
+			newNode: newVersion(func(node *v1.Node) {
+				node.Status.Conditions[0].LastHeartbeatTime = metav1.Date(2015, 1, 1, 12, 1, 0, 0, time.UTC)
+			}),
+			expected: false,
+		},
+		{
+			name:    "status fields outside the conditions",
+			oldNode: baseNode(),
+			newNode: newVersion(func(node *v1.Node) {
+				node.Status.Images = []v1.ContainerImage{{Names: []string{"image:1"}}}
+				node.Status.Addresses = []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.0.1"}}
+			}),
+			expected: false,
+		},
+		{
+			name:     "annotation",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Annotations["a"] = "2" }),
+			expected: false,
+		},
+		{
+			name:     "label that is not reconciled",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Labels[v1.LabelTopologyZone] = "zone2" }),
+			expected: false,
+		},
+		{
+			name:     "spec fields outside taints and unschedulable",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Spec.ProviderID = "gce://p/z/node0"; node.Spec.PodCIDR = "10.0.0.0/24" }),
+			expected: false,
+		},
+		{
+			name:    "condition that is not mapped to a taint",
+			oldNode: baseNode(),
+			newNode: newVersion(func(node *v1.Node) {
+				node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{Type: "KernelDeadlock", Status: v1.ConditionTrue})
+			}),
+			expected: false,
+		},
+		{
+			name:     "Ready becomes True",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Status.Conditions[0].Status = v1.ConditionTrue }),
+			expected: true,
+		},
+		{
+			name:     "Ready becomes Unknown",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Status.Conditions[0].Status = v1.ConditionUnknown }),
+			expected: true,
+		},
+		{
+			name:     "Ready condition added",
+			oldNode:  newVersion(func(node *v1.Node) { node.ResourceVersion = "1"; node.Status.Conditions = nil }),
+			newNode:  baseNode(),
+			expected: true,
+		},
+		{
+			name:     "Ready condition removed",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Status.Conditions = node.Status.Conditions[1:] }),
+			expected: true,
+		},
+		{
+			name:     "MemoryPressure becomes True",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Status.Conditions[1].Status = v1.ConditionTrue }),
+			expected: true,
+		},
+		{
+			name:    "DiskPressure condition added",
+			oldNode: baseNode(),
+			newNode: newVersion(func(node *v1.Node) {
+				node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{Type: v1.NodeDiskPressure, Status: v1.ConditionFalse})
+			}),
+			expected: true,
+		},
+		{
+			name:     "unschedulable",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Spec.Unschedulable = true }),
+			expected: true,
+		},
+		{
+			name:     "taint removed",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Spec.Taints = nil }),
+			expected: true,
+		},
+		{
+			name:    "taint added",
+			oldNode: baseNode(),
+			newNode: newVersion(func(node *v1.Node) {
+				node.Spec.Taints = append(node.Spec.Taints, v1.Taint{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule})
+			}),
+			expected: true,
+		},
+		{
+			name:     "taint value changed",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Spec.Taints[0].Value = "b" }),
+			expected: true,
+		},
+		{
+			name:     "stable OS label changed",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Labels[v1.LabelOSStable] = "windows" }),
+			expected: true,
+		},
+		{
+			name:     "beta arch label added",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { node.Labels[kubeletapis.LabelArch] = "arm64" }),
+			expected: true,
+		},
+		{
+			name:     "stable arch label removed",
+			oldNode:  baseNode(),
+			newNode:  newVersion(func(node *v1.Node) { delete(node.Labels, v1.LabelArchStable) }),
+			expected: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := nodeUpdateNeedsProcessing(test.oldNode, test.newNode); got != test.expected {
+				t.Errorf("nodeUpdateNeedsProcessing() = %v, expected %v", got, test.expected)
+			}
+		})
+	}
+}
+
 func TestNodeEventGeneration(t *testing.T) {
 	fakeNow := metav1.Date(2016, 9, 10, 12, 0, 0, 0, time.UTC)
 	fakeNodeHandler := &testutil.FakeNodeHandler{
