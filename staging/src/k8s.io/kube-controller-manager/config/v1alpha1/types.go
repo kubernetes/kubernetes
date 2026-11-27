@@ -431,6 +431,16 @@ type NodeIPAMControllerConfiguration struct {
 	NodeCIDRMaskSizeIPv6 int32
 }
 
+// NodeLivenessSource determines how NodeLifecycleController detects node liveness.
+type NodeLivenessSource string
+
+const (
+	// NodeLivenessSourceKubelet configures NodeLifecycleController to determine node liveness from kubelet heartbeats.
+	NodeLivenessSourceKubelet NodeLivenessSource = "kubelet"
+	// NodeLivenessSourceExternal configures NodeLifecycleController to delegate node liveness detection to an external component.
+	NodeLivenessSourceExternal NodeLivenessSource = "external"
+)
+
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.
 type NodeLifecycleControllerConfiguration struct {
 	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
@@ -455,6 +465,9 @@ type NodeLifecycleControllerConfiguration struct {
 	UnhealthyZoneThreshold float32
 	// NodeMonitorPeriod is the period for syncing NodeStatus in NodeLifecycleController.
 	NodeMonitorPeriod metav1.Duration
+	// NodeLivenessSource determines how NodeLifecycleController detects node liveness.
+	// Valid values are "kubelet" (default) and "external" (requires ExternalNodeLivenessDetection feature gate).
+	NodeLivenessSource NodeLivenessSource
 }
 
 // PersistentVolumeBinderControllerConfiguration contains elements describing

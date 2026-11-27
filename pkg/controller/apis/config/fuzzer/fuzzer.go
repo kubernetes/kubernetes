@@ -23,6 +23,7 @@ import (
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 )
 
 // Funcs returns the fuzzer functions for the kube-controller manager apis.
@@ -45,6 +46,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.TTLAfterFinishedController.ConcurrentTTLSyncs = c.Int31()
 			if len(obj.ServiceServingSigner.ClusterDomain) == 0 {
 				obj.ServiceServingSigner.ClusterDomain = "cluster.local"
+			}
+			if obj.NodeLifecycleController.NodeLivenessSource == "" {
+				obj.NodeLifecycleController.NodeLivenessSource = nodelifecycleconfig.NodeLivenessSourceKubelet
 			}
 		},
 	}
