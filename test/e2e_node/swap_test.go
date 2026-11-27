@@ -205,6 +205,17 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					initialConfig.MemoryThrottlingFactor = new(stressMemoryThrottlingFactor)
 				})
 
+				// The stress pods allocate the whole node memory. The AfterEach registered above restarts
+				// the kubelet, and a pod that survives the restart starves the node, so delete them
+				// before that, also when the test failed.
+				ginkgo.JustAfterEach(func(ctx context.Context) {
+					pods, err := podClient.List(ctx, metav1.ListOptions{})
+					framework.ExpectNoError(err)
+					for _, pod := range pods.Items {
+						podClient.DeleteSync(ctx, pod.Name, *metav1.NewDeleteOptions(0), f.Timeouts.PodDelete)
+					}
+				})
+
 				getRequestBySwapLimit := func(swapPercentage int64) *resource.Quantity {
 					gomega.ExpectWithOffset(1, swapPercentage).To(gomega.And(
 						gomega.BeNumerically(">=", 1),
@@ -254,10 +265,6 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 
 						return nil
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed(), "swap usage is above zero: %s", swapUsage.String())
-
-					// The pod allocates the whole node memory. Wait until it is gone: the kubelet
-					// restarts after this test, and a pod that survives the restart starves the node.
-					podClient.DeleteSync(context.Background(), stressPod.Name, *metav1.NewDeleteOptions(0), f.Timeouts.PodDelete)
 				})
 
 				ginkgo.It("should be able to use more memory than memory limits", func() {
