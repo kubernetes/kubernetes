@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -48,6 +49,8 @@ func TestGeneratePlacements(t *testing.T) {
 	}
 
 	initialPlacementName := "test-placement"
+	rootPGWithTopology := st.MakePodGroup().Name("root").Namespace("default").TopologyKey("topology").Obj()
+	rootCPGWithTopology := st.MakeCompositePodGroup().Name("root").Namespace("default").TopologyKey("topology").Obj()
 	tests := map[string]struct {
 		podGroupInfo          fwk.PodGroupInfo
 		scheduledPodGroupPods []scheduledPod
@@ -57,7 +60,7 @@ func TestGeneratePlacements(t *testing.T) {
 		wantStatus            fwk.Code
 	}{
 		"without constraint returns placement matching all nodes": {
-			podGroupInfo: makePodGroupInfoFromPG(&schedulingv1beta1.PodGroup{}),
+			podGroupInfo: tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("root").Namespace("default").Obj()),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Label("foo", "bar").Obj(),
@@ -71,7 +74,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Success,
 		},
 		"with topology key constraint, returns placement for each topology domain": {
-			podGroupInfo: makePodGroup("topology1"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("root").Namespace("default").TopologyKey("topology1").Obj()),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node0").Label("topology2", "d1").Obj(),
 				st.MakeNode().Name("node1").Label("topology2", "d4").Obj(),
@@ -88,7 +91,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Success,
 		},
 		"without matching topology label, returns empty": {
-			podGroupInfo: makePodGroup("topology3"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("root").Namespace("default").TopologyKey("topology3").Obj()),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node0").Label("topology2", "d1").Obj(),
 				st.MakeNode().Name("node1").Label("topology2", "d4").Obj(),
@@ -101,7 +104,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus:         fwk.Success,
 		},
 		"with pods already scheduled in a single domain, returns that domain": {
-			podGroupInfo: makePodGroup("topology"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(rootPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{assignedNode: "node2"},
 				{assignedNode: "node3"},
@@ -120,7 +123,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Success,
 		},
 		"with pods already scheduled in a single domain not present in current placement, returns empty": {
-			podGroupInfo: makePodGroup("topology"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(rootPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{assignedNode: "node2"},
 				{assignedNode: "node3"},
@@ -136,7 +139,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus:         fwk.Success,
 		},
 		"with pods already scheduled in conflicting domains, returns error": {
-			podGroupInfo: makePodGroup("topology"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(rootPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{assignedNode: "node2"},
 				{assignedNode: "node3"},
@@ -152,7 +155,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"with pods already scheduled in the empty string domain, returns error": {
-			podGroupInfo: makePodGroup("topology"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(rootPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{assignedNode: "node2"},
 			},
@@ -165,7 +168,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"with nodes labeled with the empty string, skips those nodes": {
-			podGroupInfo: makePodGroup("topology"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(rootPGWithTopology),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node0").Label("topology", "d1").Obj(),
 				st.MakeNode().Name("node1").Label("topology", "").Obj(),
@@ -176,7 +179,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Success,
 		},
 		"with already scheduled pod on node outside of snapshot, returns error": {
-			podGroupInfo: makePodGroup("topology"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(rootPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{assignedNode: "node2"},
 				{assignedNode: "node4"},
@@ -192,7 +195,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"with already scheduled pod on node without topology label, returns error": {
-			podGroupInfo: makePodGroup("topology"),
+			podGroupInfo: tf.NewLeafPodGroupInfo(rootPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{assignedNode: "node2"},
 			},
@@ -205,7 +208,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"for cpg without constraint returns placement matching all nodes": {
-			podGroupInfo: makePodGroupInfoFromCPG(&schedulingv1beta1.CompositePodGroup{}),
+			podGroupInfo: tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("root").Namespace("default").Obj()),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Label("foo", "bar").Obj(),
@@ -219,7 +222,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Success,
 		},
 		"for cpg with topology key constraint, returns placement for each topology domain": {
-			podGroupInfo: makeCompositePodGroup("topology1"),
+			podGroupInfo: tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("root").Namespace("default").TopologyKey("topology1").Obj()),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node0").Label("topology2", "d1").Obj(),
 				st.MakeNode().Name("node1").Label("topology2", "d4").Obj(),
@@ -236,7 +239,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Success,
 		},
 		"for cpg without matching topology label, returns empty": {
-			podGroupInfo: makeCompositePodGroup("topology3"),
+			podGroupInfo: tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("root").Namespace("default").TopologyKey("topology3").Obj()),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node0").Label("topology2", "d1").Obj(),
 				st.MakeNode().Name("node1").Label("topology2", "d4").Obj(),
@@ -249,7 +252,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus:         fwk.Success,
 		},
 		"for cpg with pods already scheduled in a single domain, returns that domain": {
-			podGroupInfo: makeCompositePodGroup("topology"),
+			podGroupInfo: tf.NewCompositePodGroupInfo(rootCPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -274,7 +277,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Success,
 		},
 		"for cpg with pods already scheduled in a single domain not present in current placement, returns empty": {
-			podGroupInfo: makeCompositePodGroup("topology"),
+			podGroupInfo: tf.NewCompositePodGroupInfo(rootCPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -296,7 +299,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus:         fwk.Success,
 		},
 		"for cpg with pods already scheduled in conflicting domains across separate pod groups, returns error": {
-			podGroupInfo: makeCompositePodGroup("topology"),
+			podGroupInfo: tf.NewCompositePodGroupInfo(rootCPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -318,7 +321,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"for cpg with pods already scheduled in conflicting domains in a single pod group, returns error": {
-			podGroupInfo: makeCompositePodGroup("topology"),
+			podGroupInfo: tf.NewCompositePodGroupInfo(rootCPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -340,7 +343,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"for cpg with already scheduled pod on node outside of snapshot, returns error": {
-			podGroupInfo: makeCompositePodGroup("topology"),
+			podGroupInfo: tf.NewCompositePodGroupInfo(rootCPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -362,7 +365,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"for cpg with already scheduled pod on node without topology label, returns error": {
-			podGroupInfo: makeCompositePodGroup("topology"),
+			podGroupInfo: tf.NewCompositePodGroupInfo(rootCPGWithTopology),
 			scheduledPodGroupPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -540,24 +543,4 @@ func TestGetScheduledPodsTopologyDomainEmptyValue(t *testing.T) {
 			}
 		})
 	}
-}
-
-func makePodGroupInfoFromPG(pg *schedulingv1beta1.PodGroup) fwk.PodGroupInfo {
-	return &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericPodGroup(pg),
-	}
-}
-
-func makePodGroupInfoFromCPG(cpg *schedulingv1beta1.CompositePodGroup) fwk.PodGroupInfo {
-	return &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
-	}
-}
-
-func makePodGroup(topologyKey string) fwk.PodGroupInfo {
-	return makePodGroupInfoFromPG(st.MakePodGroup().Name("root").Namespace("default").TopologyKey(topologyKey).Obj())
-}
-
-func makeCompositePodGroup(topologyKey string) fwk.PodGroupInfo {
-	return makePodGroupInfoFromCPG(st.MakeCompositePodGroup().Name("root").Namespace("default").TopologyKey(topologyKey).Obj())
 }

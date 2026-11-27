@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 func Test_isSchedulableAfterPodAdded(t *testing.T) {
@@ -1310,10 +1311,7 @@ func TestPlacementFeasible(t *testing.T) {
 					pgName := "test-pg"
 					namespace := "default"
 
-					pgInfo := &schedulerframework.PodGroupInfo{
-						UnscheduledPods: tc.unscheduledPods,
-					}
-
+					var pgInfo *schedulerframework.PodGroupInfo
 					if isCPG {
 						cpg := st.MakeCompositePodGroup().Namespace(namespace).Name(pgName)
 						if tc.minCount > 0 {
@@ -1321,7 +1319,8 @@ func TestPlacementFeasible(t *testing.T) {
 						} else {
 							cpg.BasicPolicy()
 						}
-						pgInfo.GenericPodGroup = fwk.NewGenericCompositePodGroup(cpg.Obj())
+						childPG := st.MakePodGroup().Namespace(namespace).Name("child-pg").ParentCompositePodGroup(pgName).Obj()
+						pgInfo = tf.NewCompositePodGroupInfo(cpg.Obj(), tf.NewLeafPodGroupInfo(childPG, tc.unscheduledPods...))
 					} else {
 						pg := st.MakePodGroup().Namespace(namespace).Name(pgName).ParentCompositePodGroup("cpg-root")
 						if tc.minCount > 0 {
@@ -1329,7 +1328,7 @@ func TestPlacementFeasible(t *testing.T) {
 						} else {
 							pg.BasicPolicy()
 						}
-						pgInfo.GenericPodGroup = fwk.NewGenericPodGroup(pg.Obj())
+						pgInfo = tf.NewLeafPodGroupInfo(pg.Obj(), tc.unscheduledPods...)
 					}
 
 					fh, err := frameworkruntime.NewFramework(ctx, nil, nil)
