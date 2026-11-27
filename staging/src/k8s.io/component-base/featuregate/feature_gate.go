@@ -103,6 +103,11 @@ type FeatureSpec struct {
 	//  - With --min-compatibility-version=1.34 (default), FeatureA is Beta and disabled by default.
 	//  - With --min-compatibility-version=1.35, FeatureA becomes enabled by default.
 	MinCompatibilityVersion *version.Version
+	// EmulationExempt indicates that the feature gate does not need to be
+	// retained for the emulation retention window from KEP-4330 because it is
+	// only consumed by components that do not support --emulated-version
+	// (e.g. kubelet-only feature gates).
+	EmulationExempt bool
 }
 
 func (spec *FeatureSpec) HelpString(featureName Feature, includeCompatVer bool) string {
