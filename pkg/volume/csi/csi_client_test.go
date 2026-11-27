@@ -1629,3 +1629,11 @@ func TestMapVolumeHealthConditions(t *testing.T) {
 		})
 	}
 }
+
+func (c *fakeCsiDriverClient) NodeStageRecoveryRequired(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (bool, error) {
+	resp, err := c.nodeClient.NodeGetVolumeHealth(ctx, &csipbv1.NodeGetVolumeHealthRequest{VolumeId: volID, StagingTargetPath: stagingTargetPath, VolumePublishPath: volumePublishPath})
+	if err != nil {
+		return false, err
+	}
+	return stageRecoveryRequested(resp.GetVolumeHealth(), volID), nil
+}

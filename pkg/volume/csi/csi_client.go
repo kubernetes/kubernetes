@@ -113,6 +113,9 @@ type csiClient interface {
 		secrets map[string]string,
 	) ([]storagev1.StorageHealthCondition, error)
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
+	// NodeStageRecoveryRequired interprets the experimental, opt-in health signal.
+	NodeStageRecoveryRequired(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (bool, error)
+
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
 	NodeSupportsVolumeStats(ctx context.Context) (bool, error)
@@ -703,6 +706,22 @@ func (c *csiDriverClient) NodeSupportsStorageHealth(ctx context.Context) (bool, 
 }
 
 func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]api.VolumeHealthCondition, error) {
+	health, err := c.nodeGetVolumeHealth(ctx, volID, stagingTargetPath, volumePublishPath)
+	if err != nil {
+		return nil, err
+	}
+	return mapVolumeHealthConditions(health), nil
+}
+
+func (c *csiDriverClient) NodeStageRecoveryRequired(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (bool, error) {
+	health, err := c.nodeGetVolumeHealth(ctx, volID, stagingTargetPath, volumePublishPath)
+	if err != nil {
+		return false, err
+	}
+	return stageRecoveryRequested(health, volID), nil
+}
+
+func (c *csiDriverClient) nodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) (*csipbv1.VolumeHealth, error) {
 	klog.V(4).InfoS(log("calling NodeGetVolumeHealth rpc"), "volID", volID, "stagingTargetPath", stagingTargetPath, "volumePublishPath", volumePublishPath)
 	if volID == "" {
 		return nil, errors.New("missing volume id")
@@ -731,7 +750,7 @@ func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagin
 	if err != nil {
 		return nil, err
 	}
-	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
+	return resp.GetVolumeHealth(), nil
 }
 
 func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
