@@ -263,7 +263,12 @@ func (m *InformerManager[T]) GetTrustAnchorsBySigner(ctx context.Context, signer
 		return nil, fmt.Errorf("while parsing label selector: %w", err)
 	}
 
-	cacheKey := cacheKeyType{signerName: signerName, labelSelector: selector.String()}
+	// Nil and empty selectors stringify identically, but select different bundles.
+	cacheKey := cacheKeyType{
+		signerName:         signerName,
+		labelSelector:      selector.String(),
+		labelSelectorIsNil: labelSelector == nil,
+	}
 
 	if lsLen := len(cacheKey.labelSelector); lsLen > maxLabelSelectorLength {
 		return nil, fmt.Errorf("label selector length (%d) is larger than %d", lsLen, maxLabelSelectorLength)
@@ -336,9 +341,10 @@ func (m *InformerManager[T]) normalizeTrustAnchors(ctbList []*T) ([]byte, error)
 }
 
 type cacheKeyType struct {
-	ctbName       string
-	signerName    string
-	labelSelector string
+	ctbName            string
+	signerName         string
+	labelSelector      string
+	labelSelectorIsNil bool
 }
 
 // NoopManager always returns an error, for use in static kubelet mode.
