@@ -1612,6 +1612,7 @@ func (s stepClockDuringSleep) SleepWithContext(ctx context.Context, d time.Durat
 }
 
 type testBackoffManager struct {
+	delay  time.Duration
 	sleeps []time.Duration
 }
 
@@ -1619,7 +1620,7 @@ func (b *testBackoffManager) UpdateBackoffWithContext(ctx context.Context, actua
 }
 
 func (b *testBackoffManager) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
-	return time.Duration(0)
+	return b.delay
 }
 
 func (b *testBackoffManager) SleepWithContext(ctx context.Context, d time.Duration) {
@@ -1644,17 +1645,19 @@ func TestCheckRetryClosesBody(t *testing.T) {
 
 	backoff := &testBackoffManager{}
 
-	// testBackoffManager.CalculateBackoff always returns 0
-	expectedSleeps := []time.Duration{0, time.Second, time.Second, time.Second, time.Second}
+	// testBackoffManager.CalculateBackoff returns 0, so the first sleep is 0 and
+	// each retry sleeps the Retry-After of 1s plus the injected jitter.
+	expectedSleeps := []time.Duration{0, 1100 * time.Millisecond, 1100 * time.Millisecond, 1100 * time.Millisecond, 1100 * time.Millisecond}
 
 	c := testRESTClient(t, testServer)
 	c.createBackoffMgr = func() BackoffManagerWithContext { return backoff }
-	_, err := c.Verb("POST").
+	req := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
 		Timeout(time.Second).
-		Body([]byte(strings.Repeat("abcd", 1000))).
-		DoRaw(context.Background())
+		Body([]byte(strings.Repeat("abcd", 1000)))
+	req.retryAfterJitterFn = func(d time.Duration) time.Duration { return d + d/10 }
+	_, err := req.DoRaw(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v %#v", err, err)
 	}

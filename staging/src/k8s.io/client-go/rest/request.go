@@ -130,6 +130,9 @@ type Request struct {
 	bodyBytes []byte
 
 	retryFn requestRetryFunc
+
+	// retryAfterJitterFn jitters the wait before each retry; nil keeps it exact.
+	retryAfterJitterFn func(time.Duration) time.Duration
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
@@ -171,6 +174,10 @@ func NewRequest(c *RESTClient) *Request {
 
 		contentConfig:     contentConfig,
 		contentTypeNotSet: contentTypeDefaulted,
+	}
+
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.ClientRetryAfterJitter) {
+		r.retryAfterJitterFn = jitterRetryAfter
 	}
 
 	r.setAcceptHeader()
