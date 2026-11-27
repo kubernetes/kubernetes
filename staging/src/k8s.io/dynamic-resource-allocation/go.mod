@@ -13,7 +13,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/onsi/gomega v1.44.0
 	github.com/stretchr/testify v1.12.1
-	go.etcd.io/etcd/client/pkg/v3 v3.7.3
+	go.etcd.io/etcd/client/pkg/v3 v3.7.4
 	google.golang.org/grpc v1.85.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
