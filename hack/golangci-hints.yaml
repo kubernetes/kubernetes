@@ -522,6 +522,15 @@ linters:
                   type: "All"
                   dependsOn:
                     - "k8s:optional"
+                - identifier: "k8s:monotonic"
+                  type: "All"
+                  dependsOn:
+                    - "k8s:minimum"
+                - identifier: "k8s:monotonic"
+                  type: "Any"
+                  dependsOn:
+                    - "k8s:update=NoUnset"
+                    - "k8s:required"
             forbiddenmarkers:
               markers:
                 # Validation should use declarative tags; approved exceptions are in exceptions.yaml.
