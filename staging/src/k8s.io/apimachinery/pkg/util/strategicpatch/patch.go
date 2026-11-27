@@ -568,6 +568,11 @@ func diffLists(original, modified []interface{}, schema LookupPatchMeta, mergeKe
 	kind := elementType.Kind()
 	switch kind {
 	case reflect.Map:
+		// Items without the merge key (for example an empty imagePullSecrets entry)
+		// cannot be diffed one by one. If the list is unchanged there is nothing to patch.
+		if reflect.DeepEqual(original, modified) && validateMergeKeyInLists(mergeKey, original) != nil {
+			return nil, nil, nil, nil
+		}
 		patchList, deleteList, err = diffListsOfMaps(original, modified, schema, mergeKey, diffOptions)
 		if err != nil {
 			return nil, nil, nil, err
