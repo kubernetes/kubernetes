@@ -6,7 +6,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 1.9.1
+    version: 1.10.0
     refPaths:
     - path: cluster/gce/config-common.sh
       match: WINDOWS_CNI_VERSION=
