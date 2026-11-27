@@ -185,17 +185,21 @@ func TestMaybeSetHugetlb(t *testing.T) {
 	if m.isCgroup2UnifiedMode() && !getSupportedUnifiedControllers().Has("hugetlb") {
 		t.Skip("hugetlb controller is not available")
 	}
-	if len(libcontainercgroups.HugePageSizes()) == 0 {
+	supportedSizes := libcontainercgroups.HugePageSizes()
+	if len(supportedSizes) == 0 {
 		t.Skip("no supported hugepage sizes")
 	}
 
-	const pageSize2MB = 2 * 1024 * 1024
+	// A positive fixture must use a supported size; not every host has 2 MiB pages.
+	pageSize := supportedSizes[0]
+	pageSizeBytes, err := hugePageSizeBytes(pageSize)
+	require.NoError(t, err)
 	zeroLimits := map[string]uint64{}
-	for _, pageSize := range libcontainercgroups.HugePageSizes() {
-		zeroLimits[pageSize] = 0
+	for _, supportedSize := range supportedSizes {
+		zeroLimits[supportedSize] = 0
 	}
-	with2MBLimit := maps.Clone(zeroLimits)
-	with2MBLimit["2MB"] = 2 * pageSize2MB
+	withLimit := maps.Clone(zeroLimits)
+	withLimit[pageSize] = uint64(2 * pageSizeBytes)
 
 	testCases := []struct {
 		name          string
@@ -214,8 +218,8 @@ func TestMaybeSetHugetlb(t *testing.T) {
 		},
 		{
 			name:          "set sizes keep their limit and omitted sizes are zeroed",
-			hugePageLimit: map[int64]int64{pageSize2MB: 2 * pageSize2MB},
-			expected:      with2MBLimit,
+			hugePageLimit: map[int64]int64{pageSizeBytes: 2 * pageSizeBytes},
+			expected:      withLimit,
 		},
 	}
 
@@ -224,6 +228,7 @@ func TestMaybeSetHugetlb(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			resources := &libcontainercgroups.Resources{}
 			m.maybeSetHugetlb(logger, &ResourceConfig{HugePageLimit: testCase.hugePageLimit}, resources)
+			require.Len(t, resources.HugetlbLimit, len(testCase.expected))
 			actual := map[string]uint64{}
 			for _, limit := range resources.HugetlbLimit {
 				actual[limit.Pagesize] = limit.Limit
@@ -276,6 +281,26 @@ func TestCpuWeightToCPUShares(t *testing.T) {
 
 func TestCgroupCommonToResources(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
+	hugePageLimits := map[int64]int64{}
+	expectedHugePageLimits := map[string]uint64{}
+	for i, pageSize := range libcontainercgroups.HugePageSizes() {
+		expectedHugePageLimits[pageSize] = 0
+		if i == 0 {
+			pageSizeBytes, err := hugePageSizeBytes(pageSize)
+			require.NoError(t, err)
+			hugePageLimits[pageSizeBytes] = 2 * pageSizeBytes
+			expectedHugePageLimits[pageSize] = uint64(2 * pageSizeBytes)
+		}
+	}
+	validateHugePageLimits := func(t *testing.T, resources *libcontainercgroups.Resources) {
+		t.Helper()
+		require.Len(t, resources.HugetlbLimit, len(expectedHugePageLimits))
+		actual := map[string]uint64{}
+		for _, limit := range resources.HugetlbLimit {
+			actual[limit.Pagesize] = limit.Limit
+		}
+		assert.Equal(t, expectedHugePageLimits, actual)
+	}
 	m := &cgroupCommon{
 		subsystems: &CgroupSubsystems{
 			MountPoints: map[string]string{
@@ -398,35 +423,15 @@ func TestCgroupCommonToResources(t *testing.T) {
 		{
 			name: "hugepages limit conversion and host padding",
 			resourceConfig: &ResourceConfig{
-				HugePageLimit: map[int64]int64{
-					2 * 1024 * 1024: 1024 * 1024 * 1024,
-				},
+				HugePageLimit: hugePageLimits,
 			},
-			validateCgroupsV1: func(t *testing.T, res *libcontainercgroups.Resources) {
-				if len(libcontainercgroups.HugePageSizes()) > 0 {
-					require.NotEmpty(t, res.HugetlbLimit)
-					found := false
-					for _, limit := range res.HugetlbLimit {
-						if limit.Pagesize == "2MB" {
-							assert.Equal(t, uint64(1024*1024*1024), limit.Limit)
-							found = true
-						}
-					}
-					assert.True(t, found, "Should have found translated 2MB hugepage limit under cgroup v1")
-				}
-			},
+			validateCgroupsV1: validateHugePageLimits,
 			validateCgroupsV2: func(t *testing.T, res *libcontainercgroups.Resources) {
-				if len(libcontainercgroups.HugePageSizes()) > 0 {
-					require.NotEmpty(t, res.HugetlbLimit)
-					found := false
-					for _, limit := range res.HugetlbLimit {
-						if limit.Pagesize == "2MB" {
-							assert.Equal(t, uint64(1024*1024*1024), limit.Limit)
-							found = true
-						}
-					}
-					assert.True(t, found, "Should have found translated 2MB hugepage limit under cgroup v2")
+				if !getSupportedUnifiedControllers().Has("hugetlb") {
+					assert.Empty(t, res.HugetlbLimit)
+					return
 				}
+				validateHugePageLimits(t, res)
 			},
 		},
 		{
