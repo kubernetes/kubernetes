@@ -42,6 +42,7 @@ import (
 // See pkg/k8s.io/kubernetes/pkg/kubelet/pod.Manager for method godoc.
 type PodManager interface {
 	TranslatePodUID(uid types.UID) kubetypes.ResolvedPodUID
+	GetPodByUID(types.UID) (*v1.Pod, bool)
 }
 
 // NewCRIStatsProvider returns a Provider that provides the node stats
@@ -58,7 +59,7 @@ func NewCRIStatsProvider(
 	fallbackStatsProvider containerStatsProvider,
 ) *Provider {
 	return newStatsProvider(cadvisor, podManager, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI, podSandboxStatsUnimplemented, fallbackStatsProvider))
+		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI, podSandboxStatsUnimplemented, fallbackStatsProvider, podManager))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
@@ -72,7 +73,7 @@ func NewCadvisorStatsProvider(
 	hostStatsProvider HostStatsProvider,
 	containerManager cm.ContainerManager,
 ) *Provider {
-	return newStatsProvider(cadvisor, podManager, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider, containerManager))
+	return newStatsProvider(cadvisor, podManager, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider, containerManager, podManager))
 }
 
 // newStatsProvider returns a new Provider that provides node stats from
