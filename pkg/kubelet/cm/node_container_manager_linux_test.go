@@ -19,13 +19,161 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	ktesting "k8s.io/klog/v2/ktesting"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/utils/ptr"
 )
+
+func TestUpdateNodeAllocatableCgroup(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	readFailure := errors.New("read failed")
+
+	tests := []struct {
+		name string
+		// version is the cgroup manager version under test.
+		version int
+		// memory is the requested Node Allocatable memory limit.
+		memory *int64
+		// cpuShares is an unrelated setting that must not be suppressed.
+		cpuShares *uint64
+		// usage is what MemoryUsage reports for the cgroup.
+		usage    int64
+		usageErr error
+		// wantErr is whether the helper reports the limit as not yet applied.
+		wantErr bool
+		// wantUpdates is how many Update calls the helper is expected to make.
+		wantUpdates int
+		// wantAppliedMemory is the memory limit recorded on the last Update.
+		wantAppliedMemory *int64
+		// wantAppliedMemoryNil asserts the last Update carried no memory limit.
+		wantAppliedMemoryNil bool
+		// wantAppliedCPUShares asserts the last Update carried this CPU shares value.
+		wantAppliedCPUShares *uint64
+	}{
+		{
+			name:              "v2 usage below limit",
+			version:           2,
+			memory:            ptr.To[int64](100),
+			usage:             99,
+			wantUpdates:       1,
+			wantAppliedMemory: ptr.To[int64](100),
+		},
+		{
+			// Writing memory.max equal to current usage leaves zero headroom,
+			// so defer memory while still applying independent settings.
+			name:                 "v2 usage at limit defers memory",
+			version:              2,
+			memory:               ptr.To[int64](100),
+			cpuShares:            ptr.To[uint64](1024),
+			usage:                100,
+			wantErr:              true,
+			wantUpdates:          1,
+			wantAppliedMemoryNil: true,
+			wantAppliedCPUShares: ptr.To[uint64](1024),
+		},
+		{
+			// Zero means "unset" to both cgroup v2 backends, so no memory.max
+			// write happens and positive usage must not block the update.
+			name:              "v2 zero memory is unset, not a limit",
+			version:           2,
+			memory:            ptr.To[int64](0),
+			usage:             101,
+			wantUpdates:       1,
+			wantAppliedMemory: ptr.To[int64](0),
+		},
+		{
+			name:                 "v2 nil memory skips the usage guard",
+			version:              2,
+			memory:               nil,
+			cpuShares:            ptr.To[uint64](1024),
+			usage:                101,
+			wantUpdates:          1,
+			wantAppliedMemoryNil: true,
+			wantAppliedCPUShares: ptr.To[uint64](1024),
+		},
+		{
+			name:              "v1 keeps existing update behavior",
+			version:           1,
+			memory:            ptr.To[int64](100),
+			usage:             101,
+			wantUpdates:       1,
+			wantAppliedMemory: ptr.To[int64](100),
+		},
+		{
+			// A failed memory read must not hold back independent settings.
+			name:                 "usage read failure still applies other settings",
+			version:              2,
+			memory:               ptr.To[int64](100),
+			cpuShares:            ptr.To[uint64](1024),
+			usageErr:             readFailure,
+			wantErr:              true,
+			wantUpdates:          1,
+			wantAppliedMemoryNil: true,
+			wantAppliedCPUShares: ptr.To[uint64](1024),
+		},
+		{
+			// Deferring memory must leave memory.max untouched while still
+			// applying independent settings such as the CPU share correction.
+			name:                 "usage above limit defers memory and applies cpu shares",
+			version:              2,
+			memory:               ptr.To[int64](100),
+			cpuShares:            ptr.To[uint64](1024),
+			usage:                101,
+			wantErr:              true,
+			wantUpdates:          1,
+			wantAppliedMemoryNil: true,
+			wantAppliedCPUShares: ptr.To[uint64](1024),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			manager := &fakeCgroupManager{version: tc.version, usage: tc.usage, usageErr: tc.usageErr}
+			cm := &containerManagerImpl{cgroupManager: manager}
+			config := &CgroupConfig{
+				Name: CgroupName{"kubepods"},
+				ResourceParameters: &ResourceConfig{
+					Memory:    tc.memory,
+					CPUShares: tc.cpuShares,
+				},
+			}
+
+			err := cm.updateNodeAllocatableCgroup(logger, config)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Len(t, manager.updates, tc.wantUpdates)
+			// The caller's configuration must stay untouched across retries.
+			require.Same(t, tc.memory, config.ResourceParameters.Memory)
+
+			if tc.wantUpdates == 0 {
+				return
+			}
+			applied := manager.updates[len(manager.updates)-1].ResourceParameters
+			require.NotNil(t, applied)
+			if tc.wantAppliedMemoryNil {
+				assert.Nil(t, applied.Memory)
+			} else {
+				require.NotNil(t, applied.Memory)
+				assert.Equal(t, *tc.wantAppliedMemory, *applied.Memory)
+			}
+			if tc.wantAppliedCPUShares != nil {
+				require.NotNil(t, applied.CPUShares)
+				assert.Equal(t, *tc.wantAppliedCPUShares, *applied.CPUShares)
+			}
+		})
+	}
+}
 
 func TestNodeAllocatableReservationForScheduling(t *testing.T) {
 	memoryEvictionThreshold := resource.MustParse("100Mi")
