@@ -11689,7 +11689,14 @@ type CheckpointPodRequest struct {
 	// runtime must not remove the directory. A Pod checkpoint is a collection
 	// of runtime-defined files; their layout and format are opaque to the
 	// caller. The runtime must not write outside this directory and must remove
-	// partial artifacts before returning an error.
+	// partial artifacts before returning an error. All bulk data, including
+	// CRIU images, logs, writable-layer diffs, intermediate content blobs and
+	// export archives, must stay within this directory on the same filesystem,
+	// with no fallback to a global content store or runtime root on ENOSPC,
+	// EDQUOT or inode exhaustion. Bounded recovery metadata may be stored
+	// separately. Runtime cleanup and container resumption must progress even
+	// if the output filesystem is full. This applies to every runtime handler
+	// accepted by CheckpointPod.
 	OutputPath string `protobuf:"bytes,2,opt,name=output_path,json=outputPath,proto3" json:"output_path,omitempty"`
 	// IDs of the containers to include in the checkpoint. The list must be
 	// non-empty, must not contain duplicates, and must contain exactly the
@@ -11699,11 +11706,19 @@ type CheckpointPodRequest struct {
 	ContainerIds []string `protobuf:"bytes,3,rep,name=container_ids,json=containerIds,proto3" json:"container_ids,omitempty"`
 	// Optional opaque runtime-specific checkpoint options supplied by the CRI
 	// caller. Keys are interpreted in the scope of the pod sandbox's runtime
-	// handler. Kubernetes does not expose these options in its alpha API and
-	// kubelet sends an empty map. Direct CRI callers may set keys documented by
-	// the selected runtime. The runtime must reject unsupported or invalid keys
-	// and values rather than silently ignore them. Options must not contain
-	// secrets.
+	// handler. The alpha kubelet leaves this map empty and uses runtime
+	// defaults; Kubernetes does not expose custom options for this operation.
+	// Every caller's options are untrusted input. The runtime must explicitly
+	// support safe keys and validate their values, rejecting unsupported,
+	// invalid, or unsafe entries rather than passing arbitrary settings to the
+	// backend. Options must not contain secrets or override administrator
+	// configuration, Pod security constraints, or allocated devices. Trusted
+	// settings must come from node or runtime configuration, never this map.
+	//
+	// These options apply only while creating the checkpoint. If an option
+	// changes what is required to restore the checkpoint, the runtime must
+	// encode that requirement in its checkpoint data; the caller does not copy
+	// checkpoint options into RestorePodRequest.options.
 	Options       map[string]string `protobuf:"bytes,4,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -11817,6 +11832,9 @@ type RestorePodRequest struct {
 	// the live Pod and status.checkpointedPodTemplate of the referenced PodCheckpoint is
 	// enforced at API-server admission (and re-checked by the kubelet before this call);
 	// arbitrary user overrides are not permitted.
+	// The metadata tuple (namespace, name, uid, attempt) identifies the restore
+	// target. If a sandbox or another restore already uses that tuple, the
+	// runtime must return AlreadyExists without modifying its resources.
 	Config *PodSandboxConfig `protobuf:"bytes,2,opt,name=config,proto3" json:"config,omitempty"`
 	// Runtime handler to use for restoring the pod sandbox and its containers.
 	// The handler selects the configured runtime implementation that interprets
@@ -11826,21 +11844,33 @@ type RestorePodRequest struct {
 	// RunPodSandboxRequest. The runtime must reject an unknown non-empty handler.
 	RuntimeHandler string `protobuf:"bytes,3,opt,name=runtime_handler,json=runtimeHandler,proto3" json:"runtime_handler,omitempty"`
 	// Optional opaque runtime-specific restore options supplied by the CRI
-	// caller. Keys are interpreted in the scope of `runtime_handler`.
-	// Kubernetes does not expose these options in its alpha API and kubelet
-	// sends an empty map. Direct CRI callers may set keys documented by the
-	// selected runtime. The runtime must reject unsupported or invalid keys and
-	// values rather than silently ignore them. Options must not contain secrets.
+	// caller. Keys are interpreted in the scope of `runtime_handler`. The alpha
+	// kubelet leaves this map empty and uses runtime defaults; Kubernetes does
+	// not expose custom options for this operation.
+	// Every caller's options are untrusted input. The runtime must explicitly
+	// support safe keys and validate their values, rejecting unsupported,
+	// invalid, or unsafe entries rather than passing arbitrary settings to the
+	// backend. Options must not contain secrets or override administrator
+	// configuration, Pod security constraints, or allocated devices. In
+	// particular, device mappings must come from the Pod's allocated devices.
+	// Trusted settings must come from node or runtime configuration, never this map.
+	//
+	// These options apply only to this restore attempt. They must not be
+	// inferred from CheckpointPodRequest.options or treated as defaults stored
+	// with the checkpoint. The runtime may separately read requirements encoded
+	// in its own checkpoint data.
 	Options map[string]string `protobuf:"bytes,4,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Complete restore-time configurations for all containers represented by
 	// the checkpoint. The list must be non-empty. Every entry must have a
 	// non-empty, unique metadata name, and those names must be the exact set of
 	// container names in the checkpoint. The runtime must match containers by
 	// metadata name. The checkpoint is authoritative for filesystem and
-	// process state. Image, command, args, working directory, environment, and
-	// process credentials describe the expected checkpointed process; they
-	// must not start or mutate it, and any mismatch the runtime can validate
-	// must fail the restore. The runtime applies restore-time settings outside
+	// process state. The runtime must validate the image, working directory,
+	// and process credentials against the checkpoint. Command, args, and
+	// environment can contain values resolved for the destination Pod (such as
+	// Downward API values); they must not start or mutate the checkpointed
+	// process. Its captured command, args, and environment remain in effect.
+	// The runtime applies restore-time settings outside
 	// checkpoint-owned process state, including labels, annotations, mounts,
 	// devices, Linux resources, logging, and security constraints, and must
 	// fail settings incompatible with the checkpoint.

@@ -1535,6 +1535,9 @@ func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*
 }
 
 func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
+	if err := etcd.CreatePrerequisites(context.TODO(), client, testNamespace, etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr].Prerequisites); err != nil {
+		return nil, err
+	}
 	stubObj, err := getStubObj(gvr, resource)
 	if err != nil {
 		return nil, err

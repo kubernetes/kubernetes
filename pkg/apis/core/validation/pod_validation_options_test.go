@@ -1678,3 +1678,37 @@ func TestGetValidationOptionsWorkloadControlledSwap(t *testing.T) {
 		})
 	}
 }
+
+func TestGetValidationOptionsRestoreFrom(t *testing.T) {
+	testCases := []struct {
+		name        string
+		oldPodSpec  *core.PodSpec
+		gateEnabled bool
+		want        bool
+	}{
+		{name: "gate enabled, no old", gateEnabled: true, want: true},
+		{name: "gate disabled, no old", gateEnabled: false, want: false},
+		{
+			name:        "gate disabled, old set restoreFrom (ratcheting)",
+			oldPodSpec:  &core.PodSpec{RestoreFrom: &core.CheckpointReference{Name: "checkpoint-1"}},
+			gateEnabled: false,
+			want:        true,
+		},
+		{
+			name:        "gate disabled, old had empty restoreFrom (ratcheting)",
+			oldPodSpec:  &core.PodSpec{RestoreFrom: &core.CheckpointReference{}},
+			gateEnabled: false,
+			want:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, tc.gateEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&core.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if gotOptions.AllowRestoreFrom != tc.want {
+				t.Errorf("AllowRestoreFrom = %t, want %t", gotOptions.AllowRestoreFrom, tc.want)
+			}
+		})
+	}
+}

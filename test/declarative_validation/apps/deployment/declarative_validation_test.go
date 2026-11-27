@@ -465,3 +465,49 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		}
 	}
 }
+
+// TestDeclarativeValidateRestoreFrom covers the declarative rules on the pod
+// template's spec.restoreFrom (KEP-5823): the referenced PodCheckpoint name is
+// required and must be a valid long name. Pod templates may not set
+// restoreFrom, so every case also reports that. The feature gate is enabled
+// because a present restoreFrom is only validated with the gate on (the field
+// is dropped in PrepareForCreate otherwise).
+func TestDeclarativeValidateRestoreFrom(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, true)
+	for _, apiVersion := range apiVersions {
+		ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+			APIGroup:   "apps",
+			APIVersion: apiVersion,
+		})
+		testCases := map[string]struct {
+			input        *apps.Deployment
+			expectedErrs field.ErrorList
+		}{
+			"restoreFrom: valid name": {
+				input: mkDeployment(tweakPodSpec(podtest.SetRestoreFrom("valid-checkpoint"))),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "restoreFrom"), "").MarkFromImperative(),
+				},
+			},
+			"restoreFrom: invalid name format": {
+				input: mkDeployment(tweakPodSpec(podtest.SetRestoreFrom("Invalid-Name"))),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "template", "spec", "restoreFrom", "name"), nil, "").WithOrigin("format=k8s-long-name"),
+					field.Forbidden(field.NewPath("spec", "template", "spec", "restoreFrom"), "").MarkFromImperative(),
+				},
+			},
+			"restoreFrom: empty name": {
+				input: mkDeployment(tweakPodSpec(podtest.SetRestoreFrom(""))),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec", "template", "spec", "restoreFrom", "name"), ""),
+					field.Forbidden(field.NewPath("spec", "template", "spec", "restoreFrom"), "").MarkFromImperative(),
+				},
+			},
+		}
+		for k, tc := range testCases {
+			t.Run(k, func(t *testing.T) {
+				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
+			})
+		}
+	}
+}

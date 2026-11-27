@@ -99,6 +99,9 @@ type PodValidationOptions struct {
 	AllowInitContainerLimitsExceedingPodLimits bool
 	// Allow containers and pods to specify swap resource limits (KEP-5359)
 	AllowWorkloadControlledSwap bool
+	// Allow spec.restoreFrom to be set (gated by the PodLevelCheckpointRestore
+	// feature gate, with ratcheting for objects that already set it).
+	AllowRestoreFrom bool
 }
 
 func hasIndivisibleHugePagesValue(list core.ResourceList) bool {
@@ -235,6 +238,10 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
+
+	// spec.restoreFrom is gated by PodLevelCheckpointRestore; allow it if the
+	// gate is enabled or the existing object already set it (ratcheting).
+	opts.AllowRestoreFrom = utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) || oldPodSpec != nil && oldPodSpec.RestoreFrom != nil
 
 	if oldPodSpec != nil {
 		// if old spec used non-integer multiple of huge page unit size, we must allow it

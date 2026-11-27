@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -2103,6 +2104,211 @@ func TestPodStrategyValidateUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod); len(errs) != 0 {
 				t.Errorf("unexpected error:%v", errs)
+			}
+		})
+	}
+}
+
+// validatePodUpdate prepares and validates an update with the strategy that
+// serves the subresource, in the order the registry uses.
+func validatePodUpdate(subresource string, newPod, oldPod *api.Pod) field.ErrorList {
+	strategy := map[string]rest.RESTUpdateStrategy{
+		"":                    Strategy,
+		"status":              StatusStrategy,
+		"resize":              ResizeStrategy,
+		"ephemeralcontainers": EphemeralContainersStrategy,
+		"dynamic":             DynamicStrategy,
+	}[subresource]
+	ctx := genericapirequest.NewContext()
+	strategy.PrepareForUpdate(ctx, newPod, oldPod)
+	return strategy.ValidateUpdate(ctx, newPod, oldPod)
+}
+
+// workloadFreezeErrors returns the errors whose detail contains message.
+func workloadFreezeErrors(errs field.ErrorList, message string) field.ErrorList {
+	var freezeErrs field.ErrorList
+	for _, err := range errs {
+		if strings.Contains(err.Detail, message) {
+			freezeErrs = append(freezeErrs, err)
+		}
+	}
+	return freezeErrs
+}
+
+func TestCheckpointingUpdatesPreserveWorkload(t *testing.T) {
+	changeImage := func(p *api.Pod) { p.Spec.Containers[0].Image = "changed-private-image" }
+	resizeCPU := func(p *api.Pod) {
+		p.Spec.Containers[0].Resources.Requests = api.ResourceList{api.ResourceCPU: resource.MustParse("2")}
+	}
+	for _, tc := range []struct {
+		name             string
+		subresource      string
+		mutate           func(*api.Pod)
+		checkpointStatus api.ConditionStatus
+		gateDisabled     bool
+		wantForbidden    bool
+	}{
+		{name: "image during checkpoint", checkpointStatus: api.ConditionTrue, mutate: changeImage, wantForbidden: true},
+		{name: "resize during checkpoint", checkpointStatus: api.ConditionTrue, subresource: "resize", mutate: resizeCPU, wantForbidden: true},
+		{name: "dynamic container during checkpoint", checkpointStatus: api.ConditionTrue, subresource: "dynamic", mutate: func(p *api.Pod) {
+			p.Spec.Containers = append(p.Spec.Containers, podtest.MakeContainer("added", podtest.SetContainerImage("added-image")))
+		}, wantForbidden: true},
+		{name: "ephemeral container during checkpoint", checkpointStatus: api.ConditionTrue, subresource: "ephemeralcontainers", mutate: func(p *api.Pod) {
+			p.Spec.EphemeralContainers = []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{
+				Name: "debug", Image: "changed-private-image", ImagePullPolicy: api.PullIfNotPresent, TerminationMessagePolicy: api.TerminationMessageReadFile,
+			}}}
+		}, wantForbidden: true},
+		{name: "arguments during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) { p.Spec.Containers[0].Args[0] = "changed-private-argument" }, wantForbidden: true},
+		{name: "environment during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) { p.Spec.Containers[0].Env[0].Value = "changed-private-environment" }, wantForbidden: true},
+		{name: "multiple changes during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) {
+			p.Spec.Containers[0].Image = "changed-private-image"
+			p.Spec.Containers[0].Env[0].Value = "changed-private-environment"
+		}, wantForbidden: true},
+		{name: "new status cannot bypass active checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) {
+			p.Spec.Containers[0].Image = "changed-private-image"
+			p.Status.Conditions = []api.PodCondition{{Type: api.PodCheckpointing, Status: api.ConditionFalse}}
+		}, wantForbidden: true},
+		{name: "metadata during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) { p.Labels = map[string]string{"app": "test"} }},
+		{name: "scheduling gate removal during checkpoint", checkpointStatus: api.ConditionTrue, mutate: func(p *api.Pod) { p.Spec.SchedulingGates = nil }},
+		{name: "status update during checkpoint", checkpointStatus: api.ConditionTrue, subresource: "status", mutate: changeImage},
+		{name: "image after checkpoint", checkpointStatus: api.ConditionFalse, mutate: changeImage},
+		{name: "resize after checkpoint", checkpointStatus: api.ConditionFalse, subresource: "resize", mutate: resizeCPU},
+		{name: "image with unknown checkpoint state", checkpointStatus: api.ConditionUnknown, mutate: changeImage},
+		{name: "image without checkpoint state", mutate: changeImage},
+		{name: "feature disabled", checkpointStatus: api.ConditionTrue, gateDisabled: true, mutate: changeImage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, !tc.gateDisabled)
+			if tc.subresource == "dynamic" {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+			}
+			oldPod := podtest.MakePod("source",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(podtest.MakeContainer("app",
+					podtest.SetContainerImage("captured-private-image"),
+					podtest.SetContainerResources(podtest.MakeResourceRequirements(map[string]string{"cpu": "1"}, nil)),
+				)),
+				podtest.SetSchedulingGates(api.PodSchedulingGate{Name: "example.com/ready"}),
+			)
+			oldPod.Spec.Containers[0].Args = []string{"captured-private-argument"}
+			oldPod.Spec.Containers[0].Env = []api.EnvVar{{Name: "PRIVATE_VALUE", Value: "captured-private-environment"}}
+			if tc.checkpointStatus != "" {
+				oldPod.Status.Conditions = []api.PodCondition{{
+					Type: api.PodCheckpointing, Status: tc.checkpointStatus, Message: `Checkpointing for PodCheckpoint "source-checkpoint"`,
+					Reason: "CheckpointingPod", LastTransitionTime: metav1.Now(),
+				}}
+			}
+			if tc.subresource == "dynamic" {
+				oldPod.Status.Phase = api.PodRunning
+				oldPod.Status.Conditions = append(oldPod.Status.Conditions, api.PodCondition{Type: api.PodInitialized, Status: api.ConditionTrue})
+				oldPod.Status.ContainerStatuses = []api.ContainerStatus{{Name: "app", State: api.ContainerState{Running: &api.ContainerStateRunning{}}}}
+			}
+			newPod := oldPod.DeepCopy()
+			tc.mutate(newPod)
+
+			errs := validatePodUpdate(tc.subresource, newPod, oldPod)
+			if !tc.wantForbidden {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %v", errs)
+				}
+				return
+			}
+			freezeErrs := workloadFreezeErrors(errs, "while PodCheckpointing=True")
+			if len(freezeErrs) != 1 {
+				t.Fatalf("want one PodCheckpointing error, got %v", errs)
+			}
+			err := freezeErrs[0]
+			if err.Type != field.ErrorTypeForbidden || err.Field != "spec" {
+				t.Errorf("want a forbidden spec error, got %v", err)
+			}
+			if want := `PodCheckpoint "source-checkpoint"`; !strings.Contains(err.Detail, want) {
+				t.Errorf("error %q does not contain %q", err.Detail, want)
+			}
+			if strings.Contains(err.Error(), "captured-private-") || strings.Contains(err.Error(), "changed-private-") {
+				t.Errorf("error exposes a field value: %v", err)
+			}
+		})
+	}
+}
+
+func TestRestoreUpdatesPreserveWorkload(t *testing.T) {
+	changeImage := func(p *api.Pod) { p.Spec.Containers[0].Image = "changed-private-image" }
+	resizeCPU := func(p *api.Pod) {
+		p.Spec.Containers[0].Resources.Requests = api.ResourceList{api.ResourceCPU: resource.MustParse("2")}
+	}
+	for _, tc := range []struct {
+		name         string
+		subresource  string
+		mutate       func(*api.Pod)
+		restored     bool
+		gateDisabled bool
+		wantMismatch bool
+	}{
+		{name: "image before restore", mutate: changeImage, wantMismatch: true},
+		{name: "resize before restore", subresource: "resize", mutate: resizeCPU, wantMismatch: true},
+		{name: "ephemeral container before restore", subresource: "ephemeralcontainers", mutate: func(p *api.Pod) {
+			p.Spec.EphemeralContainers = []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{
+				Name: "debug", Image: "changed-private-image", ImagePullPolicy: api.PullIfNotPresent, TerminationMessagePolicy: api.TerminationMessageReadFile,
+			}}}
+		}, wantMismatch: true},
+		{name: "placement before restore", mutate: func(p *api.Pod) { p.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "other"} }, wantMismatch: true},
+		{name: "arguments before restore", mutate: func(p *api.Pod) { p.Spec.Containers[0].Args[0] = "changed-private-argument" }, wantMismatch: true},
+		{name: "environment before restore", mutate: func(p *api.Pod) { p.Spec.Containers[0].Env[0].Value = "changed-private-environment" }, wantMismatch: true},
+		{name: "toleration before restore", mutate: func(p *api.Pod) { p.Spec.Tolerations[0].Value = "changed-private-toleration" }, wantMismatch: true},
+		{name: "multiple changes before restore", mutate: func(p *api.Pod) {
+			p.Spec.Containers[0].Image = "changed-private-image"
+			p.Spec.Containers[0].Env[0].Value = "changed-private-environment"
+		}, wantMismatch: true},
+		{name: "status cannot bypass pending restore", mutate: func(p *api.Pod) {
+			p.Spec.Containers[0].Image = "changed-private-image"
+			p.Status.Conditions = []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionTrue}}
+		}, wantMismatch: true},
+		{name: "remove scheduling gate", mutate: func(p *api.Pod) { p.Spec.SchedulingGates = nil }},
+		{name: "metadata update", mutate: func(p *api.Pod) { p.Labels = map[string]string{"app": "test"} }},
+		{name: "status update before restore", subresource: "status", mutate: changeImage},
+		{name: "image after restore", restored: true, mutate: changeImage},
+		{name: "resize after restore", restored: true, subresource: "resize", mutate: resizeCPU},
+		{name: "feature disabled", gateDisabled: true, mutate: changeImage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, !tc.gateDisabled)
+			oldPod := podtest.MakePod("restored",
+				podtest.SetResourceVersion("1"),
+				podtest.SetRestoreFrom("cp-1"),
+				podtest.SetContainers(podtest.MakeContainer("app",
+					podtest.SetContainerImage("captured-private-image"),
+					podtest.SetContainerResources(podtest.MakeResourceRequirements(map[string]string{"cpu": "1"}, nil)),
+				)),
+				podtest.SetTolerations(api.Toleration{Key: "private", Value: "captured-private-toleration"}),
+				podtest.SetSchedulingGates(api.PodSchedulingGate{Name: "example.com/ready"}),
+			)
+			oldPod.Spec.Containers[0].Args = []string{"captured-private-argument"}
+			oldPod.Spec.Containers[0].Env = []api.EnvVar{{Name: "PRIVATE_VALUE", Value: "captured-private-environment"}}
+			if tc.restored {
+				oldPod.Status.Conditions = []api.PodCondition{{Type: api.PodRestored, Status: api.ConditionTrue}}
+			}
+			newPod := oldPod.DeepCopy()
+			tc.mutate(newPod)
+
+			errs := validatePodUpdate(tc.subresource, newPod, oldPod)
+			if !tc.wantMismatch {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected errors: %v", errs)
+				}
+				return
+			}
+			freezeErrs := workloadFreezeErrors(errs, "until restore succeeds")
+			if len(freezeErrs) != 1 {
+				t.Fatalf("want one restore error, got %v", errs)
+			}
+			err := freezeErrs[0]
+			if err.Type != field.ErrorTypeForbidden || err.Field != "spec" {
+				t.Errorf("want a forbidden spec error, got %v", err)
+			}
+			if strings.Contains(err.Error(), "captured-private-") || strings.Contains(err.Error(), "changed-private-") {
+				t.Errorf("error exposes a field value: %v", err)
 			}
 		})
 	}
@@ -5580,6 +5786,24 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 	}
 }
 
+func TestStatusPrepareForUpdatePodRestoredCondition(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		for _, state := range []api.ConditionStatus{api.ConditionUnknown, api.ConditionTrue, api.ConditionFalse} {
+			t.Run(fmt.Sprintf("gate=%t/state=%s", enabled, state), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+				oldPod := podtest.MakePod("pod", podtest.SetRestoreFrom("checkpoint"))
+				oldPod.Status.Conditions = []api.PodCondition{{Type: api.PodRestored, Status: state, Reason: "Recorded", Message: "durable outcome", ObservedGeneration: 3}}
+				newPod := oldPod.DeepCopy()
+				newPod.Status.Conditions = nil
+				StatusStrategy.PrepareForUpdate(genericapirequest.NewContext(), newPod, oldPod)
+				if diff := cmp.Diff(oldPod.Status.Conditions, newPod.Status.Conditions); diff != "" {
+					t.Errorf("restore status lost during preparation (-want +got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
 func TestWarningsOnUpdate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -6225,4 +6449,29 @@ func TestPodVolumeStatusesOwnership(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestRestoreCheckpointUIDPreservedOnUpdate(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		for _, tc := range []struct{ name, checkpoint, uid, want string }{
+			{name: "omitted UID", checkpoint: "checkpoint", want: "pinned"},
+			{name: "explicit UID", checkpoint: "checkpoint", uid: "pinned", want: "pinned"},
+			{name: "replacement UID is not defaulted", checkpoint: "checkpoint", uid: "replacement", want: "replacement"},
+			{name: "replacement name is not resolved", checkpoint: "replacement", want: ""},
+		} {
+			t.Run(fmt.Sprintf("gate-%t/%s", enabled, tc.name), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+				oldPod := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns", Generation: 2}, Spec: api.PodSpec{RestoreFrom: &api.CheckpointReference{Name: "checkpoint", UID: "pinned"}}}
+				pod := oldPod.DeepCopy()
+				pod.Spec.RestoreFrom = &api.CheckpointReference{Name: tc.checkpoint, UID: types.UID(tc.uid)}
+				Strategy.PrepareForUpdate(context.Background(), pod, oldPod)
+				if pod.Spec.RestoreFrom.UID != types.UID(tc.want) {
+					t.Fatalf("UID %q, want %q", pod.Spec.RestoreFrom.UID, tc.want)
+				}
+				if tc.want == "pinned" && pod.Generation != oldPod.Generation {
+					t.Fatalf("identity defaulting changed generation: %d", pod.Generation)
+				}
+			})
+		}
+	}
 }

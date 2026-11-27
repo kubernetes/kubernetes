@@ -41,6 +41,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	nodeclient "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -75,10 +76,20 @@ type PodStorage struct {
 type REST struct {
 	*genericregistry.Store
 	proxyTransport http.RoundTripper
+	restorePolicy  *restorePolicy
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter, authorizer authorizer.UnconditionalAuthorizer) (PodStorage, error) {
+func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter, authorizer authorizer.UnconditionalAuthorizer, checkpoints nodeclient.PodCheckpointsGetter) (PodStorage, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelCheckpointRestore) {
+		if authorizer == nil {
+			return PodStorage{}, fmt.Errorf("pod restore storage requires an authorizer")
+		}
+		if checkpoints == nil {
+			return PodStorage{}, fmt.Errorf("pod restore storage requires a PodCheckpoint client")
+		}
+	}
+	restorePolicy := &restorePolicy{authorizer: authorizer, checkpoints: checkpoints}
 
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Pod{} },
@@ -121,7 +132,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 	bindingREST := &BindingREST{store: store}
 	return PodStorage{
-		Pod:                 &REST{store, proxyTransport},
+		Pod:                 &REST{Store: store, proxyTransport: proxyTransport, restorePolicy: restorePolicy},
 		Binding:             &BindingREST{store: store},
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
 		Eviction:            newEvictionStorage(&evictionStore, podDisruptionBudgetClient),
