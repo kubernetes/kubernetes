@@ -26,7 +26,12 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -122,5 +127,57 @@ var _ = SIGDescribe("Device Plugin Allocation", framework.WithSerial(), feature.
 			pod.Namespace,
 			pod.Name,
 		))
+	})
+
+	f.Context("with pod-level resource managers", feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
+		tempSetCurrentKubeletConfig(f, func(_ context.Context, cfg *kubeletconfig.KubeletConfiguration) {
+			if cfg.FeatureGates == nil {
+				cfg.FeatureGates = map[string]bool{}
+			}
+			cfg.FeatureGates[string(features.PodLevelResources)] = true
+			cfg.FeatureGates[string(features.PodLevelResourceManagers)] = true
+			cfg.TopologyManagerScope = topologymanager.PodTopologyScope
+			cfg.TopologyManagerPolicy = topologymanager.PolicyBestEffort
+		})
+
+		ginkgo.It("allocates container devices during admission for a pod with pod-level resources", func(ctx context.Context) {
+			resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
+			const deviceID = "device-1"
+			plugin := testdeviceplugin.NewDevicePlugin(nil)
+			// PreStartContainer checks the allocation cache before start-time re-allocation,
+			// so this pod cannot start unless admission already allocated its device.
+			plugin.SetDevicePluginOptions(&kubeletdevicepluginv1beta1.DevicePluginOptions{PreStartRequired: true})
+			defer plugin.Stop()
+			framework.ExpectNoError(plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, []*kubeletdevicepluginv1beta1.Device{{
+				ID:     deviceID,
+				Health: kubeletdevicepluginv1beta1.Healthy,
+			}}))
+
+			ginkgo.By("waiting for the device resource to become allocatable")
+			gomega.Eventually(ctx, func(ctx context.Context) int64 {
+				node := getLocalNode(ctx, f)
+				quantity := node.Status.Allocatable[v1.ResourceName(resourceName)]
+				return quantity.Value()
+			}, time.Minute, framework.Poll).Should(gomega.Equal(int64(1)))
+
+			pod := makeBusyboxPod(resourceName, fmt.Sprintf("sleep %s", sleepIntervalForever))
+			podResources := v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("10m"),
+				v1.ResourceMemory: resource.MustParse("10Mi"),
+			}
+			pod.Spec.Resources = &v1.ResourceRequirements{Requests: podResources, Limits: podResources}
+			podClient := e2epod.NewPodClient(f)
+			pod = podClient.Create(ctx, pod)
+			defer podClient.DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+			gomega.Expect(plugin.WasCalled("PreStartContainer")).To(gomega.BeTrueBecause("the container must pass the pre-start allocation check"))
+
+			ginkgo.By("verifying the committed device assignment using pod-resources")
+			podResourcesResponse, err := getV1NodeDevices(ctx)
+			framework.ExpectNoError(err)
+			err, found := checkPodResourcesAssignment(podResourcesResponse, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, resourceName, []string{deviceID})
+			framework.ExpectNoError(err)
+			gomega.Expect(found).To(gomega.BeTrueBecause("expected pod %s/%s to have a committed device allocation", pod.Namespace, pod.Name))
+		})
 	})
 })
