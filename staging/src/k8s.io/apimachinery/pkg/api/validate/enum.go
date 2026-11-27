@@ -29,7 +29,7 @@ import (
 // Enum verifies that a given value is a member of a set of enum values.
 // Exclude Rules that apply when options are enabled or disabled are also considered.
 // If ANY exclude rule matches for a value, that value is excluded from the enum when validating.
-func Enum[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T, validValues sets.Set[T], exclusions []EnumExclusion[T]) field.ErrorList {
+func Enum[T ~string | ~int32 | ~int64](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T, validValues sets.Set[T], exclusions []EnumExclusion[T]) field.ErrorList {
 	if value == nil {
 		return nil
 	}
@@ -49,7 +49,7 @@ func Enum[T ~string](_ context.Context, op operation.Operation, fldPath *field.P
 
 // supportedValues returns a sorted list of supported values.
 // Excluded enum values are not included in the list.
-func supportedValues[T ~string](op operation.Operation, values sets.Set[T], exclusions []EnumExclusion[T]) ([]T, error) {
+func supportedValues[T ~string | ~int32 | ~int64](op operation.Operation, values sets.Set[T], exclusions []EnumExclusion[T]) ([]T, error) {
 	res := make([]T, 0, len(values))
 	for key := range values {
 		excluded, err := isExcluded(op, exclusions, key)
@@ -66,7 +66,7 @@ func supportedValues[T ~string](op operation.Operation, values sets.Set[T], excl
 }
 
 // EnumExclusion represents a single enum exclusion rule.
-type EnumExclusion[T ~string] struct {
+type EnumExclusion[T ~string | ~int32 | ~int64] struct {
 	// Value specifies the enum value to be conditionally excluded.
 	Value T
 	// ExcludeWhen determines the condition for exclusion.
@@ -77,7 +77,7 @@ type EnumExclusion[T ~string] struct {
 	Option string
 }
 
-func isExcluded[T ~string](op operation.Operation, exclusions []EnumExclusion[T], value T) (bool, error) {
+func isExcluded[T ~string | ~int32 | ~int64](op operation.Operation, exclusions []EnumExclusion[T], value T) (bool, error) {
 	for _, rule := range exclusions {
 		on, defined := op.HasOption(rule.Option)
 		if !defined {
