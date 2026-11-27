@@ -1954,6 +1954,98 @@ func Test_checkNodeTopologyDistribution(t *testing.T) {
 	}
 }
 
+func TestUpdateNodeAllocatableCPU(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		cpu             string
+		memory          string
+		capacity        string
+		wantQueued      bool
+		wantServiceSync bool
+		wantHints       map[string]int
+	}{
+		{name: "increased CPU", cpu: "8", wantQueued: true, wantServiceSync: true, wantHints: map[string]int{"zone-a": 4, "zone-b": 2}},
+		{name: "decreased CPU", cpu: "2", wantQueued: true, wantServiceSync: true, wantHints: map[string]int{"zone-a": 2, "zone-b": 4}},
+		{name: "zero CPU disables hints", cpu: "0", wantQueued: true, wantServiceSync: true, wantHints: map[string]int{}},
+		{name: "allocation stays within overload threshold", cpu: "5", wantQueued: true, wantHints: map[string]int{"zone-a": 3, "zone-b": 3}},
+		{name: "equivalent CPU quantity", cpu: "4000m", wantHints: map[string]int{"zone-a": 3, "zone-b": 3}},
+		{name: "memory change", cpu: "4", memory: "16Gi", wantHints: map[string]int{"zone-a": 3, "zone-b": 3}},
+		{name: "capacity change", cpu: "4", capacity: "32", wantHints: map[string]int{"zone-a": 3, "zone-b": 3}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client, c := newController(t, nil, 0)
+			logger, ctx := ktesting.NewTestContext(t)
+			var nodes []*v1.Node
+			for i, zone := range []string{"zone-a", "zone-b"} {
+				node := &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("node-%d", i+1), Labels: map[string]string{v1.LabelTopologyZone: zone}},
+					Status: v1.NodeStatus{
+						Allocatable: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("8Gi")},
+						Capacity:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("16")},
+						Conditions:  []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+					},
+				}
+				require.NoError(t, c.nodeStore.Add(node))
+				nodes = append(nodes, node)
+			}
+			c.addNode()
+			c.processNextTopologyWorkItem(logger)
+			for i := 0; i < 6; i++ {
+				pod := newPod(i, "ns", true, 0, false)
+				pod.Spec.NodeName = nodes[i/3].Name
+				require.NoError(t, c.podStore.Add(pod))
+			}
+			service := createService(t, c, "ns", "svc").DeepCopy()
+			service.Annotations = map[string]string{v1.AnnotationTopologyMode: "Auto"}
+			require.NoError(t, c.serviceStore.Update(service))
+			require.NoError(t, c.syncService(logger, "ns/svc"))
+			hintCounts := func() map[string]int {
+				slices, err := client.DiscoveryV1().EndpointSlices("ns").List(ctx, metav1.ListOptions{})
+				require.NoError(t, err)
+				counts := map[string]int{}
+				total := 0
+				for _, slice := range slices.Items {
+					for _, endpoint := range slice.Endpoints {
+						total++
+						if endpoint.Hints != nil {
+							require.Len(t, endpoint.Hints.ForZones, 1)
+							counts[endpoint.Hints.ForZones[0].Name]++
+						}
+					}
+				}
+				require.Equal(t, 6, total)
+				return counts
+			}
+			require.Equal(t, map[string]int{"zone-a": 3, "zone-b": 3}, hintCounts())
+
+			updated := nodes[0].DeepCopy()
+			updated.Status.Allocatable[v1.ResourceCPU] = resource.MustParse(tc.cpu)
+			if tc.memory != "" {
+				updated.Status.Allocatable[v1.ResourceMemory] = resource.MustParse(tc.memory)
+			}
+			if tc.capacity != "" {
+				updated.Status.Capacity[v1.ResourceCPU] = resource.MustParse(tc.capacity)
+			}
+			require.NoError(t, c.nodeStore.Update(updated))
+			c.updateNode(nodes[0], updated)
+			if tc.wantQueued {
+				require.Equal(t, 1, c.topologyQueue.Len(), "CPU update did not trigger topology recalculation")
+				c.processNextTopologyWorkItem(logger)
+				if tc.wantServiceSync {
+					require.Equal(t, 1, c.serviceQueue.Len(), "affected Service was not queued")
+					c.processNextServiceWorkItem(logger)
+				} else {
+					require.Zero(t, c.serviceQueue.Len())
+				}
+			} else {
+				require.Zero(t, c.topologyQueue.Len())
+				require.Zero(t, c.serviceQueue.Len())
+			}
+			require.Equal(t, tc.wantHints, hintCounts())
+		})
+	}
+}
+
 func TestUpdateNode(t *testing.T) {
 	nodeReadyStatus := v1.NodeStatus{
 		Allocatable: map[v1.ResourceName]resource.Quantity{
