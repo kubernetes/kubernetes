@@ -716,18 +716,22 @@ type throttledLogger struct {
 	settings []*throttleSettings
 }
 
-var globalThrottledLogger = &throttledLogger{
-	clock: clock.RealClock{},
-	settings: []*throttleSettings{
-		{
-			logLevel:       2,
-			minLogInterval: 1 * time.Second,
-		}, {
-			logLevel:       0,
-			minLogInterval: 10 * time.Second,
+func newThrottledLogger(c clock.PassiveClock) *throttledLogger {
+	return &throttledLogger{
+		clock: c,
+		settings: []*throttleSettings{
+			{
+				logLevel:       2,
+				minLogInterval: 1 * time.Second,
+			}, {
+				logLevel:       0,
+				minLogInterval: 10 * time.Second,
+			},
 		},
-	},
+	}
 }
+
+var globalThrottledLogger = newThrottledLogger(clock.RealClock{})
 
 func (b *throttledLogger) attemptToLog(logger klog.Logger) (int, bool) {
 	for _, setting := range b.settings {
