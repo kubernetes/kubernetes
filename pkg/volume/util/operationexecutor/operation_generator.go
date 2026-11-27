@@ -1302,7 +1302,16 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		deviceToDetach.VolumeSpec.Name(),
 		"" /* podUID */)
 	if newUnmapperErr != nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewUnmapper failed", newUnmapperErr)
+		// If vol_data.json has already been deleted by a prior partial run (e.g. a
+		// previous attempt that reached TearDownDevice before EBUSY), treat the
+		// unmapper as unavailable but still allow the operation closure to run so
+		// that RemoveMapPath and MarkDeviceAsUnmounted can complete the teardown.
+		// This mirrors the filesystem path, which handles os.ErrNotExist in
+		// NewUnmounter rather than failing the whole operation at construction time.
+		if !os.IsNotExist(newUnmapperErr) {
+			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewUnmapper failed", newUnmapperErr)
+		}
+		blockVolumeUnmapper = nil
 	}
 
 	unmapDeviceFunc := func() volumetypes.OperationContext {
@@ -1337,6 +1346,28 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
+		// Check whether the device is still held open before tearing it down.
+		// This guard must run before TearDownDevice so that a transient EBUSY does
+		// not delete vol_data.json (inside TearDownDevice / cleanupOrphanDeviceFiles)
+		// and leave subsequent retries unable to reconstruct the unmapper — causing
+		// a permanent retry loop that floods kubelet logs (see issue #144389).
+		// Note: this in-use safety check only takes effect on platforms with a
+		// device node tree (Linux). On Windows, hostutil.PathIsDevice and
+		// hostutil.DeviceOpened always report (false, nil), so the check is a
+		// no-op there; Node.status.volumesAttached[].devicePath carries the CSI
+		// VolumeID on Windows rather than a device path.
+		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, hostutil)
+		if deviceOpenedErr != nil {
+			return volumetypes.NewOperationContext(nil, deviceOpenedErr, migrated)
+		}
+		// The device is still in use elsewhere. Caller will log and retry.
+		if deviceOpened {
+			eventErr, detailedErr := deviceToDetach.GenerateError(
+				"UnmapDevice failed",
+				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+
 		// Call TearDownDevice if blockVolumeUnmapper implements CustomBlockVolumeUnmapper
 		if customBlockVolumeUnmapper, ok := blockVolumeUnmapper.(volume.CustomBlockVolumeUnmapper); ok {
 			// Execute tear down device
@@ -1357,16 +1388,14 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
-		// Before logging that UnmapDevice succeeded and moving on,
-		// use hostutil.PathIsDevice to check if the path is a device,
-		// if so use hostutil.DeviceOpened to check if the device is in use anywhere
-		// else on the system. Retry if it returns true.
+		// Re-check that the device has not been re-opened between TearDownDevice
+		// and RemoveMapPath (e.g. a container restart racing with teardown).
 		// Note: this in-use safety check only takes effect on platforms with a
 		// device node tree (Linux). On Windows, hostutil.PathIsDevice and
 		// hostutil.DeviceOpened always report (false, nil), so the check is a
 		// no-op there; Node.status.volumesAttached[].devicePath carries the CSI
 		// VolumeID on Windows rather than a device path.
-		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, hostutil)
+		deviceOpened, deviceOpenedErr = isDeviceOpened(deviceToDetach, hostutil)
 		if deviceOpenedErr != nil {
 			return volumetypes.NewOperationContext(nil, deviceOpenedErr, migrated)
 		}
