@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsresourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,17 @@ type DeviceTaintRuleInterface interface {
 
 // deviceTaintRules implements DeviceTaintRuleInterface
 type deviceTaintRules struct {
-	*gentype.ClientWithListAndApply[*resourcev1alpha3.DeviceTaintRule, *resourcev1alpha3.DeviceTaintRuleList, *applyconfigurationsresourcev1alpha3.DeviceTaintRuleApplyConfiguration]
+	*v2.TypedClientWithListAndApply[resourcev1alpha3.DeviceTaintRule, resourcev1alpha3.DeviceTaintRuleList, applyconfigurationsresourcev1alpha3.DeviceTaintRuleApplyConfiguration, *resourcev1alpha3.DeviceTaintRule, *resourcev1alpha3.DeviceTaintRuleList, *applyconfigurationsresourcev1alpha3.DeviceTaintRuleApplyConfiguration]
 }
 
 // newDeviceTaintRules returns a DeviceTaintRules
 func newDeviceTaintRules(c *ResourceV1alpha3Client) *deviceTaintRules {
 	return &deviceTaintRules{
-		gentype.NewClientWithListAndApply[*resourcev1alpha3.DeviceTaintRule, *resourcev1alpha3.DeviceTaintRuleList, *applyconfigurationsresourcev1alpha3.DeviceTaintRuleApplyConfiguration](
-			"devicetaintrules",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *resourcev1alpha3.DeviceTaintRule { return &resourcev1alpha3.DeviceTaintRule{} },
-			func() *resourcev1alpha3.DeviceTaintRuleList { return &resourcev1alpha3.DeviceTaintRuleList{} },
-			gentype.PrefersProtobuf[*resourcev1alpha3.DeviceTaintRule](),
+		v2.NewTypedClientWithListAndApply[resourcev1alpha3.DeviceTaintRule, resourcev1alpha3.DeviceTaintRuleList, applyconfigurationsresourcev1alpha3.DeviceTaintRuleApplyConfiguration](
+			v2.ForResource("devicetaintrules"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

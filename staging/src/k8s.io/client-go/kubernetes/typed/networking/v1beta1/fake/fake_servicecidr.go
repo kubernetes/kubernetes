@@ -21,30 +21,25 @@ package fake
 import (
 	v1beta1 "k8s.io/api/networking/v1beta1"
 	networkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typednetworkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 )
 
 // fakeServiceCIDRs implements ServiceCIDRInterface
 type fakeServiceCIDRs struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.ServiceCIDR, *v1beta1.ServiceCIDRList, *networkingv1beta1.ServiceCIDRApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.ServiceCIDR, v1beta1.ServiceCIDRList, networkingv1beta1.ServiceCIDRApplyConfiguration, *v1beta1.ServiceCIDR, *v1beta1.ServiceCIDRList, *networkingv1beta1.ServiceCIDRApplyConfiguration]
 	Fake *FakeNetworkingV1beta1
 }
 
 func newFakeServiceCIDRs(fake *FakeNetworkingV1beta1) typednetworkingv1beta1.ServiceCIDRInterface {
 	return &fakeServiceCIDRs{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.ServiceCIDR, *v1beta1.ServiceCIDRList, *networkingv1beta1.ServiceCIDRApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.ServiceCIDR, v1beta1.ServiceCIDRList, networkingv1beta1.ServiceCIDRApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("servicecidrs"),
-			v1beta1.SchemeGroupVersion.WithKind("ServiceCIDR"),
-			func() *v1beta1.ServiceCIDR { return &v1beta1.ServiceCIDR{} },
-			func() *v1beta1.ServiceCIDRList { return &v1beta1.ServiceCIDRList{} },
-			func(dst, src *v1beta1.ServiceCIDRList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.ServiceCIDRList) []*v1beta1.ServiceCIDR { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.ServiceCIDRList, items []*v1beta1.ServiceCIDR) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("servicecidrs")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("ServiceCIDR")),
+			v2fake.WithListMetaCopier[v1beta1.ServiceCIDR](func(dst, src *v1beta1.ServiceCIDRList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.ServiceCIDRList) []v1beta1.ServiceCIDR { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.ServiceCIDRList, items []v1beta1.ServiceCIDR) { list.Items = items }),
 		),
 		fake,
 	}

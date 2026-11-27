@@ -21,32 +21,29 @@ package fake
 import (
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedadmissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 )
 
 // fakeMutatingWebhookConfigurations implements MutatingWebhookConfigurationInterface
 type fakeMutatingWebhookConfigurations struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.MutatingWebhookConfiguration, *v1beta1.MutatingWebhookConfigurationList, *admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.MutatingWebhookConfiguration, v1beta1.MutatingWebhookConfigurationList, admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration, *v1beta1.MutatingWebhookConfiguration, *v1beta1.MutatingWebhookConfigurationList, *admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration]
 	Fake *FakeAdmissionregistrationV1beta1
 }
 
 func newFakeMutatingWebhookConfigurations(fake *FakeAdmissionregistrationV1beta1) typedadmissionregistrationv1beta1.MutatingWebhookConfigurationInterface {
 	return &fakeMutatingWebhookConfigurations{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.MutatingWebhookConfiguration, *v1beta1.MutatingWebhookConfigurationList, *admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.MutatingWebhookConfiguration, v1beta1.MutatingWebhookConfigurationList, admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("mutatingwebhookconfigurations"),
-			v1beta1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration"),
-			func() *v1beta1.MutatingWebhookConfiguration { return &v1beta1.MutatingWebhookConfiguration{} },
-			func() *v1beta1.MutatingWebhookConfigurationList { return &v1beta1.MutatingWebhookConfigurationList{} },
-			func(dst, src *v1beta1.MutatingWebhookConfigurationList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.MutatingWebhookConfigurationList) []*v1beta1.MutatingWebhookConfiguration {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.MutatingWebhookConfigurationList, items []*v1beta1.MutatingWebhookConfiguration) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("mutatingwebhookconfigurations")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration")),
+			v2fake.WithListMetaCopier[v1beta1.MutatingWebhookConfiguration](func(dst, src *v1beta1.MutatingWebhookConfigurationList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.MutatingWebhookConfigurationList) []v1beta1.MutatingWebhookConfiguration {
+				return list.Items
+			}),
+			v2fake.WithItemsSetter(func(list *v1beta1.MutatingWebhookConfigurationList, items []v1beta1.MutatingWebhookConfiguration) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

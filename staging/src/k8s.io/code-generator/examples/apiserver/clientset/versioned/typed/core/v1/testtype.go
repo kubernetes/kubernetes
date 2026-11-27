@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	corev1 "k8s.io/code-generator/examples/apiserver/apis/core/v1"
 	scheme "k8s.io/code-generator/examples/apiserver/clientset/versioned/scheme"
 )
@@ -53,19 +53,17 @@ type TestTypeInterface interface {
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	*gentype.ClientWithList[*corev1.TestType, *corev1.TestTypeList]
+	*v2.TypedClientWithList[corev1.TestType, corev1.TestTypeList, *corev1.TestType, *corev1.TestTypeList]
 }
 
 // newTestTypes returns a TestTypes
 func newTestTypes(c *CoreV1Client, namespace string) *testTypes {
 	return &testTypes{
-		gentype.NewClientWithList[*corev1.TestType, *corev1.TestTypeList](
-			"testtypes",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *corev1.TestType { return &corev1.TestType{} },
-			func() *corev1.TestTypeList { return &corev1.TestTypeList{} },
+		v2.NewTypedClientWithList[corev1.TestType, corev1.TestTypeList](
+			v2.ForResource("testtypes"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
 		),
 	}
 }

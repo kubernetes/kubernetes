@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsschedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type WorkloadInterface interface {
 
 // workloads implements WorkloadInterface
 type workloads struct {
-	*gentype.ClientWithListAndApply[*schedulingv1beta1.Workload, *schedulingv1beta1.WorkloadList, *applyconfigurationsschedulingv1beta1.WorkloadApplyConfiguration]
+	*v2.TypedClientWithListAndApply[schedulingv1beta1.Workload, schedulingv1beta1.WorkloadList, applyconfigurationsschedulingv1beta1.WorkloadApplyConfiguration, *schedulingv1beta1.Workload, *schedulingv1beta1.WorkloadList, *applyconfigurationsschedulingv1beta1.WorkloadApplyConfiguration]
 }
 
 // newWorkloads returns a Workloads
 func newWorkloads(c *SchedulingV1beta1Client, namespace string) *workloads {
 	return &workloads{
-		gentype.NewClientWithListAndApply[*schedulingv1beta1.Workload, *schedulingv1beta1.WorkloadList, *applyconfigurationsschedulingv1beta1.WorkloadApplyConfiguration](
-			"workloads",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *schedulingv1beta1.Workload { return &schedulingv1beta1.Workload{} },
-			func() *schedulingv1beta1.WorkloadList { return &schedulingv1beta1.WorkloadList{} },
-			gentype.PrefersProtobuf[*schedulingv1beta1.Workload](),
+		v2.NewTypedClientWithListAndApply[schedulingv1beta1.Workload, schedulingv1beta1.WorkloadList, applyconfigurationsschedulingv1beta1.WorkloadApplyConfiguration](
+			v2.ForResource("workloads"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

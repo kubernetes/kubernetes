@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsappsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type ControllerRevisionInterface interface {
 
 // controllerRevisions implements ControllerRevisionInterface
 type controllerRevisions struct {
-	*gentype.ClientWithListAndApply[*appsv1beta2.ControllerRevision, *appsv1beta2.ControllerRevisionList, *applyconfigurationsappsv1beta2.ControllerRevisionApplyConfiguration]
+	*v2.TypedClientWithListAndApply[appsv1beta2.ControllerRevision, appsv1beta2.ControllerRevisionList, applyconfigurationsappsv1beta2.ControllerRevisionApplyConfiguration, *appsv1beta2.ControllerRevision, *appsv1beta2.ControllerRevisionList, *applyconfigurationsappsv1beta2.ControllerRevisionApplyConfiguration]
 }
 
 // newControllerRevisions returns a ControllerRevisions
 func newControllerRevisions(c *AppsV1beta2Client, namespace string) *controllerRevisions {
 	return &controllerRevisions{
-		gentype.NewClientWithListAndApply[*appsv1beta2.ControllerRevision, *appsv1beta2.ControllerRevisionList, *applyconfigurationsappsv1beta2.ControllerRevisionApplyConfiguration](
-			"controllerrevisions",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *appsv1beta2.ControllerRevision { return &appsv1beta2.ControllerRevision{} },
-			func() *appsv1beta2.ControllerRevisionList { return &appsv1beta2.ControllerRevisionList{} },
-			gentype.PrefersProtobuf[*appsv1beta2.ControllerRevision](),
+		v2.NewTypedClientWithListAndApply[appsv1beta2.ControllerRevision, appsv1beta2.ControllerRevisionList, applyconfigurationsappsv1beta2.ControllerRevisionApplyConfiguration](
+			v2.ForResource("controllerrevisions"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsflowcontrolv1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,17 @@ type FlowSchemaInterface interface {
 
 // flowSchemas implements FlowSchemaInterface
 type flowSchemas struct {
-	*gentype.ClientWithListAndApply[*flowcontrolv1.FlowSchema, *flowcontrolv1.FlowSchemaList, *applyconfigurationsflowcontrolv1.FlowSchemaApplyConfiguration]
+	*v2.TypedClientWithListAndApply[flowcontrolv1.FlowSchema, flowcontrolv1.FlowSchemaList, applyconfigurationsflowcontrolv1.FlowSchemaApplyConfiguration, *flowcontrolv1.FlowSchema, *flowcontrolv1.FlowSchemaList, *applyconfigurationsflowcontrolv1.FlowSchemaApplyConfiguration]
 }
 
 // newFlowSchemas returns a FlowSchemas
 func newFlowSchemas(c *FlowcontrolV1Client) *flowSchemas {
 	return &flowSchemas{
-		gentype.NewClientWithListAndApply[*flowcontrolv1.FlowSchema, *flowcontrolv1.FlowSchemaList, *applyconfigurationsflowcontrolv1.FlowSchemaApplyConfiguration](
-			"flowschemas",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *flowcontrolv1.FlowSchema { return &flowcontrolv1.FlowSchema{} },
-			func() *flowcontrolv1.FlowSchemaList { return &flowcontrolv1.FlowSchemaList{} },
-			gentype.PrefersProtobuf[*flowcontrolv1.FlowSchema](),
+		v2.NewTypedClientWithListAndApply[flowcontrolv1.FlowSchema, flowcontrolv1.FlowSchemaList, applyconfigurationsflowcontrolv1.FlowSchemaApplyConfiguration](
+			v2.ForResource("flowschemas"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

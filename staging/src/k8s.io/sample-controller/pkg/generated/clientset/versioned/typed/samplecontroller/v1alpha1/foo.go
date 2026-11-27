@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	applyconfigurationsamplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/applyconfiguration/samplecontroller/v1alpha1"
 	scheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
@@ -57,19 +57,17 @@ type FooInterface interface {
 
 // foos implements FooInterface
 type foos struct {
-	*gentype.ClientWithListAndApply[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList, *applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration]
+	*v2.TypedClientWithListAndApply[samplecontrollerv1alpha1.Foo, samplecontrollerv1alpha1.FooList, applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration, *samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList, *applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration]
 }
 
 // newFoos returns a Foos
 func newFoos(c *SamplecontrollerV1alpha1Client, namespace string) *foos {
 	return &foos{
-		gentype.NewClientWithListAndApply[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList, *applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration](
-			"foos",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *samplecontrollerv1alpha1.Foo { return &samplecontrollerv1alpha1.Foo{} },
-			func() *samplecontrollerv1alpha1.FooList { return &samplecontrollerv1alpha1.FooList{} },
+		v2.NewTypedClientWithListAndApply[samplecontrollerv1alpha1.Foo, samplecontrollerv1alpha1.FooList, applyconfigurationsamplecontrollerv1alpha1.FooApplyConfiguration](
+			v2.ForResource("foos"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
 		),
 	}
 }

@@ -25,31 +25,27 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
 // fakeServiceAccounts implements ServiceAccountInterface
 type fakeServiceAccounts struct {
-	*gentype.FakeClientWithListAndApply[*v1.ServiceAccount, *v1.ServiceAccountList, *corev1.ServiceAccountApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.ServiceAccount, v1.ServiceAccountList, corev1.ServiceAccountApplyConfiguration, *v1.ServiceAccount, *v1.ServiceAccountList, *corev1.ServiceAccountApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeServiceAccounts(fake *FakeCoreV1, namespace string) typedcorev1.ServiceAccountInterface {
 	return &fakeServiceAccounts{
-		gentype.NewFakeClientWithListAndApply[*v1.ServiceAccount, *v1.ServiceAccountList, *corev1.ServiceAccountApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.ServiceAccount, v1.ServiceAccountList, corev1.ServiceAccountApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("serviceaccounts"),
-			v1.SchemeGroupVersion.WithKind("ServiceAccount"),
-			func() *v1.ServiceAccount { return &v1.ServiceAccount{} },
-			func() *v1.ServiceAccountList { return &v1.ServiceAccountList{} },
-			func(dst, src *v1.ServiceAccountList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.ServiceAccountList) []*v1.ServiceAccount { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.ServiceAccountList, items []*v1.ServiceAccount) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("serviceaccounts")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("ServiceAccount")),
+			v2fake.WithListMetaCopier[v1.ServiceAccount](func(dst, src *v1.ServiceAccountList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.ServiceAccountList) []v1.ServiceAccount { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.ServiceAccountList, items []v1.ServiceAccount) { list.Items = items }),
 		),
 		fake,
 	}

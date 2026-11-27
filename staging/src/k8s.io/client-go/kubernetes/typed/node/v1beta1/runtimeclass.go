@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsnodev1beta1 "k8s.io/client-go/applyconfigurations/node/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,17 @@ type RuntimeClassInterface interface {
 
 // runtimeClasses implements RuntimeClassInterface
 type runtimeClasses struct {
-	*gentype.ClientWithListAndApply[*nodev1beta1.RuntimeClass, *nodev1beta1.RuntimeClassList, *applyconfigurationsnodev1beta1.RuntimeClassApplyConfiguration]
+	*v2.TypedClientWithListAndApply[nodev1beta1.RuntimeClass, nodev1beta1.RuntimeClassList, applyconfigurationsnodev1beta1.RuntimeClassApplyConfiguration, *nodev1beta1.RuntimeClass, *nodev1beta1.RuntimeClassList, *applyconfigurationsnodev1beta1.RuntimeClassApplyConfiguration]
 }
 
 // newRuntimeClasses returns a RuntimeClasses
 func newRuntimeClasses(c *NodeV1beta1Client) *runtimeClasses {
 	return &runtimeClasses{
-		gentype.NewClientWithListAndApply[*nodev1beta1.RuntimeClass, *nodev1beta1.RuntimeClassList, *applyconfigurationsnodev1beta1.RuntimeClassApplyConfiguration](
-			"runtimeclasses",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *nodev1beta1.RuntimeClass { return &nodev1beta1.RuntimeClass{} },
-			func() *nodev1beta1.RuntimeClassList { return &nodev1beta1.RuntimeClassList{} },
-			gentype.PrefersProtobuf[*nodev1beta1.RuntimeClass](),
+		v2.NewTypedClientWithListAndApply[nodev1beta1.RuntimeClass, nodev1beta1.RuntimeClassList, applyconfigurationsnodev1beta1.RuntimeClassApplyConfiguration](
+			v2.ForResource("runtimeclasses"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

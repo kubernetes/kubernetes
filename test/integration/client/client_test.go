@@ -56,7 +56,7 @@ import (
 	"k8s.io/client-go/discovery"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
-	"k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	"k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -1420,13 +1420,10 @@ func TestClientCBOREnablement(t *testing.T) {
 
 		// Generated clients for built-in types include the PreferProtobuf option, which
 		// forces Protobuf encoding on a per-request basis.
-		client := gentype.NewClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1ac.NamespaceApplyConfiguration](
-			"namespaces",
-			clientset.CoreV1().RESTClient(),
-			clientscheme.ParameterCodec,
-			"",
-			func() *v1.Namespace { return &v1.Namespace{} },
-			func() *v1.NamespaceList { return &v1.NamespaceList{} },
+		client := v2.NewTypedClientWithListAndApply[v1.Namespace, v1.NamespaceList, corev1ac.NamespaceApplyConfiguration](
+			v2.ForResource("namespaces"),
+			v2.UsingClient(clientset.CoreV1().RESTClient()),
+			v2.UsingParameterCodec(clientscheme.ParameterCodec),
 		)
 		_, err = client.Create(
 			context.TODO(),
@@ -1448,13 +1445,10 @@ func TestClientCBOREnablement(t *testing.T) {
 
 		// Generated clients for built-in types include the PreferProtobuf option, which
 		// forces Protobuf encoding on a per-request basis.
-		client := gentype.NewClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1ac.NamespaceApplyConfiguration](
-			"namespaces",
-			clientset.CoreV1().RESTClient(),
-			clientscheme.ParameterCodec,
-			"",
-			func() *v1.Namespace { return &v1.Namespace{} },
-			func() *v1.NamespaceList { return &v1.NamespaceList{} },
+		client := v2.NewTypedClientWithListAndApply[v1.Namespace, v1.NamespaceList, corev1ac.NamespaceApplyConfiguration](
+			v2.ForResource("namespaces"),
+			v2.UsingClient(clientset.CoreV1().RESTClient()),
+			v2.UsingParameterCodec(clientscheme.ParameterCodec),
 		)
 		w, err := client.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "a,!a"})
 		if err != nil {
@@ -1884,13 +1878,11 @@ func TestCBORWithTypedClient(t *testing.T) {
 	// https://github.com/kubernetes/kubernetes/blob/9ec52fc06395e6ac2fd7a947d6b9fbd3f1bbacb3/staging/src/k8s.io/client-go/kubernetes/typed/core/v1/namespace.go#L64-L72
 	// minus the PrefersProtobuf option, which overrides content negotiation to Protobuf on a
 	// per-request basis.
-	var secretClient corev1client.SecretInterface = gentype.NewClientWithListAndApply[*v1.Secret, *v1.SecretList, *corev1ac.SecretApplyConfiguration](
-		"secrets",
-		clientset.CoreV1().RESTClient(),
-		clientscheme.ParameterCodec,
-		TestNamespace,
-		func() *v1.Secret { return &v1.Secret{} },
-		func() *v1.SecretList { return &v1.SecretList{} },
+	var secretClient corev1client.SecretInterface = v2.NewTypedClientWithListAndApply[v1.Secret, v1.SecretList, corev1ac.SecretApplyConfiguration](
+		v2.ForResource("secrets"),
+		v2.UsingClient(clientset.CoreV1().RESTClient()),
+		v2.UsingParameterCodec(clientscheme.ParameterCodec),
+		v2.InNamespace(TestNamespace),
 	)
 
 	secret, err := secretClient.Create(context.TODO(), &v1.Secret{
@@ -1964,13 +1956,10 @@ func TestCBORWithTypedClient(t *testing.T) {
 	}
 
 	// for UpdateStatus
-	nsClient := gentype.NewClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1ac.NamespaceApplyConfiguration](
-		"namespaces",
-		clientset.CoreV1().RESTClient(),
-		clientscheme.ParameterCodec,
-		"",
-		func() *v1.Namespace { return &v1.Namespace{} },
-		func() *v1.NamespaceList { return &v1.NamespaceList{} },
+	nsClient := v2.NewTypedClientWithListAndApply[v1.Namespace, v1.NamespaceList, corev1ac.NamespaceApplyConfiguration](
+		v2.ForResource("namespaces"),
+		v2.UsingClient(clientset.CoreV1().RESTClient()),
+		v2.UsingParameterCodec(clientscheme.ParameterCodec),
 	)
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {

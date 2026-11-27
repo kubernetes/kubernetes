@@ -27,7 +27,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,7 +53,7 @@ type ReplicationControllerInterface interface {
 	Apply(ctx context.Context, replicationController *applyconfigurationscorev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.ReplicationController, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, replicationController *applyconfigurationscorev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.ReplicationController, err error)
-	GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
+	GetScale(ctx context.Context, replicationControllerName string, opts metav1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 
 	ReplicationControllerExpansion
@@ -61,51 +61,28 @@ type ReplicationControllerInterface interface {
 
 // replicationControllers implements ReplicationControllerInterface
 type replicationControllers struct {
-	*gentype.ClientWithListAndApply[*corev1.ReplicationController, *corev1.ReplicationControllerList, *applyconfigurationscorev1.ReplicationControllerApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.ReplicationController, corev1.ReplicationControllerList, applyconfigurationscorev1.ReplicationControllerApplyConfiguration, *corev1.ReplicationController, *corev1.ReplicationControllerList, *applyconfigurationscorev1.ReplicationControllerApplyConfiguration]
 }
 
 // newReplicationControllers returns a ReplicationControllers
 func newReplicationControllers(c *CoreV1Client, namespace string) *replicationControllers {
 	return &replicationControllers{
-		gentype.NewClientWithListAndApply[*corev1.ReplicationController, *corev1.ReplicationControllerList, *applyconfigurationscorev1.ReplicationControllerApplyConfiguration](
-			"replicationcontrollers",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *corev1.ReplicationController { return &corev1.ReplicationController{} },
-			func() *corev1.ReplicationControllerList { return &corev1.ReplicationControllerList{} },
-			gentype.PrefersProtobuf[*corev1.ReplicationController](),
+		v2.NewTypedClientWithListAndApply[corev1.ReplicationController, corev1.ReplicationControllerList, applyconfigurationscorev1.ReplicationControllerApplyConfiguration](
+			v2.ForResource("replicationcontrollers"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }
 
 // GetScale takes name of the replicationController, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
-func (c *replicationControllers) GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Get().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("replicationcontrollers").
-		Name(replicationControllerName).
-		SubResource("scale").
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
+func (c *replicationControllers) GetScale(ctx context.Context, replicationControllerName string, opts metav1.GetOptions) (*autoscalingv1.Scale, error) {
+	return c.SubResourceGet[autoscalingv1.Scale](ctx, replicationControllerName, "scale", opts)
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *replicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
-	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Put().
-		UseProtobufAsDefault().
-		Namespace(c.GetNamespace()).
-		Resource("replicationcontrollers").
-		Name(replicationControllerName).
-		SubResource("scale").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(scale).
-		Do(ctx).
-		Into(result)
-	return
+func (c *replicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error) {
+	return c.SubResourceUpdate(ctx, replicationControllerName, "scale", scale, opts)
 }

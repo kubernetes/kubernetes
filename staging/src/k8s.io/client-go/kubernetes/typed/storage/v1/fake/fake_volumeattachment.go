@@ -21,30 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 )
 
 // fakeVolumeAttachments implements VolumeAttachmentInterface
 type fakeVolumeAttachments struct {
-	*gentype.FakeClientWithListAndApply[*v1.VolumeAttachment, *v1.VolumeAttachmentList, *storagev1.VolumeAttachmentApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.VolumeAttachment, v1.VolumeAttachmentList, storagev1.VolumeAttachmentApplyConfiguration, *v1.VolumeAttachment, *v1.VolumeAttachmentList, *storagev1.VolumeAttachmentApplyConfiguration]
 	Fake *FakeStorageV1
 }
 
 func newFakeVolumeAttachments(fake *FakeStorageV1) typedstoragev1.VolumeAttachmentInterface {
 	return &fakeVolumeAttachments{
-		gentype.NewFakeClientWithListAndApply[*v1.VolumeAttachment, *v1.VolumeAttachmentList, *storagev1.VolumeAttachmentApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.VolumeAttachment, v1.VolumeAttachmentList, storagev1.VolumeAttachmentApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("volumeattachments"),
-			v1.SchemeGroupVersion.WithKind("VolumeAttachment"),
-			func() *v1.VolumeAttachment { return &v1.VolumeAttachment{} },
-			func() *v1.VolumeAttachmentList { return &v1.VolumeAttachmentList{} },
-			func(dst, src *v1.VolumeAttachmentList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.VolumeAttachmentList) []*v1.VolumeAttachment { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.VolumeAttachmentList, items []*v1.VolumeAttachment) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("volumeattachments")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("VolumeAttachment")),
+			v2fake.WithListMetaCopier[v1.VolumeAttachment](func(dst, src *v1.VolumeAttachmentList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.VolumeAttachmentList) []v1.VolumeAttachment { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.VolumeAttachmentList, items []v1.VolumeAttachment) { list.Items = items }),
 		),
 		fake,
 	}

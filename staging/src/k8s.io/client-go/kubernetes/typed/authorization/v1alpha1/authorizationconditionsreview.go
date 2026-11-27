@@ -23,7 +23,7 @@ import (
 
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -41,21 +41,17 @@ type AuthorizationConditionsReviewInterface interface {
 
 // authorizationConditionsReviews implements AuthorizationConditionsReviewInterface
 type authorizationConditionsReviews struct {
-	*gentype.Client[*authorizationv1alpha1.AuthorizationConditionsReview]
+	*v2.TypedClient[authorizationv1alpha1.AuthorizationConditionsReview, *authorizationv1alpha1.AuthorizationConditionsReview]
 }
 
 // newAuthorizationConditionsReviews returns a AuthorizationConditionsReviews
 func newAuthorizationConditionsReviews(c *AuthorizationV1alpha1Client) *authorizationConditionsReviews {
 	return &authorizationConditionsReviews{
-		gentype.NewClient[*authorizationv1alpha1.AuthorizationConditionsReview](
-			"authorizationconditionsreviews",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *authorizationv1alpha1.AuthorizationConditionsReview {
-				return &authorizationv1alpha1.AuthorizationConditionsReview{}
-			},
-			gentype.PrefersProtobuf[*authorizationv1alpha1.AuthorizationConditionsReview](),
+		v2.NewTypedClient[authorizationv1alpha1.AuthorizationConditionsReview](
+			v2.ForResource("authorizationconditionsreviews"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

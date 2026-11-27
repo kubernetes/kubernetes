@@ -21,30 +21,25 @@ package fake
 import (
 	v1beta2 "k8s.io/api/resource/v1beta2"
 	resourcev1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedresourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 )
 
 // fakeDeviceClasses implements DeviceClassInterface
 type fakeDeviceClasses struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.DeviceClass, *v1beta2.DeviceClassList, *resourcev1beta2.DeviceClassApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta2.DeviceClass, v1beta2.DeviceClassList, resourcev1beta2.DeviceClassApplyConfiguration, *v1beta2.DeviceClass, *v1beta2.DeviceClassList, *resourcev1beta2.DeviceClassApplyConfiguration]
 	Fake *FakeResourceV1beta2
 }
 
 func newFakeDeviceClasses(fake *FakeResourceV1beta2) typedresourcev1beta2.DeviceClassInterface {
 	return &fakeDeviceClasses{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.DeviceClass, *v1beta2.DeviceClassList, *resourcev1beta2.DeviceClassApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta2.DeviceClass, v1beta2.DeviceClassList, resourcev1beta2.DeviceClassApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta2.SchemeGroupVersion.WithResource("deviceclasses"),
-			v1beta2.SchemeGroupVersion.WithKind("DeviceClass"),
-			func() *v1beta2.DeviceClass { return &v1beta2.DeviceClass{} },
-			func() *v1beta2.DeviceClassList { return &v1beta2.DeviceClassList{} },
-			func(dst, src *v1beta2.DeviceClassList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.DeviceClassList) []*v1beta2.DeviceClass { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta2.DeviceClassList, items []*v1beta2.DeviceClass) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta2.SchemeGroupVersion.WithResource("deviceclasses")),
+			v2fake.ForKind(v1beta2.SchemeGroupVersion.WithKind("DeviceClass")),
+			v2fake.WithListMetaCopier[v1beta2.DeviceClass](func(dst, src *v1beta2.DeviceClassList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta2.DeviceClassList) []v1beta2.DeviceClass { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta2.DeviceClassList, items []v1beta2.DeviceClass) { list.Items = items }),
 		),
 		fake,
 	}

@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscoordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type LeaseInterface interface {
 
 // leases implements LeaseInterface
 type leases struct {
-	*gentype.ClientWithListAndApply[*coordinationv1.Lease, *coordinationv1.LeaseList, *applyconfigurationscoordinationv1.LeaseApplyConfiguration]
+	*v2.TypedClientWithListAndApply[coordinationv1.Lease, coordinationv1.LeaseList, applyconfigurationscoordinationv1.LeaseApplyConfiguration, *coordinationv1.Lease, *coordinationv1.LeaseList, *applyconfigurationscoordinationv1.LeaseApplyConfiguration]
 }
 
 // newLeases returns a Leases
 func newLeases(c *CoordinationV1Client, namespace string) *leases {
 	return &leases{
-		gentype.NewClientWithListAndApply[*coordinationv1.Lease, *coordinationv1.LeaseList, *applyconfigurationscoordinationv1.LeaseApplyConfiguration](
-			"leases",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *coordinationv1.Lease { return &coordinationv1.Lease{} },
-			func() *coordinationv1.LeaseList { return &coordinationv1.LeaseList{} },
-			gentype.PrefersProtobuf[*coordinationv1.Lease](),
+		v2.NewTypedClientWithListAndApply[coordinationv1.Lease, coordinationv1.LeaseList, applyconfigurationscoordinationv1.LeaseApplyConfiguration](
+			v2.ForResource("leases"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

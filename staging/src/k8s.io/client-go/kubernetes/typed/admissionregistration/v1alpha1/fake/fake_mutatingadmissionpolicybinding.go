@@ -21,34 +21,29 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedadmissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 )
 
 // fakeMutatingAdmissionPolicyBindings implements MutatingAdmissionPolicyBindingInterface
 type fakeMutatingAdmissionPolicyBindings struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.MutatingAdmissionPolicyBinding, *v1alpha1.MutatingAdmissionPolicyBindingList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.MutatingAdmissionPolicyBinding, v1alpha1.MutatingAdmissionPolicyBindingList, admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration, *v1alpha1.MutatingAdmissionPolicyBinding, *v1alpha1.MutatingAdmissionPolicyBindingList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration]
 	Fake *FakeAdmissionregistrationV1alpha1
 }
 
 func newFakeMutatingAdmissionPolicyBindings(fake *FakeAdmissionregistrationV1alpha1) typedadmissionregistrationv1alpha1.MutatingAdmissionPolicyBindingInterface {
 	return &fakeMutatingAdmissionPolicyBindings{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.MutatingAdmissionPolicyBinding, *v1alpha1.MutatingAdmissionPolicyBindingList, *admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.MutatingAdmissionPolicyBinding, v1alpha1.MutatingAdmissionPolicyBindingList, admissionregistrationv1alpha1.MutatingAdmissionPolicyBindingApplyConfiguration](
 			fake.Fake,
-			"",
-			v1alpha1.SchemeGroupVersion.WithResource("mutatingadmissionpolicybindings"),
-			v1alpha1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicyBinding"),
-			func() *v1alpha1.MutatingAdmissionPolicyBinding { return &v1alpha1.MutatingAdmissionPolicyBinding{} },
-			func() *v1alpha1.MutatingAdmissionPolicyBindingList {
-				return &v1alpha1.MutatingAdmissionPolicyBindingList{}
-			},
-			func(dst, src *v1alpha1.MutatingAdmissionPolicyBindingList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.MutatingAdmissionPolicyBindingList) []*v1alpha1.MutatingAdmissionPolicyBinding {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha1.MutatingAdmissionPolicyBindingList, items []*v1alpha1.MutatingAdmissionPolicyBinding) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("mutatingadmissionpolicybindings")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("MutatingAdmissionPolicyBinding")),
+			v2fake.WithListMetaCopier[v1alpha1.MutatingAdmissionPolicyBinding](func(dst, src *v1alpha1.MutatingAdmissionPolicyBindingList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.MutatingAdmissionPolicyBindingList) []v1alpha1.MutatingAdmissionPolicyBinding {
+				return list.Items
+			}),
+			v2fake.WithItemsSetter(func(list *v1alpha1.MutatingAdmissionPolicyBindingList, items []v1alpha1.MutatingAdmissionPolicyBinding) {
+				list.Items = items
+			}),
 		),
 		fake,
 	}

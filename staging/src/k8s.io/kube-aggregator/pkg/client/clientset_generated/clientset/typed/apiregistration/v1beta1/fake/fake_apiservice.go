@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/applyconfiguration/apiregistration/v1beta1"
 	typedapiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1beta1"
@@ -27,24 +27,19 @@ import (
 
 // fakeAPIServices implements APIServiceInterface
 type fakeAPIServices struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.APIService, *v1beta1.APIServiceList, *apiregistrationv1beta1.APIServiceApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.APIService, v1beta1.APIServiceList, apiregistrationv1beta1.APIServiceApplyConfiguration, *v1beta1.APIService, *v1beta1.APIServiceList, *apiregistrationv1beta1.APIServiceApplyConfiguration]
 	Fake *FakeApiregistrationV1beta1
 }
 
 func newFakeAPIServices(fake *FakeApiregistrationV1beta1) typedapiregistrationv1beta1.APIServiceInterface {
 	return &fakeAPIServices{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.APIService, *v1beta1.APIServiceList, *apiregistrationv1beta1.APIServiceApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.APIService, v1beta1.APIServiceList, apiregistrationv1beta1.APIServiceApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("apiservices"),
-			v1beta1.SchemeGroupVersion.WithKind("APIService"),
-			func() *v1beta1.APIService { return &v1beta1.APIService{} },
-			func() *v1beta1.APIServiceList { return &v1beta1.APIServiceList{} },
-			func(dst, src *v1beta1.APIServiceList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.APIServiceList) []*v1beta1.APIService { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.APIServiceList, items []*v1beta1.APIService) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("apiservices")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("APIService")),
+			v2fake.WithListMetaCopier[v1beta1.APIService](func(dst, src *v1beta1.APIServiceList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.APIServiceList) []v1beta1.APIService { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.APIServiceList, items []v1beta1.APIService) { list.Items = items }),
 		),
 		fake,
 	}

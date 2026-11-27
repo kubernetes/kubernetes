@@ -21,30 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 )
 
 // fakeDaemonSets implements DaemonSetInterface
 type fakeDaemonSets struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.DaemonSet, *v1beta1.DaemonSetList, *extensionsv1beta1.DaemonSetApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.DaemonSet, v1beta1.DaemonSetList, extensionsv1beta1.DaemonSetApplyConfiguration, *v1beta1.DaemonSet, *v1beta1.DaemonSetList, *extensionsv1beta1.DaemonSetApplyConfiguration]
 	Fake *FakeExtensionsV1beta1
 }
 
 func newFakeDaemonSets(fake *FakeExtensionsV1beta1, namespace string) typedextensionsv1beta1.DaemonSetInterface {
 	return &fakeDaemonSets{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.DaemonSet, *v1beta1.DaemonSetList, *extensionsv1beta1.DaemonSetApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.DaemonSet, v1beta1.DaemonSetList, extensionsv1beta1.DaemonSetApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("daemonsets"),
-			v1beta1.SchemeGroupVersion.WithKind("DaemonSet"),
-			func() *v1beta1.DaemonSet { return &v1beta1.DaemonSet{} },
-			func() *v1beta1.DaemonSetList { return &v1beta1.DaemonSetList{} },
-			func(dst, src *v1beta1.DaemonSetList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.DaemonSetList) []*v1beta1.DaemonSet { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.DaemonSetList, items []*v1beta1.DaemonSet) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("daemonsets")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("DaemonSet")),
+			v2fake.WithListMetaCopier[v1beta1.DaemonSet](func(dst, src *v1beta1.DaemonSetList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.DaemonSetList) []v1beta1.DaemonSet { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.DaemonSetList, items []v1beta1.DaemonSet) { list.Items = items }),
 		),
 		fake,
 	}

@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	applyconfigurationapiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/applyconfiguration/apiregistration/v1beta1"
 	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
@@ -57,20 +57,17 @@ type APIServiceInterface interface {
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	*gentype.ClientWithListAndApply[*apiregistrationv1beta1.APIService, *apiregistrationv1beta1.APIServiceList, *applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration]
+	*v2.TypedClientWithListAndApply[apiregistrationv1beta1.APIService, apiregistrationv1beta1.APIServiceList, applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration, *apiregistrationv1beta1.APIService, *apiregistrationv1beta1.APIServiceList, *applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration]
 }
 
 // newAPIServices returns a APIServices
 func newAPIServices(c *ApiregistrationV1beta1Client) *aPIServices {
 	return &aPIServices{
-		gentype.NewClientWithListAndApply[*apiregistrationv1beta1.APIService, *apiregistrationv1beta1.APIServiceList, *applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration](
-			"apiservices",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *apiregistrationv1beta1.APIService { return &apiregistrationv1beta1.APIService{} },
-			func() *apiregistrationv1beta1.APIServiceList { return &apiregistrationv1beta1.APIServiceList{} },
-			gentype.PrefersProtobuf[*apiregistrationv1beta1.APIService](),
+		v2.NewTypedClientWithListAndApply[apiregistrationv1beta1.APIService, apiregistrationv1beta1.APIServiceList, applyconfigurationapiregistrationv1beta1.APIServiceApplyConfiguration](
+			v2.ForResource("apiservices"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

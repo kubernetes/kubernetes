@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	apiv1 "k8s.io/code-generator/examples/single/api/v1"
 	applyconfigurationapiv1 "k8s.io/code-generator/examples/single/applyconfiguration/api/v1"
 	scheme "k8s.io/code-generator/examples/single/clientset/versioned/scheme"
@@ -57,19 +57,17 @@ type TestTypeInterface interface {
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	*gentype.ClientWithListAndApply[*apiv1.TestType, *apiv1.TestTypeList, *applyconfigurationapiv1.TestTypeApplyConfiguration]
+	*v2.TypedClientWithListAndApply[apiv1.TestType, apiv1.TestTypeList, applyconfigurationapiv1.TestTypeApplyConfiguration, *apiv1.TestType, *apiv1.TestTypeList, *applyconfigurationapiv1.TestTypeApplyConfiguration]
 }
 
 // newTestTypes returns a TestTypes
 func newTestTypes(c *ExampleV1Client, namespace string) *testTypes {
 	return &testTypes{
-		gentype.NewClientWithListAndApply[*apiv1.TestType, *apiv1.TestTypeList, *applyconfigurationapiv1.TestTypeApplyConfiguration](
-			"testtypes",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *apiv1.TestType { return &apiv1.TestType{} },
-			func() *apiv1.TestTypeList { return &apiv1.TestTypeList{} },
+		v2.NewTypedClientWithListAndApply[apiv1.TestType, apiv1.TestTypeList, applyconfigurationapiv1.TestTypeApplyConfiguration](
+			v2.ForResource("testtypes"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
 		),
 	}
 }

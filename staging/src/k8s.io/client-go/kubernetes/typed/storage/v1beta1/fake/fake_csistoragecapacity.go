@@ -21,32 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 )
 
 // fakeCSIStorageCapacities implements CSIStorageCapacityInterface
 type fakeCSIStorageCapacities struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.CSIStorageCapacity, *v1beta1.CSIStorageCapacityList, *storagev1beta1.CSIStorageCapacityApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.CSIStorageCapacity, v1beta1.CSIStorageCapacityList, storagev1beta1.CSIStorageCapacityApplyConfiguration, *v1beta1.CSIStorageCapacity, *v1beta1.CSIStorageCapacityList, *storagev1beta1.CSIStorageCapacityApplyConfiguration]
 	Fake *FakeStorageV1beta1
 }
 
 func newFakeCSIStorageCapacities(fake *FakeStorageV1beta1, namespace string) typedstoragev1beta1.CSIStorageCapacityInterface {
 	return &fakeCSIStorageCapacities{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.CSIStorageCapacity, *v1beta1.CSIStorageCapacityList, *storagev1beta1.CSIStorageCapacityApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.CSIStorageCapacity, v1beta1.CSIStorageCapacityList, storagev1beta1.CSIStorageCapacityApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"),
-			v1beta1.SchemeGroupVersion.WithKind("CSIStorageCapacity"),
-			func() *v1beta1.CSIStorageCapacity { return &v1beta1.CSIStorageCapacity{} },
-			func() *v1beta1.CSIStorageCapacityList { return &v1beta1.CSIStorageCapacityList{} },
-			func(dst, src *v1beta1.CSIStorageCapacityList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.CSIStorageCapacityList) []*v1beta1.CSIStorageCapacity {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.CSIStorageCapacityList, items []*v1beta1.CSIStorageCapacity) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("csistoragecapacities")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("CSIStorageCapacity")),
+			v2fake.WithListMetaCopier[v1beta1.CSIStorageCapacity](func(dst, src *v1beta1.CSIStorageCapacityList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.CSIStorageCapacityList) []v1beta1.CSIStorageCapacity { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.CSIStorageCapacityList, items []v1beta1.CSIStorageCapacity) { list.Items = items }),
 		),
 		fake,
 	}

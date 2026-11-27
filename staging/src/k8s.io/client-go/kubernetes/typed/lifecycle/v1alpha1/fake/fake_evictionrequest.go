@@ -21,32 +21,26 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/lifecycle/v1alpha1"
 	lifecyclev1alpha1 "k8s.io/client-go/applyconfigurations/lifecycle/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedlifecyclev1alpha1 "k8s.io/client-go/kubernetes/typed/lifecycle/v1alpha1"
 )
 
 // fakeEvictionRequests implements EvictionRequestInterface
 type fakeEvictionRequests struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.EvictionRequest, *v1alpha1.EvictionRequestList, *lifecyclev1alpha1.EvictionRequestApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.EvictionRequest, v1alpha1.EvictionRequestList, lifecyclev1alpha1.EvictionRequestApplyConfiguration, *v1alpha1.EvictionRequest, *v1alpha1.EvictionRequestList, *lifecyclev1alpha1.EvictionRequestApplyConfiguration]
 	Fake *FakeLifecycleV1alpha1
 }
 
 func newFakeEvictionRequests(fake *FakeLifecycleV1alpha1, namespace string) typedlifecyclev1alpha1.EvictionRequestInterface {
 	return &fakeEvictionRequests{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.EvictionRequest, *v1alpha1.EvictionRequestList, *lifecyclev1alpha1.EvictionRequestApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.EvictionRequest, v1alpha1.EvictionRequestList, lifecyclev1alpha1.EvictionRequestApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1alpha1.SchemeGroupVersion.WithResource("evictionrequests"),
-			v1alpha1.SchemeGroupVersion.WithKind("EvictionRequest"),
-			func() *v1alpha1.EvictionRequest { return &v1alpha1.EvictionRequest{} },
-			func() *v1alpha1.EvictionRequestList { return &v1alpha1.EvictionRequestList{} },
-			func(dst, src *v1alpha1.EvictionRequestList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.EvictionRequestList) []*v1alpha1.EvictionRequest {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1alpha1.EvictionRequestList, items []*v1alpha1.EvictionRequest) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("evictionrequests")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("EvictionRequest")),
+			v2fake.WithListMetaCopier[v1alpha1.EvictionRequest](func(dst, src *v1alpha1.EvictionRequestList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.EvictionRequestList) []v1alpha1.EvictionRequest { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1alpha1.EvictionRequestList, items []v1alpha1.EvictionRequest) { list.Items = items }),
 		),
 		fake,
 	}

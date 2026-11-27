@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsautoscalingv2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
-	gentype "k8s.io/client-go/gentype"
+	gentypev2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type HorizontalPodAutoscalerInterface interface {
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
 type horizontalPodAutoscalers struct {
-	*gentype.ClientWithListAndApply[*autoscalingv2.HorizontalPodAutoscaler, *autoscalingv2.HorizontalPodAutoscalerList, *applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration]
+	*gentypev2.TypedClientWithListAndApply[autoscalingv2.HorizontalPodAutoscaler, autoscalingv2.HorizontalPodAutoscalerList, applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration, *autoscalingv2.HorizontalPodAutoscaler, *autoscalingv2.HorizontalPodAutoscalerList, *applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration]
 }
 
 // newHorizontalPodAutoscalers returns a HorizontalPodAutoscalers
 func newHorizontalPodAutoscalers(c *AutoscalingV2Client, namespace string) *horizontalPodAutoscalers {
 	return &horizontalPodAutoscalers{
-		gentype.NewClientWithListAndApply[*autoscalingv2.HorizontalPodAutoscaler, *autoscalingv2.HorizontalPodAutoscalerList, *applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration](
-			"horizontalpodautoscalers",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *autoscalingv2.HorizontalPodAutoscaler { return &autoscalingv2.HorizontalPodAutoscaler{} },
-			func() *autoscalingv2.HorizontalPodAutoscalerList { return &autoscalingv2.HorizontalPodAutoscalerList{} },
-			gentype.PrefersProtobuf[*autoscalingv2.HorizontalPodAutoscaler](),
+		gentypev2.NewTypedClientWithListAndApply[autoscalingv2.HorizontalPodAutoscaler, autoscalingv2.HorizontalPodAutoscalerList, applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration](
+			gentypev2.ForResource("horizontalpodautoscalers"),
+			gentypev2.UsingClient(c.RESTClient()),
+			gentypev2.UsingParameterCodec(scheme.ParameterCodec),
+			gentypev2.InNamespace(namespace),
+			gentypev2.PrefersProtobuf(),
 		),
 	}
 }

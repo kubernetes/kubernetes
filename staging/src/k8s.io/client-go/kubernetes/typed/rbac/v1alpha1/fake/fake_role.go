@@ -21,28 +21,26 @@ package fake
 import (
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedrbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
 )
 
 // fakeRoles implements RoleInterface
 type fakeRoles struct {
-	*gentype.FakeClientWithListAndApply[*v1alpha1.Role, *v1alpha1.RoleList, *rbacv1alpha1.RoleApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1alpha1.Role, v1alpha1.RoleList, rbacv1alpha1.RoleApplyConfiguration, *v1alpha1.Role, *v1alpha1.RoleList, *rbacv1alpha1.RoleApplyConfiguration]
 	Fake *FakeRbacV1alpha1
 }
 
 func newFakeRoles(fake *FakeRbacV1alpha1, namespace string) typedrbacv1alpha1.RoleInterface {
 	return &fakeRoles{
-		gentype.NewFakeClientWithListAndApply[*v1alpha1.Role, *v1alpha1.RoleList, *rbacv1alpha1.RoleApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1alpha1.Role, v1alpha1.RoleList, rbacv1alpha1.RoleApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1alpha1.SchemeGroupVersion.WithResource("roles"),
-			v1alpha1.SchemeGroupVersion.WithKind("Role"),
-			func() *v1alpha1.Role { return &v1alpha1.Role{} },
-			func() *v1alpha1.RoleList { return &v1alpha1.RoleList{} },
-			func(dst, src *v1alpha1.RoleList) { dst.ListMeta = src.ListMeta },
-			func(list *v1alpha1.RoleList) []*v1alpha1.Role { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1alpha1.RoleList, items []*v1alpha1.Role) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1alpha1.SchemeGroupVersion.WithResource("roles")),
+			v2fake.ForKind(v1alpha1.SchemeGroupVersion.WithKind("Role")),
+			v2fake.WithListMetaCopier[v1alpha1.Role](func(dst, src *v1alpha1.RoleList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1alpha1.RoleList) []v1alpha1.Role { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1alpha1.RoleList, items []v1alpha1.Role) { list.Items = items }),
 		),
 		fake,
 	}

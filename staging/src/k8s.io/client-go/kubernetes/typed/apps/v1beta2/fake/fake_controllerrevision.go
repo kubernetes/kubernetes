@@ -21,32 +21,26 @@ package fake
 import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedappsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
 )
 
 // fakeControllerRevisions implements ControllerRevisionInterface
 type fakeControllerRevisions struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.ControllerRevision, *v1beta2.ControllerRevisionList, *appsv1beta2.ControllerRevisionApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta2.ControllerRevision, v1beta2.ControllerRevisionList, appsv1beta2.ControllerRevisionApplyConfiguration, *v1beta2.ControllerRevision, *v1beta2.ControllerRevisionList, *appsv1beta2.ControllerRevisionApplyConfiguration]
 	Fake *FakeAppsV1beta2
 }
 
 func newFakeControllerRevisions(fake *FakeAppsV1beta2, namespace string) typedappsv1beta2.ControllerRevisionInterface {
 	return &fakeControllerRevisions{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.ControllerRevision, *v1beta2.ControllerRevisionList, *appsv1beta2.ControllerRevisionApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta2.ControllerRevision, v1beta2.ControllerRevisionList, appsv1beta2.ControllerRevisionApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta2.SchemeGroupVersion.WithResource("controllerrevisions"),
-			v1beta2.SchemeGroupVersion.WithKind("ControllerRevision"),
-			func() *v1beta2.ControllerRevision { return &v1beta2.ControllerRevision{} },
-			func() *v1beta2.ControllerRevisionList { return &v1beta2.ControllerRevisionList{} },
-			func(dst, src *v1beta2.ControllerRevisionList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.ControllerRevisionList) []*v1beta2.ControllerRevision {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta2.ControllerRevisionList, items []*v1beta2.ControllerRevision) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta2.SchemeGroupVersion.WithResource("controllerrevisions")),
+			v2fake.ForKind(v1beta2.SchemeGroupVersion.WithKind("ControllerRevision")),
+			v2fake.WithListMetaCopier[v1beta2.ControllerRevision](func(dst, src *v1beta2.ControllerRevisionList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta2.ControllerRevisionList) []v1beta2.ControllerRevision { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta2.ControllerRevisionList, items []v1beta2.ControllerRevision) { list.Items = items }),
 		),
 		fake,
 	}

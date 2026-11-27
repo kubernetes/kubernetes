@@ -21,30 +21,25 @@ package fake
 import (
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	rbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedrbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 )
 
 // fakeClusterRoles implements ClusterRoleInterface
 type fakeClusterRoles struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.ClusterRole, *v1beta1.ClusterRoleList, *rbacv1beta1.ClusterRoleApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.ClusterRole, v1beta1.ClusterRoleList, rbacv1beta1.ClusterRoleApplyConfiguration, *v1beta1.ClusterRole, *v1beta1.ClusterRoleList, *rbacv1beta1.ClusterRoleApplyConfiguration]
 	Fake *FakeRbacV1beta1
 }
 
 func newFakeClusterRoles(fake *FakeRbacV1beta1) typedrbacv1beta1.ClusterRoleInterface {
 	return &fakeClusterRoles{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.ClusterRole, *v1beta1.ClusterRoleList, *rbacv1beta1.ClusterRoleApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.ClusterRole, v1beta1.ClusterRoleList, rbacv1beta1.ClusterRoleApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("clusterroles"),
-			v1beta1.SchemeGroupVersion.WithKind("ClusterRole"),
-			func() *v1beta1.ClusterRole { return &v1beta1.ClusterRole{} },
-			func() *v1beta1.ClusterRoleList { return &v1beta1.ClusterRoleList{} },
-			func(dst, src *v1beta1.ClusterRoleList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.ClusterRoleList) []*v1beta1.ClusterRole { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.ClusterRoleList, items []*v1beta1.ClusterRole) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("clusterroles")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("ClusterRole")),
+			v2fake.WithListMetaCopier[v1beta1.ClusterRole](func(dst, src *v1beta1.ClusterRoleList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.ClusterRoleList) []v1beta1.ClusterRole { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.ClusterRoleList, items []v1beta1.ClusterRole) { list.Items = items }),
 		),
 		fake,
 	}

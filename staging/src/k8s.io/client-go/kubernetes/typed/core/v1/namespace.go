@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -56,20 +56,17 @@ type NamespaceInterface interface {
 
 // namespaces implements NamespaceInterface
 type namespaces struct {
-	*gentype.ClientWithListAndApply[*corev1.Namespace, *corev1.NamespaceList, *applyconfigurationscorev1.NamespaceApplyConfiguration]
+	*v2.TypedClientWithListAndApply[corev1.Namespace, corev1.NamespaceList, applyconfigurationscorev1.NamespaceApplyConfiguration, *corev1.Namespace, *corev1.NamespaceList, *applyconfigurationscorev1.NamespaceApplyConfiguration]
 }
 
 // newNamespaces returns a Namespaces
 func newNamespaces(c *CoreV1Client) *namespaces {
 	return &namespaces{
-		gentype.NewClientWithListAndApply[*corev1.Namespace, *corev1.NamespaceList, *applyconfigurationscorev1.NamespaceApplyConfiguration](
-			"namespaces",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			"",
-			func() *corev1.Namespace { return &corev1.Namespace{} },
-			func() *corev1.NamespaceList { return &corev1.NamespaceList{} },
-			gentype.PrefersProtobuf[*corev1.Namespace](),
+		v2.NewTypedClientWithListAndApply[corev1.Namespace, corev1.NamespaceList, applyconfigurationscorev1.NamespaceApplyConfiguration](
+			v2.ForResource("namespaces"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

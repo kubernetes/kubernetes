@@ -21,28 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/coordination/v1beta1"
 	coordinationv1beta1 "k8s.io/client-go/applyconfigurations/coordination/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 )
 
 // fakeLeases implements LeaseInterface
 type fakeLeases struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.Lease, *v1beta1.LeaseList, *coordinationv1beta1.LeaseApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.Lease, v1beta1.LeaseList, coordinationv1beta1.LeaseApplyConfiguration, *v1beta1.Lease, *v1beta1.LeaseList, *coordinationv1beta1.LeaseApplyConfiguration]
 	Fake *FakeCoordinationV1beta1
 }
 
 func newFakeLeases(fake *FakeCoordinationV1beta1, namespace string) typedcoordinationv1beta1.LeaseInterface {
 	return &fakeLeases{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.Lease, *v1beta1.LeaseList, *coordinationv1beta1.LeaseApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.Lease, v1beta1.LeaseList, coordinationv1beta1.LeaseApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("leases"),
-			v1beta1.SchemeGroupVersion.WithKind("Lease"),
-			func() *v1beta1.Lease { return &v1beta1.Lease{} },
-			func() *v1beta1.LeaseList { return &v1beta1.LeaseList{} },
-			func(dst, src *v1beta1.LeaseList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.LeaseList) []*v1beta1.Lease { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.LeaseList, items []*v1beta1.Lease) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("leases")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("Lease")),
+			v2fake.WithListMetaCopier[v1beta1.Lease](func(dst, src *v1beta1.LeaseList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.LeaseList) []v1beta1.Lease { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.LeaseList, items []v1beta1.Lease) { list.Items = items }),
 		),
 		fake,
 	}

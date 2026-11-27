@@ -21,32 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/policy/v1"
 	policyv1 "k8s.io/client-go/applyconfigurations/policy/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedpolicyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
 )
 
 // fakePodDisruptionBudgets implements PodDisruptionBudgetInterface
 type fakePodDisruptionBudgets struct {
-	*gentype.FakeClientWithListAndApply[*v1.PodDisruptionBudget, *v1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.PodDisruptionBudget, v1.PodDisruptionBudgetList, policyv1.PodDisruptionBudgetApplyConfiguration, *v1.PodDisruptionBudget, *v1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetApplyConfiguration]
 	Fake *FakePolicyV1
 }
 
 func newFakePodDisruptionBudgets(fake *FakePolicyV1, namespace string) typedpolicyv1.PodDisruptionBudgetInterface {
 	return &fakePodDisruptionBudgets{
-		gentype.NewFakeClientWithListAndApply[*v1.PodDisruptionBudget, *v1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.PodDisruptionBudget, v1.PodDisruptionBudgetList, policyv1.PodDisruptionBudgetApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("poddisruptionbudgets"),
-			v1.SchemeGroupVersion.WithKind("PodDisruptionBudget"),
-			func() *v1.PodDisruptionBudget { return &v1.PodDisruptionBudget{} },
-			func() *v1.PodDisruptionBudgetList { return &v1.PodDisruptionBudgetList{} },
-			func(dst, src *v1.PodDisruptionBudgetList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.PodDisruptionBudgetList) []*v1.PodDisruptionBudget {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.PodDisruptionBudgetList, items []*v1.PodDisruptionBudget) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("poddisruptionbudgets")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("PodDisruptionBudget")),
+			v2fake.WithListMetaCopier[v1.PodDisruptionBudget](func(dst, src *v1.PodDisruptionBudgetList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.PodDisruptionBudgetList) []v1.PodDisruptionBudget { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.PodDisruptionBudgetList, items []v1.PodDisruptionBudget) { list.Items = items }),
 		),
 		fake,
 	}

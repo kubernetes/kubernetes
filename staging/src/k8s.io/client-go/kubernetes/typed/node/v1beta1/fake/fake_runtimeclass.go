@@ -21,32 +21,25 @@ package fake
 import (
 	v1beta1 "k8s.io/api/node/v1beta1"
 	nodev1beta1 "k8s.io/client-go/applyconfigurations/node/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typednodev1beta1 "k8s.io/client-go/kubernetes/typed/node/v1beta1"
 )
 
 // fakeRuntimeClasses implements RuntimeClassInterface
 type fakeRuntimeClasses struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.RuntimeClass, *v1beta1.RuntimeClassList, *nodev1beta1.RuntimeClassApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.RuntimeClass, v1beta1.RuntimeClassList, nodev1beta1.RuntimeClassApplyConfiguration, *v1beta1.RuntimeClass, *v1beta1.RuntimeClassList, *nodev1beta1.RuntimeClassApplyConfiguration]
 	Fake *FakeNodeV1beta1
 }
 
 func newFakeRuntimeClasses(fake *FakeNodeV1beta1) typednodev1beta1.RuntimeClassInterface {
 	return &fakeRuntimeClasses{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.RuntimeClass, *v1beta1.RuntimeClassList, *nodev1beta1.RuntimeClassApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.RuntimeClass, v1beta1.RuntimeClassList, nodev1beta1.RuntimeClassApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("runtimeclasses"),
-			v1beta1.SchemeGroupVersion.WithKind("RuntimeClass"),
-			func() *v1beta1.RuntimeClass { return &v1beta1.RuntimeClass{} },
-			func() *v1beta1.RuntimeClassList { return &v1beta1.RuntimeClassList{} },
-			func(dst, src *v1beta1.RuntimeClassList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.RuntimeClassList) []*v1beta1.RuntimeClass {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.RuntimeClassList, items []*v1beta1.RuntimeClass) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("runtimeclasses")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("RuntimeClass")),
+			v2fake.WithListMetaCopier[v1beta1.RuntimeClass](func(dst, src *v1beta1.RuntimeClassList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.RuntimeClassList) []v1beta1.RuntimeClass { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.RuntimeClassList, items []v1beta1.RuntimeClass) { list.Items = items }),
 		),
 		fake,
 	}

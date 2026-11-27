@@ -21,32 +21,26 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakePersistentVolumeClaims implements PersistentVolumeClaimInterface
 type fakePersistentVolumeClaims struct {
-	*gentype.FakeClientWithListAndApply[*v1.PersistentVolumeClaim, *v1.PersistentVolumeClaimList, *corev1.PersistentVolumeClaimApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.PersistentVolumeClaim, v1.PersistentVolumeClaimList, corev1.PersistentVolumeClaimApplyConfiguration, *v1.PersistentVolumeClaim, *v1.PersistentVolumeClaimList, *corev1.PersistentVolumeClaimApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakePersistentVolumeClaims(fake *FakeCoreV1, namespace string) typedcorev1.PersistentVolumeClaimInterface {
 	return &fakePersistentVolumeClaims{
-		gentype.NewFakeClientWithListAndApply[*v1.PersistentVolumeClaim, *v1.PersistentVolumeClaimList, *corev1.PersistentVolumeClaimApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.PersistentVolumeClaim, v1.PersistentVolumeClaimList, corev1.PersistentVolumeClaimApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-			v1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"),
-			func() *v1.PersistentVolumeClaim { return &v1.PersistentVolumeClaim{} },
-			func() *v1.PersistentVolumeClaimList { return &v1.PersistentVolumeClaimList{} },
-			func(dst, src *v1.PersistentVolumeClaimList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.PersistentVolumeClaimList) []*v1.PersistentVolumeClaim {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1.PersistentVolumeClaimList, items []*v1.PersistentVolumeClaim) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("persistentvolumeclaims")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("PersistentVolumeClaim")),
+			v2fake.WithListMetaCopier[v1.PersistentVolumeClaim](func(dst, src *v1.PersistentVolumeClaimList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.PersistentVolumeClaimList) []v1.PersistentVolumeClaim { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.PersistentVolumeClaimList, items []v1.PersistentVolumeClaim) { list.Items = items }),
 		),
 		fake,
 	}

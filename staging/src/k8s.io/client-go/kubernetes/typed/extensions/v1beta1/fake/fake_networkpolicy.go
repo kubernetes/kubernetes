@@ -21,32 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 )
 
 // fakeNetworkPolicies implements NetworkPolicyInterface
 type fakeNetworkPolicies struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.NetworkPolicy, *v1beta1.NetworkPolicyList, *extensionsv1beta1.NetworkPolicyApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.NetworkPolicy, v1beta1.NetworkPolicyList, extensionsv1beta1.NetworkPolicyApplyConfiguration, *v1beta1.NetworkPolicy, *v1beta1.NetworkPolicyList, *extensionsv1beta1.NetworkPolicyApplyConfiguration]
 	Fake *FakeExtensionsV1beta1
 }
 
 func newFakeNetworkPolicies(fake *FakeExtensionsV1beta1, namespace string) typedextensionsv1beta1.NetworkPolicyInterface {
 	return &fakeNetworkPolicies{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.NetworkPolicy, *v1beta1.NetworkPolicyList, *extensionsv1beta1.NetworkPolicyApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.NetworkPolicy, v1beta1.NetworkPolicyList, extensionsv1beta1.NetworkPolicyApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
-			v1beta1.SchemeGroupVersion.WithKind("NetworkPolicy"),
-			func() *v1beta1.NetworkPolicy { return &v1beta1.NetworkPolicy{} },
-			func() *v1beta1.NetworkPolicyList { return &v1beta1.NetworkPolicyList{} },
-			func(dst, src *v1beta1.NetworkPolicyList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.NetworkPolicyList) []*v1beta1.NetworkPolicy {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.NetworkPolicyList, items []*v1beta1.NetworkPolicy) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("networkpolicies")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("NetworkPolicy")),
+			v2fake.WithListMetaCopier[v1beta1.NetworkPolicy](func(dst, src *v1beta1.NetworkPolicyList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.NetworkPolicyList) []v1beta1.NetworkPolicy { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.NetworkPolicyList, items []v1beta1.NetworkPolicy) { list.Items = items }),
 		),
 		fake,
 	}

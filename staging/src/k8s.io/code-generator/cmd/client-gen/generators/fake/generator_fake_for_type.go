@@ -114,14 +114,21 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"NewRootUpdateSubresourceActionWithOptions": c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootUpdateSubresourceActionWithOptions"}),
 		"NewRootPatchSubresourceActionWithOptions":  c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootPatchSubresourceActionWithOptions"}),
 		"NewPatchSubresourceActionWithOptions":      c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewPatchSubresourceActionWithOptions"}),
-		"FakeClient":                                c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "FakeClient"}),
-		"NewFakeClient":                             c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewFakeClient"}),
-		"FakeClientWithApply":                       c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "FakeClientWithApply"}),
-		"NewFakeClientWithApply":                    c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewFakeClientWithApply"}),
-		"FakeClientWithList":                        c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "FakeClientWithList"}),
-		"NewFakeClientWithList":                     c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewFakeClientWithList"}),
-		"FakeClientWithListAndApply":                c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "FakeClientWithListAndApply"}),
-		"NewFakeClientWithListAndApply":             c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewFakeClientWithListAndApply"}),
+		"FakeClient":                                c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "FakeClient"}),
+		"NewFakeClient":                             c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "NewFakeClient"}),
+		"FakeClientWithApply":                       c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "FakeClientWithApply"}),
+		"NewFakeClientWithApply":                    c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "NewFakeClientWithApply"}),
+		"FakeClientWithList":                        c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "FakeClientWithList"}),
+		"NewFakeClientWithList":                     c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "NewFakeClientWithList"}),
+		"FakeClientWithListAndApply":                c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "FakeClientWithListAndApply"}),
+		"NewFakeClientWithListAndApply":             c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "NewFakeClientWithListAndApply"}),
+		"Option":                                    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "Option"}),
+		"ForKind":                                   c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "ForKind"}),
+		"ForResource":                               c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "ForResource"}),
+		"InNamespace":                               c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "InNamespace"}),
+		"WithListMetaCopier":                        c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "WithListMetaCopier"}),
+		"WithItemsGetter":                           c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "WithItemsGetter"}),
+		"WithItemsSetter":                           c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2/fake", Name: "WithItemsSetter"}),
 	}
 
 	generateApply := len(g.applyConfigurationPackage) > 0
@@ -269,28 +276,28 @@ var structType = []string{
 	noList | noApply: `
 	// fake$.type|publicPlural$ implements $.type|public$Interface
 	type fake$.type|publicPlural$ struct {
-		*$.FakeClient|raw$[*$.type|raw$]
+		*$.FakeClient|raw$[$.type|raw$, *$.type|raw$]
 		Fake *Fake$.GroupGoName$$.Version$
 	}
 	`,
 	withList | noApply: `
 	// fake$.type|publicPlural$ implements $.type|public$Interface
 	type fake$.type|publicPlural$ struct {
-		*$.FakeClientWithList|raw$[*$.type|raw$, *$.type|raw$List]
+		*$.FakeClientWithList|raw$[$.type|raw$, $.type|raw$List, *$.type|raw$, *$.type|raw$List]
 		Fake *Fake$.GroupGoName$$.Version$
 	}
 	`,
 	noList | withApply: `
 	// fake$.type|publicPlural$ implements $.type|public$Interface
 	type fake$.type|publicPlural$ struct {
-		*$.FakeClientWithApply|raw$[*$.type|raw$, *$.inputApplyConfig|raw$]
+		*$.FakeClientWithApply|raw$[$.type|raw$, $.inputApplyConfig|raw$, *$.type|raw$, *$.inputApplyConfig|raw$]
 		Fake *Fake$.GroupGoName$$.Version$
 	}
 	`,
 	withList | withApply: `
 	// fake$.type|publicPlural$ implements $.type|public$Interface
 	type fake$.type|publicPlural$ struct {
-		*$.FakeClientWithListAndApply|raw$[*$.type|raw$, *$.type|raw$List, *$.inputApplyConfig|raw$]
+		*$.FakeClientWithListAndApply|raw$[$.type|raw$, $.type|raw$List, $.inputApplyConfig|raw$, *$.type|raw$, *$.type|raw$List, *$.inputApplyConfig|raw$]
 		Fake *Fake$.GroupGoName$$.Version$
 	}
 	`,
@@ -301,12 +308,11 @@ var newStruct = []string{
 	noList | noApply: `
 	func newFake$.type|publicPlural$(fake *Fake$.GroupGoName$$.Version$$if .namespaced$, namespace string$end$) $.realClientInterface|raw$ {
 		return &fake$.type|publicPlural${
-			$.NewFakeClient|raw$[*$.type|raw$](
-				fake.Fake,
-				$if .namespaced$namespace$else$""$end$,
-				$.SchemeGroupVersion|raw$.WithResource("$.type|resource$"),
-				$.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$"),
-				func() *$.type|raw$ {return &$.type|raw${}},
+			$.NewFakeClient|raw$[$.type|raw$](
+				fake.Fake, $if .namespaced$
+				$.InNamespace|raw$(namespace),$end$
+				$.ForResource|raw$($.SchemeGroupVersion|raw$.WithResource("$.type|resource$")),
+				$.ForKind|raw$($.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$")),
 			),
 			fake,
 		}
@@ -315,12 +321,11 @@ var newStruct = []string{
 	noList | withApply: `
 	func newFake$.type|publicPlural$(fake *Fake$.GroupGoName$$.Version$$if .namespaced$, namespace string$end$) $.realClientInterface|raw$ {
 		return &fake$.type|publicPlural${
-			$.NewFakeClientWithApply|raw$[*$.type|raw$, *$.inputApplyConfig|raw$](
-				fake.Fake,
-				$if .namespaced$namespace$else$""$end$,
-				$.SchemeGroupVersion|raw$.WithResource("$.type|resource$"),
-				$.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$"),
-				func() *$.type|raw$ {return &$.type|raw${}},
+			$.NewFakeClientWithApply|raw$[$.type|raw$, $.inputApplyConfig|raw$](
+				fake.Fake, $if .namespaced$
+				$.InNamespace|raw$(namespace),$end$
+				$.ForResource|raw$($.SchemeGroupVersion|raw$.WithResource("$.type|resource$")),
+				$.ForKind|raw$($.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$")),
 			),
 			fake,
 		}
@@ -329,16 +334,14 @@ var newStruct = []string{
 	withList | noApply: `
 	func newFake$.type|publicPlural$(fake *Fake$.GroupGoName$$.Version$$if .namespaced$, namespace string$end$) $.realClientInterface|raw$ {
 		return &fake$.type|publicPlural${
-			$.NewFakeClientWithList|raw$[*$.type|raw$, *$.type|raw$List](
-				fake.Fake,
-				$if .namespaced$namespace$else$""$end$,
-				$.SchemeGroupVersion|raw$.WithResource("$.type|resource$"),
-				$.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$"),
-				func() *$.type|raw$ {return &$.type|raw${}},
-				func() *$.type|raw$List {return &$.type|raw$List{}},
-				func(dst, src *$.type|raw$List) {dst.ListMeta = src.ListMeta},
-				func(list *$.type|raw$List) []*$.type|raw$ {return gentype.ToPointerSlice(list.Items)},
-				func(list *$.type|raw$List, items []*$.type|raw$) {list.Items = gentype.FromPointerSlice(items)},
+			$.NewFakeClientWithList|raw$[$.type|raw$, $.type|raw$List](
+				fake.Fake, $if .namespaced$
+				$.InNamespace|raw$(namespace),$end$
+				$.ForResource|raw$($.SchemeGroupVersion|raw$.WithResource("$.type|resource$")),
+				$.ForKind|raw$($.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$")),
+				$.WithListMetaCopier|raw$[$.type|raw$](func(dst, src *$.type|raw$List) { dst.ListMeta = src.ListMeta }),
+				$.WithItemsGetter|raw$(func(list *$.type|raw$List) []$.type|raw$ { return list.Items }),
+				$.WithItemsSetter|raw$(func(list *$.type|raw$List, items []$.type|raw$) { list.Items = items }),
 			),
 			fake,
 		}
@@ -347,16 +350,14 @@ var newStruct = []string{
 	withList | withApply: `
 	func newFake$.type|publicPlural$(fake *Fake$.GroupGoName$$.Version$$if .namespaced$, namespace string$end$) $.realClientInterface|raw$ {
 		return &fake$.type|publicPlural${
-			$.NewFakeClientWithListAndApply|raw$[*$.type|raw$, *$.type|raw$List, *$.inputApplyConfig|raw$](
-				fake.Fake,
-				$if .namespaced$namespace$else$""$end$,
-				$.SchemeGroupVersion|raw$.WithResource("$.type|resource$"),
-				$.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$"),
-				func() *$.type|raw$ {return &$.type|raw${}},
-				func() *$.type|raw$List {return &$.type|raw$List{}},
-				func(dst, src *$.type|raw$List) {dst.ListMeta = src.ListMeta},
-				func(list *$.type|raw$List) []*$.type|raw$ {return gentype.ToPointerSlice(list.Items)},
-				func(list *$.type|raw$List, items []*$.type|raw$) {list.Items = gentype.FromPointerSlice(items)},
+			$.NewFakeClientWithListAndApply|raw$[$.type|raw$, $.type|raw$List, $.inputApplyConfig|raw$](
+				fake.Fake, $if .namespaced$
+				$.InNamespace|raw$(namespace),$end$
+				$.ForResource|raw$($.SchemeGroupVersion|raw$.WithResource("$.type|resource$")),
+				$.ForKind|raw$($.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$")),
+				$.WithListMetaCopier|raw$[$.type|raw$](func(dst, src *$.type|raw$List) { dst.ListMeta = src.ListMeta }),
+				$.WithItemsGetter|raw$(func(list *$.type|raw$List) []$.type|raw$ { return list.Items }),
+				$.WithItemsSetter|raw$(func(list *$.type|raw$List, items []$.type|raw$) { list.Items = items }),
 			),
 			fake,
 		}

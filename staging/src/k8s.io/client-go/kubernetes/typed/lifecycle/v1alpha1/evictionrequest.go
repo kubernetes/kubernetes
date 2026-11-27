@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationslifecyclev1alpha1 "k8s.io/client-go/applyconfigurations/lifecycle/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -57,20 +57,18 @@ type EvictionRequestInterface interface {
 
 // evictionRequests implements EvictionRequestInterface
 type evictionRequests struct {
-	*gentype.ClientWithListAndApply[*lifecyclev1alpha1.EvictionRequest, *lifecyclev1alpha1.EvictionRequestList, *applyconfigurationslifecyclev1alpha1.EvictionRequestApplyConfiguration]
+	*v2.TypedClientWithListAndApply[lifecyclev1alpha1.EvictionRequest, lifecyclev1alpha1.EvictionRequestList, applyconfigurationslifecyclev1alpha1.EvictionRequestApplyConfiguration, *lifecyclev1alpha1.EvictionRequest, *lifecyclev1alpha1.EvictionRequestList, *applyconfigurationslifecyclev1alpha1.EvictionRequestApplyConfiguration]
 }
 
 // newEvictionRequests returns a EvictionRequests
 func newEvictionRequests(c *LifecycleV1alpha1Client, namespace string) *evictionRequests {
 	return &evictionRequests{
-		gentype.NewClientWithListAndApply[*lifecyclev1alpha1.EvictionRequest, *lifecyclev1alpha1.EvictionRequestList, *applyconfigurationslifecyclev1alpha1.EvictionRequestApplyConfiguration](
-			"evictionrequests",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *lifecyclev1alpha1.EvictionRequest { return &lifecyclev1alpha1.EvictionRequest{} },
-			func() *lifecyclev1alpha1.EvictionRequestList { return &lifecyclev1alpha1.EvictionRequestList{} },
-			gentype.PrefersProtobuf[*lifecyclev1alpha1.EvictionRequest](),
+		v2.NewTypedClientWithListAndApply[lifecyclev1alpha1.EvictionRequest, lifecyclev1alpha1.EvictionRequestList, applyconfigurationslifecyclev1alpha1.EvictionRequestApplyConfiguration](
+			v2.ForResource("evictionrequests"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

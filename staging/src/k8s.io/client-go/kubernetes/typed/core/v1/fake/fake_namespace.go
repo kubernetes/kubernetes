@@ -21,28 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakeNamespaces implements NamespaceInterface
 type fakeNamespaces struct {
-	*gentype.FakeClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1.NamespaceApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.Namespace, v1.NamespaceList, corev1.NamespaceApplyConfiguration, *v1.Namespace, *v1.NamespaceList, *corev1.NamespaceApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeNamespaces(fake *FakeCoreV1) typedcorev1.NamespaceInterface {
 	return &fakeNamespaces{
-		gentype.NewFakeClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1.NamespaceApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.Namespace, v1.NamespaceList, corev1.NamespaceApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("namespaces"),
-			v1.SchemeGroupVersion.WithKind("Namespace"),
-			func() *v1.Namespace { return &v1.Namespace{} },
-			func() *v1.NamespaceList { return &v1.NamespaceList{} },
-			func(dst, src *v1.NamespaceList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.NamespaceList) []*v1.Namespace { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.NamespaceList, items []*v1.Namespace) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("namespaces")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("Namespace")),
+			v2fake.WithListMetaCopier[v1.Namespace](func(dst, src *v1.NamespaceList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.NamespaceList) []v1.Namespace { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.NamespaceList, items []v1.Namespace) { list.Items = items }),
 		),
 		fake,
 	}

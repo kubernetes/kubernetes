@@ -21,28 +21,25 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // fakeNodes implements NodeInterface
 type fakeNodes struct {
-	*gentype.FakeClientWithListAndApply[*v1.Node, *v1.NodeList, *corev1.NodeApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1.Node, v1.NodeList, corev1.NodeApplyConfiguration, *v1.Node, *v1.NodeList, *corev1.NodeApplyConfiguration]
 	Fake *FakeCoreV1
 }
 
 func newFakeNodes(fake *FakeCoreV1) typedcorev1.NodeInterface {
 	return &fakeNodes{
-		gentype.NewFakeClientWithListAndApply[*v1.Node, *v1.NodeList, *corev1.NodeApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1.Node, v1.NodeList, corev1.NodeApplyConfiguration](
 			fake.Fake,
-			"",
-			v1.SchemeGroupVersion.WithResource("nodes"),
-			v1.SchemeGroupVersion.WithKind("Node"),
-			func() *v1.Node { return &v1.Node{} },
-			func() *v1.NodeList { return &v1.NodeList{} },
-			func(dst, src *v1.NodeList) { dst.ListMeta = src.ListMeta },
-			func(list *v1.NodeList) []*v1.Node { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1.NodeList, items []*v1.Node) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.ForResource(v1.SchemeGroupVersion.WithResource("nodes")),
+			v2fake.ForKind(v1.SchemeGroupVersion.WithKind("Node")),
+			v2fake.WithListMetaCopier[v1.Node](func(dst, src *v1.NodeList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1.NodeList) []v1.Node { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1.NodeList, items []v1.Node) { list.Items = items }),
 		),
 		fake,
 	}

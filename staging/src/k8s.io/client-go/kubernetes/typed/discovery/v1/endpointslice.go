@@ -26,7 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsdiscoveryv1 "k8s.io/client-go/applyconfigurations/discovery/v1"
-	gentype "k8s.io/client-go/gentype"
+	v2 "k8s.io/client-go/gentype/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -53,20 +53,18 @@ type EndpointSliceInterface interface {
 
 // endpointSlices implements EndpointSliceInterface
 type endpointSlices struct {
-	*gentype.ClientWithListAndApply[*discoveryv1.EndpointSlice, *discoveryv1.EndpointSliceList, *applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration]
+	*v2.TypedClientWithListAndApply[discoveryv1.EndpointSlice, discoveryv1.EndpointSliceList, applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration, *discoveryv1.EndpointSlice, *discoveryv1.EndpointSliceList, *applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration]
 }
 
 // newEndpointSlices returns a EndpointSlices
 func newEndpointSlices(c *DiscoveryV1Client, namespace string) *endpointSlices {
 	return &endpointSlices{
-		gentype.NewClientWithListAndApply[*discoveryv1.EndpointSlice, *discoveryv1.EndpointSliceList, *applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration](
-			"endpointslices",
-			c.RESTClient(),
-			scheme.ParameterCodec,
-			namespace,
-			func() *discoveryv1.EndpointSlice { return &discoveryv1.EndpointSlice{} },
-			func() *discoveryv1.EndpointSliceList { return &discoveryv1.EndpointSliceList{} },
-			gentype.PrefersProtobuf[*discoveryv1.EndpointSlice](),
+		v2.NewTypedClientWithListAndApply[discoveryv1.EndpointSlice, discoveryv1.EndpointSliceList, applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration](
+			v2.ForResource("endpointslices"),
+			v2.UsingClient(c.RESTClient()),
+			v2.UsingParameterCodec(scheme.ParameterCodec),
+			v2.InNamespace(namespace),
+			v2.PrefersProtobuf(),
 		),
 	}
 }

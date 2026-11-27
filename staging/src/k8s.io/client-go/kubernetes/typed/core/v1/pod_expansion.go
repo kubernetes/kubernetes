@@ -48,7 +48,8 @@ type PodExpansion interface {
 
 // Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
 func (c *pods) Bind(ctx context.Context, binding *v1.Binding, opts metav1.CreateOptions) error {
-	return c.GetClient().Post().Namespace(c.GetNamespace()).Resource("pods").Name(binding.Name).VersionedParams(&opts, scheme.ParameterCodec).SubResource("binding").Body(binding).Do(ctx).Error()
+	_, err := c.SubResourceCreate(ctx, binding.Name, "binding", binding, opts)
+	return err
 }
 
 // Evict submits a policy/v1beta1 Eviction request to the pod's eviction subresource.
@@ -56,15 +57,18 @@ func (c *pods) Bind(ctx context.Context, binding *v1.Binding, opts metav1.Create
 //
 // Deprecated: Use EvictV1() (supported in 1.22+) or EvictV1beta1().
 func (c *pods) Evict(ctx context.Context, eviction *policyv1beta1.Eviction) error {
-	return c.GetClient().Post().Namespace(c.GetNamespace()).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
+	_, err := c.SubResourceCreate(ctx, eviction.Name, "eviction", eviction, metav1.CreateOptions{})
+	return err
 }
 
 func (c *pods) EvictV1beta1(ctx context.Context, eviction *policyv1beta1.Eviction) error {
-	return c.GetClient().Post().Namespace(c.GetNamespace()).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
+	_, err := c.SubResourceCreate(ctx, eviction.Name, "eviction", eviction, metav1.CreateOptions{})
+	return err
 }
 
 func (c *pods) EvictV1(ctx context.Context, eviction *policyv1.Eviction) error {
-	return c.GetClient().Post().Namespace(c.GetNamespace()).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
+	_, err := c.SubResourceCreate(ctx, eviction.Name, "eviction", eviction, metav1.CreateOptions{})
+	return err
 }
 
 // Get constructs a request for getting the logs for a pod

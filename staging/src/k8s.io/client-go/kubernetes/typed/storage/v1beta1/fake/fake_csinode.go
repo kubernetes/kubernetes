@@ -21,30 +21,25 @@ package fake
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 )
 
 // fakeCSINodes implements CSINodeInterface
 type fakeCSINodes struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.CSINode, *v1beta1.CSINodeList, *storagev1beta1.CSINodeApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.CSINode, v1beta1.CSINodeList, storagev1beta1.CSINodeApplyConfiguration, *v1beta1.CSINode, *v1beta1.CSINodeList, *storagev1beta1.CSINodeApplyConfiguration]
 	Fake *FakeStorageV1beta1
 }
 
 func newFakeCSINodes(fake *FakeStorageV1beta1) typedstoragev1beta1.CSINodeInterface {
 	return &fakeCSINodes{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.CSINode, *v1beta1.CSINodeList, *storagev1beta1.CSINodeApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.CSINode, v1beta1.CSINodeList, storagev1beta1.CSINodeApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("csinodes"),
-			v1beta1.SchemeGroupVersion.WithKind("CSINode"),
-			func() *v1beta1.CSINode { return &v1beta1.CSINode{} },
-			func() *v1beta1.CSINodeList { return &v1beta1.CSINodeList{} },
-			func(dst, src *v1beta1.CSINodeList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.CSINodeList) []*v1beta1.CSINode { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.CSINodeList, items []*v1beta1.CSINode) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("csinodes")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("CSINode")),
+			v2fake.WithListMetaCopier[v1beta1.CSINode](func(dst, src *v1beta1.CSINodeList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.CSINodeList) []v1beta1.CSINode { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.CSINodeList, items []v1beta1.CSINode) { list.Items = items }),
 		),
 		fake,
 	}

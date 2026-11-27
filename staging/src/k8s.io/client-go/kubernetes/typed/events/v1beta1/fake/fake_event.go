@@ -21,28 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/events/v1beta1"
 	eventsv1beta1 "k8s.io/client-go/applyconfigurations/events/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedeventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 )
 
 // fakeEvents implements EventInterface
 type fakeEvents struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.Event, *v1beta1.EventList, *eventsv1beta1.EventApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.Event, v1beta1.EventList, eventsv1beta1.EventApplyConfiguration, *v1beta1.Event, *v1beta1.EventList, *eventsv1beta1.EventApplyConfiguration]
 	Fake *FakeEventsV1beta1
 }
 
 func newFakeEvents(fake *FakeEventsV1beta1, namespace string) typedeventsv1beta1.EventInterface {
 	return &fakeEvents{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.Event, *v1beta1.EventList, *eventsv1beta1.EventApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.Event, v1beta1.EventList, eventsv1beta1.EventApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("events"),
-			v1beta1.SchemeGroupVersion.WithKind("Event"),
-			func() *v1beta1.Event { return &v1beta1.Event{} },
-			func() *v1beta1.EventList { return &v1beta1.EventList{} },
-			func(dst, src *v1beta1.EventList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.EventList) []*v1beta1.Event { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.EventList, items []*v1beta1.Event) { list.Items = gentype.FromPointerSlice(items) },
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("events")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("Event")),
+			v2fake.WithListMetaCopier[v1beta1.Event](func(dst, src *v1beta1.EventList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.EventList) []v1beta1.Event { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.EventList, items []v1beta1.Event) { list.Items = items }),
 		),
 		fake,
 	}

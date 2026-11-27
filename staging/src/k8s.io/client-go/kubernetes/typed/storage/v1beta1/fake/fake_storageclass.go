@@ -21,32 +21,25 @@ package fake
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedstoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 )
 
 // fakeStorageClasses implements StorageClassInterface
 type fakeStorageClasses struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.StorageClass, *v1beta1.StorageClassList, *storagev1beta1.StorageClassApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.StorageClass, v1beta1.StorageClassList, storagev1beta1.StorageClassApplyConfiguration, *v1beta1.StorageClass, *v1beta1.StorageClassList, *storagev1beta1.StorageClassApplyConfiguration]
 	Fake *FakeStorageV1beta1
 }
 
 func newFakeStorageClasses(fake *FakeStorageV1beta1) typedstoragev1beta1.StorageClassInterface {
 	return &fakeStorageClasses{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.StorageClass, *v1beta1.StorageClassList, *storagev1beta1.StorageClassApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.StorageClass, v1beta1.StorageClassList, storagev1beta1.StorageClassApplyConfiguration](
 			fake.Fake,
-			"",
-			v1beta1.SchemeGroupVersion.WithResource("storageclasses"),
-			v1beta1.SchemeGroupVersion.WithKind("StorageClass"),
-			func() *v1beta1.StorageClass { return &v1beta1.StorageClass{} },
-			func() *v1beta1.StorageClassList { return &v1beta1.StorageClassList{} },
-			func(dst, src *v1beta1.StorageClassList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.StorageClassList) []*v1beta1.StorageClass {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta1.StorageClassList, items []*v1beta1.StorageClass) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("storageclasses")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("StorageClass")),
+			v2fake.WithListMetaCopier[v1beta1.StorageClass](func(dst, src *v1beta1.StorageClassList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.StorageClassList) []v1beta1.StorageClass { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.StorageClassList, items []v1beta1.StorageClass) { list.Items = items }),
 		),
 		fake,
 	}

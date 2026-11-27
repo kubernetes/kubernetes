@@ -21,30 +21,26 @@ package fake
 import (
 	v1beta1 "k8s.io/api/scheduling/v1beta1"
 	schedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	v2fake "k8s.io/client-go/gentype/v2/fake"
 	typedschedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 )
 
 // fakeWorkloads implements WorkloadInterface
 type fakeWorkloads struct {
-	*gentype.FakeClientWithListAndApply[*v1beta1.Workload, *v1beta1.WorkloadList, *schedulingv1beta1.WorkloadApplyConfiguration]
+	*v2fake.FakeClientWithListAndApply[v1beta1.Workload, v1beta1.WorkloadList, schedulingv1beta1.WorkloadApplyConfiguration, *v1beta1.Workload, *v1beta1.WorkloadList, *schedulingv1beta1.WorkloadApplyConfiguration]
 	Fake *FakeSchedulingV1beta1
 }
 
 func newFakeWorkloads(fake *FakeSchedulingV1beta1, namespace string) typedschedulingv1beta1.WorkloadInterface {
 	return &fakeWorkloads{
-		gentype.NewFakeClientWithListAndApply[*v1beta1.Workload, *v1beta1.WorkloadList, *schedulingv1beta1.WorkloadApplyConfiguration](
+		v2fake.NewFakeClientWithListAndApply[v1beta1.Workload, v1beta1.WorkloadList, schedulingv1beta1.WorkloadApplyConfiguration](
 			fake.Fake,
-			namespace,
-			v1beta1.SchemeGroupVersion.WithResource("workloads"),
-			v1beta1.SchemeGroupVersion.WithKind("Workload"),
-			func() *v1beta1.Workload { return &v1beta1.Workload{} },
-			func() *v1beta1.WorkloadList { return &v1beta1.WorkloadList{} },
-			func(dst, src *v1beta1.WorkloadList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta1.WorkloadList) []*v1beta1.Workload { return gentype.ToPointerSlice(list.Items) },
-			func(list *v1beta1.WorkloadList, items []*v1beta1.Workload) {
-				list.Items = gentype.FromPointerSlice(items)
-			},
+			v2fake.InNamespace(namespace),
+			v2fake.ForResource(v1beta1.SchemeGroupVersion.WithResource("workloads")),
+			v2fake.ForKind(v1beta1.SchemeGroupVersion.WithKind("Workload")),
+			v2fake.WithListMetaCopier[v1beta1.Workload](func(dst, src *v1beta1.WorkloadList) { dst.ListMeta = src.ListMeta }),
+			v2fake.WithItemsGetter(func(list *v1beta1.WorkloadList) []v1beta1.Workload { return list.Items }),
+			v2fake.WithItemsSetter(func(list *v1beta1.WorkloadList, items []v1beta1.Workload) { list.Items = items }),
 		),
 		fake,
 	}
