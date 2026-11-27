@@ -31,11 +31,13 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 const (
@@ -48,19 +50,6 @@ var (
 	dummyKubernetesVersion    = constants.MinimumControlPlaneVersion
 	dummyKubernetesVersionStr = dummyKubernetesVersion.String()
 )
-
-func TestNewCmdConfigImagesList(t *testing.T) {
-	var output bytes.Buffer
-	mockK8sVersion := dummyKubernetesVersionStr
-	images := newCmdConfigImagesList(&output, &mockK8sVersion)
-	if err := images.RunE(nil, nil); err != nil {
-		t.Fatalf("Error from running the images command: %v", err)
-	}
-	actual := strings.Split(output.String(), "\n")
-	if len(actual) != defaultNumberOfImages {
-		t.Fatalf("Expected %v but found %v images", defaultNumberOfImages, len(actual))
-	}
-}
 
 func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 	testcases := []struct {
@@ -383,6 +372,11 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			expectedKinds: []string{constants.ResetConfigurationKind},
 			cmdProc:       newCmdConfigPrintResetDefaults,
 		},
+		{
+			name:          "UpgradeConfiguration",
+			expectedKinds: []string{constants.UpgradeConfigurationKind},
+			cmdProc:       newCmdConfigPrintUpgradeDefaults,
+		},
 	}
 
 	for _, test := range tests {
@@ -413,6 +407,373 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 
 			if !reflect.DeepEqual(gotKinds, test.expectedKinds) {
 				t.Fatalf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", test.expectedKinds, gotKinds)
+			}
+		})
+	}
+}
+
+func TestNewCmdConfigPrintActionDefaultsInvalidComponentConfigs(t *testing.T) {
+	var out bytes.Buffer
+	cmd := newCmdConfigPrintInitDefaults(&out)
+	if err := cmd.Flags().Set("component-configs", "UnknownConfiguration"); err != nil {
+		t.Fatalf("failed to set component-configs flag: %v", err)
+	}
+
+	err := cmd.RunE(nil, nil)
+	if err == nil {
+		t.Fatal("expected an error for an unsupported component config kind, got none")
+	}
+	if !strings.Contains(err.Error(), "--component-configs needs to contain some of") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("expected no output on error, got %q", out.String())
+	}
+}
+
+func TestNewCmdConfigSubcommands(t *testing.T) {
+	tests := []struct {
+		name     string
+		cmdProc  func() *cobra.Command
+		expected []string
+	}{
+		{
+			name:     "config",
+			cmdProc:  func() *cobra.Command { return newCmdConfig(io.Discard) },
+			expected: []string{"images", "migrate", "print", "validate"},
+		},
+		{
+			name:     "config print",
+			cmdProc:  func() *cobra.Command { return newCmdConfigPrint(io.Discard) },
+			expected: []string{"init-defaults", "join-defaults", "reset-defaults", "upgrade-defaults"},
+		},
+		{
+			name:     "config images",
+			cmdProc:  func() *cobra.Command { return newCmdConfigImages(io.Discard) },
+			expected: []string{"list", "pull"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := []string{}
+			for _, subCmd := range test.cmdProc().Commands() {
+				got = append(got, subCmd.Name())
+			}
+			sort.Strings(got)
+			if !reflect.DeepEqual(got, test.expected) {
+				t.Fatalf("subcommands not matching:\n\texpected: %v\n\tgot: %v\n", test.expected, got)
+			}
+		})
+	}
+}
+
+func TestNewCmdConfigMigrate(t *testing.T) {
+	oldConfigBytes, err := getDefaultNodeConfigBytes()
+	if err != nil {
+		t.Fatalf("failed to get the default join configuration: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	oldCfgPath := filepath.Join(tmpDir, "old-config.yaml")
+	if err := os.WriteFile(oldCfgPath, oldConfigBytes, 0644); err != nil {
+		t.Fatalf("failed to write the old config file: %v", err)
+	}
+	invalidCfgPath := filepath.Join(tmpDir, "invalid-config.yaml")
+	if err := os.WriteFile(invalidCfgPath, []byte(dedent.Dedent(`
+		apiVersion: kubeadm.k8s.io/v1beta4
+		kind: UnknownConfiguration`)), 0644); err != nil {
+		t.Fatalf("failed to write the invalid config file: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		oldCfgPath     string
+		writeNewConfig bool
+		expectError    bool
+	}{
+		{
+			name:        "--old-config is mandatory",
+			expectError: true,
+		},
+		{
+			name:        "old config file does not exist",
+			oldCfgPath:  filepath.Join(tmpDir, "missing-config.yaml"),
+			expectError: true,
+		},
+		{
+			name:       "print the migrated config to stdout",
+			oldCfgPath: oldCfgPath,
+		},
+		{
+			name:           "write the migrated config to a file",
+			oldCfgPath:     oldCfgPath,
+			writeNewConfig: true,
+		},
+		{
+			name:        "invalid old config",
+			oldCfgPath:  invalidCfgPath,
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var out bytes.Buffer
+			cmd := newCmdConfigMigrate(&out)
+
+			if test.oldCfgPath != "" {
+				if err := cmd.Flags().Set("old-config", test.oldCfgPath); err != nil {
+					t.Fatalf("failed to set old-config flag: %v", err)
+				}
+			}
+			newCfgPath := filepath.Join(t.TempDir(), "new-config.yaml")
+			if test.writeNewConfig {
+				if err := cmd.Flags().Set("new-config", newCfgPath); err != nil {
+					t.Fatalf("failed to set new-config flag: %v", err)
+				}
+			}
+
+			err := cmd.RunE(nil, nil)
+			if test.expectError {
+				if err == nil {
+					t.Fatal("expected an error, got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			migrated := out.String()
+			if test.writeNewConfig {
+				if out.Len() != 0 {
+					t.Errorf("expected no output when writing to a file, got %q", migrated)
+				}
+				migratedBytes, err := os.ReadFile(newCfgPath)
+				if err != nil {
+					t.Fatalf("failed to read the new config file: %v", err)
+				}
+				migrated = string(migratedBytes)
+			}
+			if !strings.Contains(migrated, "kind: "+constants.JoinConfigurationKind) {
+				t.Errorf("expected the migrated config to contain kind %s, got:\n%s", constants.JoinConfigurationKind, migrated)
+			}
+		})
+	}
+}
+
+func TestNewCmdConfigValidate(t *testing.T) {
+	validConfigBytes, err := getDefaultInitConfigBytes()
+	if err != nil {
+		t.Fatalf("failed to get the default init configuration: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	validCfgPath := filepath.Join(tmpDir, "valid-config.yaml")
+	if err := os.WriteFile(validCfgPath, validConfigBytes, 0644); err != nil {
+		t.Fatalf("failed to write the valid config file: %v", err)
+	}
+	invalidCfgPath := filepath.Join(tmpDir, "invalid-config.yaml")
+	if err := os.WriteFile(invalidCfgPath, []byte(dedent.Dedent(`
+		apiVersion: kubeadm.k8s.io/v1beta4
+		kind: ClusterConfiguration
+		kubernetesVersion: not-a-version`)), 0644); err != nil {
+		t.Fatalf("failed to write the invalid config file: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		cfgPath     string
+		expectError bool
+	}{
+		{
+			name:        "--config is mandatory",
+			expectError: true,
+		},
+		{
+			name:        "config file does not exist",
+			cfgPath:     filepath.Join(tmpDir, "missing-config.yaml"),
+			expectError: true,
+		},
+		{
+			name:    "valid config",
+			cfgPath: validCfgPath,
+		},
+		{
+			name:        "invalid config",
+			cfgPath:     invalidCfgPath,
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var out bytes.Buffer
+			cmd := newCmdConfigValidate(&out)
+			if test.cfgPath != "" {
+				if err := cmd.Flags().Set("config", test.cfgPath); err != nil {
+					t.Fatalf("failed to set config flag: %v", err)
+				}
+			}
+
+			err := cmd.RunE(nil, nil)
+			if test.expectError {
+				if err == nil {
+					t.Fatal("expected an error, got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if out.String() != "ok\n" {
+				t.Errorf("expected %q, got %q", "ok\n", out.String())
+			}
+		})
+	}
+}
+
+func TestNewCmdConfigImagesPull(t *testing.T) {
+	tests := []struct {
+		name         string
+		featureGates string
+		cfgPath      string
+		expectError  bool
+	}{
+		{
+			name:         "invalid feature gate",
+			featureGates: "UnknownFeatureGate=true",
+			expectError:  true,
+		},
+		{
+			name:        "config file does not exist",
+			cfgPath:     filepath.Join(t.TempDir(), "missing-config.yaml"),
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cmd := newCmdConfigImagesPull()
+			if test.featureGates != "" {
+				if err := cmd.PersistentFlags().Set("feature-gates", test.featureGates); err != nil {
+					t.Fatalf("failed to set feature-gates flag: %v", err)
+				}
+			}
+			if test.cfgPath != "" {
+				if err := cmd.PersistentFlags().Set("config", test.cfgPath); err != nil {
+					t.Fatalf("failed to set config flag: %v", err)
+				}
+			}
+
+			err := cmd.RunE(nil, nil)
+			if test.expectError && err == nil {
+				t.Fatal("expected an error, got none")
+			}
+			if !test.expectError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestNewCmdConfigImagesList(t *testing.T) {
+	tests := []struct {
+		name         string
+		featureGates string
+		cfgPath      string
+		outputFormat string
+		expectError  bool
+	}{
+		{
+			name:         "invalid feature gate",
+			featureGates: "UnknownFeatureGate=true",
+			expectError:  true,
+		},
+		{
+			name:        "config file does not exist",
+			cfgPath:     filepath.Join(t.TempDir(), "missing-config.yaml"),
+			expectError: true,
+		},
+		{
+			name:         "valid defaults with text output",
+			outputFormat: "text",
+		},
+		{
+			name:         "unsupported output format",
+			outputFormat: "not-a-format",
+			expectError:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var out bytes.Buffer
+			mockVersion := constants.MinimumControlPlaneVersion.String()
+			cmd := newCmdConfigImagesList(&out, &mockVersion)
+			if test.featureGates != "" {
+				if err := cmd.PersistentFlags().Set("feature-gates", test.featureGates); err != nil {
+					t.Fatalf("failed to set feature-gates flag: %v", err)
+				}
+			}
+			if test.cfgPath != "" {
+				if err := cmd.PersistentFlags().Set("config", test.cfgPath); err != nil {
+					t.Fatalf("failed to set config flag: %v", err)
+				}
+			}
+			if test.outputFormat != "" {
+				if err := cmd.Flags().Set("output", test.outputFormat); err != nil {
+					t.Fatalf("failed to set output flag: %v", err)
+				}
+			}
+
+			err := cmd.RunE(nil, nil)
+			if test.expectError && err == nil {
+				t.Fatal("expected an error, got none")
+			}
+			if !test.expectError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestPullControlPlaneImages(t *testing.T) {
+	tests := []struct {
+		name        string
+		pullErr     error
+		expectError bool
+	}{
+		{
+			name: "all images pulled",
+		},
+		{
+			name:        "pull failure",
+			pullErr:     fmt.Errorf("pull failed"),
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeRuntime := utilruntime.NewContainerRuntime("/var/run/containerd/containerd.sock")
+			fakeImpl := &utilruntime.FakeImpl{}
+			fakeImpl.PullImageReturns("", test.pullErr)
+			fakeRuntime.SetImpl(fakeImpl)
+
+			cfg := &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
+			}
+			err := PullControlPlaneImages(fakeRuntime, cfg)
+			if test.expectError {
+				if err == nil {
+					t.Fatal("expected an error, got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
