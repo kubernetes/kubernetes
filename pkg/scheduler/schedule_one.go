@@ -918,6 +918,14 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	if e != nil {
 		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
 		// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
+	} else if cachedPod.UID != podInfo.Pod.UID {
+		// Check UID before the NodeName branch so an already-bound replacement Pod still
+		// cleans up the old nomination and skips the FailedScheduling event and status patch.
+		logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
+		// Drop any nomination this instance still holds. The nominator is keyed by UID, so this
+		// cannot affect the recreated Pod, and no future event will ever carry the old UID.
+		sched.SchedulingQueue.DeleteNominatedPodIfExists(podInfo.Pod)
+		return
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
@@ -934,10 +942,6 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
 		} else {
-			if cachedPod.UID != podInfo.Pod.UID {
-				logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
-				return
-			}
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms
 			// and we can't fix the validation for backwards compatibility.
@@ -952,6 +956,12 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 				nominated = true
 			}
 			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+				if errors.Is(err, queue.ErrPodSuperseded) {
+					// The Pod was recreated after the lister read above; skip the nomination,
+					// FailedScheduling event, and status patch for the stale instance.
+					calledDone = true
+					return
+				}
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
 			calledDone = true
