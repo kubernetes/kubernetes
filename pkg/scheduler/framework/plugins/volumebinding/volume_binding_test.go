@@ -1274,6 +1274,7 @@ func TestVolumeBinding(t *testing.T) {
 			stateCmpOpts := []cmp.Option{
 				cmp.AllowUnexported(stateData{}),
 				cmp.AllowUnexported(PodVolumeClaims{}),
+				cmpopts.IgnoreFields(PodVolumeClaims{}, "capacityIndex"),
 				cmpopts.IgnoreFields(stateData{}, "Mutex"),
 				cmpopts.SortSlices(func(a *v1.PersistentVolume, b *v1.PersistentVolume) bool {
 					return a.Name < b.Name
