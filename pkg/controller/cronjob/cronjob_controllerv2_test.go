@@ -35,12 +35,14 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
 )
 
 var (
@@ -1945,4 +1947,111 @@ func TestControllerV2ProcessNextItemClearFailureRate(t *testing.T) {
 				"(rate limiter failure count was not reset — queue.Forget was not called)", requeues)
 		}
 	})
+}
+
+// creationTimeJobControl is a fakeJobControl that sets the creation
+// timestamp of created Jobs, as the API server would.
+type creationTimeJobControl struct {
+	*fakeJobControl
+	creationTime time.Time
+}
+
+func (c *creationTimeJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
+	created, err := c.fakeJobControl.CreateJob(namespace, job)
+	if err != nil {
+		return nil, err
+	}
+	created.CreationTimestamp = metav1.NewTime(c.creationTime)
+	return created, nil
+}
+
+// TestControllerV2JobCreationSkewMetric verifies that
+// cronjob_controller_job_creation_skew_duration_seconds observes the time
+// between a Job's scheduled time and its creation, and only when the
+// controller actually creates the Job.
+func TestControllerV2JobCreationSkewMetric(t *testing.T) {
+	const skew = 42 * time.Second
+	scheduledTime := *topOfTheHour()
+
+	testCases := map[string]struct {
+		jobCreateErr    error
+		jobExists       bool
+		wantObservation bool
+	}{
+		"job created": {
+			wantObservation: true,
+		},
+		"job creation fails": {
+			jobCreateErr: errors.NewBadRequest("fake job create error"),
+		},
+		"job already exists": {
+			jobCreateErr: errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, ""),
+			jobExists:    true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			cj := cronJob()
+			cj.Spec.Schedule = onTheHour
+			cjCopy := cj.DeepCopy()
+
+			jobControl := &fakeJobControl{CreateErr: tc.jobCreateErr}
+			if tc.jobExists {
+				job, err := getJobFromTemplate2(&cj, scheduledTime)
+				if err != nil {
+					t.Fatalf("Unexpected error creating a job from template: %v", err)
+				}
+				job.UID = "1234"
+				job.Namespace = cj.Namespace
+				jobControl.Job = job
+			}
+
+			client := fake.NewSimpleClientset(cjCopy)
+			informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+			_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
+
+			jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			jm.jobControl = &creationTimeJobControl{fakeJobControl: jobControl, creationTime: scheduledTime.Add(skew)}
+			jm.cronJobControl = &fakeCJControl{}
+			jm.now = func() time.Time { return *justAfterTheHour() }
+
+			countBefore, err := metricstestutil.GetHistogramMetricCount(metrics.CronJobCreationSkew.ObserverMetric)
+			if err != nil {
+				t.Fatalf("Obtaining job_creation_skew_duration_seconds count: %v", err)
+			}
+			sumBefore, err := metricstestutil.GetHistogramMetricValue(metrics.CronJobCreationSkew.ObserverMetric)
+			if err != nil {
+				t.Fatalf("Obtaining job_creation_skew_duration_seconds sum: %v", err)
+			}
+
+			jm.enqueueController(cjCopy)
+			jm.processNextWorkItem(ctx)
+
+			countAfter, err := metricstestutil.GetHistogramMetricCount(metrics.CronJobCreationSkew.ObserverMetric)
+			if err != nil {
+				t.Fatalf("Obtaining job_creation_skew_duration_seconds count: %v", err)
+			}
+			sumAfter, err := metricstestutil.GetHistogramMetricValue(metrics.CronJobCreationSkew.ObserverMetric)
+			if err != nil {
+				t.Fatalf("Obtaining job_creation_skew_duration_seconds sum: %v", err)
+			}
+
+			wantCount, wantSum := uint64(0), 0.0
+			if tc.wantObservation {
+				wantCount, wantSum = 1, skew.Seconds()
+			}
+			if got := countAfter - countBefore; got != wantCount {
+				t.Errorf("job_creation_skew_duration_seconds observations = %d, want %d", got, wantCount)
+			}
+			if got := sumAfter - sumBefore; got != wantSum {
+				t.Errorf("job_creation_skew_duration_seconds observed sum = %v, want %v", got, wantSum)
+			}
+		})
+	}
 }
