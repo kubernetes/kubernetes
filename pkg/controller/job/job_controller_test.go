@@ -1521,6 +1521,131 @@ func TestControllerSyncJob(t *testing.T) {
 	}
 }
 
+// TestJobSyncMetrics verifies that every Job sync is recorded in
+// job_controller_job_syncs_total and job_controller_job_sync_duration_seconds
+// with the expected completion_mode, result and action labels, and that the
+// duration is measured with the controller's clock.
+func TestJobSyncMetrics(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	const syncDuration = 2 * time.Second
+
+	testCases := map[string]struct {
+		completionMode     batch.CompletionMode
+		suspend            bool
+		activePods         int
+		expectCreations    int
+		podControllerError error
+		wantMode           string
+		wantResult         string
+		wantAction         string
+		wantSyncErr        bool
+	}{
+		"non-indexed job creates pods": {
+			completionMode: batch.NonIndexedCompletion,
+			wantMode:       string(batch.NonIndexedCompletion),
+			wantResult:     "success",
+			wantAction:     metrics.JobSyncActionPodsCreated,
+		},
+		"indexed job creates pods": {
+			completionMode: batch.IndexedCompletion,
+			wantMode:       string(batch.IndexedCompletion),
+			wantResult:     "success",
+			wantAction:     metrics.JobSyncActionPodsCreated,
+		},
+		"pod creation fails": {
+			completionMode:     batch.NonIndexedCompletion,
+			podControllerError: errors.New("fake pod create error"),
+			wantMode:           string(batch.NonIndexedCompletion),
+			wantResult:         "error",
+			wantAction:         metrics.JobSyncActionPodsCreated,
+			wantSyncErr:        true,
+		},
+		"active pods match parallelism": {
+			completionMode: batch.NonIndexedCompletion,
+			activePods:     2,
+			wantMode:       string(batch.NonIndexedCompletion),
+			wantResult:     "success",
+			wantAction:     metrics.JobSyncActionTracking,
+		},
+		"suspended job deletes pods": {
+			completionMode: batch.NonIndexedCompletion,
+			suspend:        true,
+			activePods:     2,
+			wantMode:       string(batch.NonIndexedCompletion),
+			wantResult:     "success",
+			wantAction:     metrics.JobSyncActionPodsDeleted,
+		},
+		"expectations not satisfied": {
+			completionMode:  batch.NonIndexedCompletion,
+			expectCreations: 1,
+			wantMode:        string(batch.NonIndexedCompletion),
+			wantResult:      "success",
+			wantAction:      metrics.JobSyncActionReconciling,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			fakeClock := clocktesting.NewFakeClock(time.Now())
+			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientSet, controller.NoResyncPeriodFunc, fakeClock)
+			manager.podControl = &controller.FakePodControl{Err: tc.podControllerError}
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			metrics.JobSyncNum.Reset()
+			metrics.JobSyncDurationSeconds.Reset()
+
+			job := newJob(2, 2, 6, tc.completionMode)
+			job.Spec.Suspend = ptr.To(tc.suspend)
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			setPodsStatuses(sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer(), job, 0, tc.activePods, 0, 0, 0, 0)
+			key := testutil.GetKey(job, t)
+			if tc.expectCreations > 0 {
+				if err := manager.expectations.ExpectCreations(logger, key, tc.expectCreations); err != nil {
+					t.Fatalf("ExpectCreations() error = %v", err)
+				}
+			}
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+				fakeClock.Step(syncDuration)
+				return job, nil
+			}
+
+			err := manager.syncJob(ctx, key)
+			if tc.wantSyncErr {
+				if err == nil {
+					t.Fatal("Expected syncJob to return an error")
+				}
+			} else if err != nil {
+				t.Fatalf("Unexpected syncJob error: %v", err)
+			}
+
+			gotSyncs, err := metricstestutil.GetCounterMetricValue(metrics.JobSyncNum.WithLabelValues(tc.wantMode, tc.wantResult, tc.wantAction))
+			if err != nil {
+				t.Fatalf("Obtaining job_syncs_total: %v", err)
+			}
+			if gotSyncs != 1 {
+				t.Errorf("job_syncs_total{completion_mode=%q,result=%q,action=%q} = %v, want 1", tc.wantMode, tc.wantResult, tc.wantAction, gotSyncs)
+			}
+
+			histogram := metrics.JobSyncDurationSeconds.WithLabelValues(tc.wantMode, tc.wantResult, tc.wantAction)
+			gotCount, err := metricstestutil.GetHistogramMetricCount(histogram)
+			if err != nil {
+				t.Fatalf("Obtaining job_sync_duration_seconds count: %v", err)
+			}
+			if gotCount != 1 {
+				t.Errorf("job_sync_duration_seconds{completion_mode=%q,result=%q,action=%q} count = %d, want 1", tc.wantMode, tc.wantResult, tc.wantAction, gotCount)
+			}
+			gotSum, err := metricstestutil.GetHistogramMetricValue(histogram)
+			if err != nil {
+				t.Fatalf("Obtaining job_sync_duration_seconds sum: %v", err)
+			}
+			if gotSum != syncDuration.Seconds() {
+				t.Errorf("job_sync_duration_seconds{completion_mode=%q,result=%q,action=%q} sum = %v, want %v", tc.wantMode, tc.wantResult, tc.wantAction, gotSum, syncDuration.Seconds())
+			}
+		})
+	}
+}
+
 func TestJobPodsCreationTotal(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
