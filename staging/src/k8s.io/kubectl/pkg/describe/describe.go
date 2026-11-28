@@ -1928,15 +1928,18 @@ func formatQuantity(name corev1.ResourceName, q resource.Quantity) string {
 	return resource.NewQuantity(q.Value(), q.Format).String()
 }
 
-// isByteResource reports whether name is measured in bytes. Quota names such as
-// requests.memory and limits.ephemeral-storage count too.
+// isByteResource reports whether name is measured in bytes, including the
+// matching ResourceQuota names.
 func isByteResource(name corev1.ResourceName) bool {
-	n := strings.TrimPrefix(strings.TrimPrefix(string(name), "requests."), "limits.")
-	switch corev1.ResourceName(n) {
-	case corev1.ResourceMemory, corev1.ResourceStorage, corev1.ResourceEphemeralStorage:
+	switch name {
+	case corev1.ResourceMemory, corev1.ResourceStorage, corev1.ResourceEphemeralStorage,
+		corev1.ResourceRequestsMemory, corev1.ResourceLimitsMemory,
+		corev1.ResourceRequestsStorage,
+		corev1.ResourceRequestsEphemeralStorage, corev1.ResourceLimitsEphemeralStorage:
 		return true
 	}
-	return strings.HasPrefix(n, corev1.ResourceHugePagesPrefix)
+	return kubectlresourcehelper.IsHugePageResourceName(name) ||
+		strings.HasPrefix(string(name), corev1.ResourceRequestsHugePagesPrefix)
 }
 
 func describeContainerState(status corev1.ContainerStatus, w PrefixWriter) {
