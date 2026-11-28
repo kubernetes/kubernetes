@@ -644,7 +644,7 @@ func (o *DebugOptions) displayWarning(container *corev1.Container, pod *corev1.P
 		return
 	}
 
-	if pod.Spec.SecurityContext.RunAsUser == nil || *pod.Spec.SecurityContext.RunAsUser == 0 {
+	if pod.Spec.SecurityContext == nil || pod.Spec.SecurityContext.RunAsUser == nil || *pod.Spec.SecurityContext.RunAsUser == 0 {
 		return
 	}
 
