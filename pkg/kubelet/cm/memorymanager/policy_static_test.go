@@ -2069,6 +2069,135 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")),
 		},
 		{
+			description: "should fail to allocate single NUMA hint on node already in multi-NUMA group",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         1536 * mb,
+						},
+					},
+				},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         1536 * mb,
+						},
+					},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1024 * mb,
+							Free:           0,
+							Reserved:       1024 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   1536 * mb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 1,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1024 * mb,
+							Free:           512 * mb,
+							Reserved:       512 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   1536 * mb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 1,
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1024 * mb,
+							Free:           0,
+							Reserved:       1024 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   1536 * mb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 1,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1024 * mb,
+							Free:           512 * mb,
+							Reserved:       512 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   1536 * mb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 1,
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			},
+			pod: getPod("pod2", "container1", &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewQuantity(1, resource.DecimalSI),
+					v1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewQuantity(1, resource.DecimalSI),
+					v1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			}),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(1), Preferred: false},
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")),
+		},
+		{
 			description:         "should do nothing for guaranteed pod with pod level resources",
 			expectedAssignments: state.ContainerMemoryAssignments{},
 			machineState: state.NUMANodeMap{
@@ -5088,6 +5217,57 @@ func Test_isAffinityViolatingNUMAAllocations(t *testing.T) {
 				1: {
 					NumberOfAssignments: 0,
 					Cells:               []int{1},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(0, 1),
+			},
+			isViolationExpected: false,
+		},
+		{
+			description: "violating NUMA allocations because given single-node affinity asks for NUMA ID 1 which is already in a multi-NUMA cells group",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: {
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(1),
+			},
+			isViolationExpected: true,
+		},
+		{
+			description: "valid single-node affinity on a node already used for single-NUMA allocation",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 0,
+					Cells:               []int{0},
+				},
+				1: {
+					NumberOfAssignments: 1,
+					Cells:               []int{1},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(1),
+			},
+			isViolationExpected: false,
+		},
+		{
+			description: "valid multi-node affinity matching existing multi-NUMA cells group",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: {
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
 				},
 			},
 			topologyHint: &topologymanager.TopologyHint{
