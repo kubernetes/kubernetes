@@ -1577,6 +1577,8 @@ type MatchCondition struct {
 	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
 	// 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
 	//   request resource.
+	// 'namespaceObject' is not available in match conditions and always evaluates to null.
+	// 'variables' cannot be referenced in match conditions.
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
 	//
 	// Required.
