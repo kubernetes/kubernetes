@@ -1544,6 +1544,18 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateVolumeNodeAffinityUpdateErrorPath(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutablePVNodeAffinity, false)
+	oldPV := testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar"))
+	newPV := testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "baz"))
+
+	errs := ValidatePersistentVolumeUpdate(newPV, oldPV, ValidationOptionsForPersistentVolume(newPV, oldPV))
+	expected := field.ErrorList{
+		field.Invalid(field.NewPath("spec", "nodeAffinity"), nil, ""),
+	}
+	field.ErrorMatcher{}.ByType().ByField().Test(t, expected, errs)
+}
+
 func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure           bool
@@ -3135,6 +3147,30 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidatePersistentVolumeClaimUpdateVolumeModeErrorPath(t *testing.T) {
+	file, block := core.PersistentVolumeFilesystem, core.PersistentVolumeBlock
+	mkClaim := func(mode *core.PersistentVolumeMode) *core.PersistentVolumeClaim {
+		claim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+			AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			VolumeMode:  mode,
+			Resources: core.VolumeResourceRequirements{
+				Requests: core.ResourceList{core.ResourceStorage: resource.MustParse("10G")},
+			},
+		})
+		claim.ResourceVersion = "1"
+		return claim
+	}
+	oldClaim, newClaim := mkClaim(&file), mkClaim(&block)
+
+	errs := ValidatePersistentVolumeClaimUpdate(newClaim, oldClaim, ValidationOptionsForPersistentVolumeClaim(newClaim, oldClaim))
+	// The whole-spec immutability check also fires; it does not return early.
+	expected := field.ErrorList{
+		field.Forbidden(field.NewPath("spec"), ""),
+		field.Invalid(field.NewPath("spec", "volumeMode"), nil, ""),
+	}
+	field.ErrorMatcher{}.ByType().ByField().Test(t, expected, errs)
 }
 
 func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
