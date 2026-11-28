@@ -1258,6 +1258,21 @@ func TestWaitForAttachAndMount_DynamicVolumes(t *testing.T) {
 	shortCtx6, cancel6 := context.WithTimeout(tCtx, 50*time.Millisecond)
 	defer cancel6()
 	require.Error(t, vm.WaitForAttachAndMount(shortCtx6, podWithImageVol), "Image volume must not be skipped before actualStateOfWorld has its entry")
+
+	// A sync that started before a dynamic update removed vol1 must not wait for it. By the
+	// time the sync reaches the wait, the pod manager has the updated spec without vol1 and
+	// the populator/reconciler have already removed it from DSW/ASW, so the wait would
+	// otherwise block until podAttachAndMountTimeout.
+	stalePod := pod.DeepCopy()
+	latestPod := pod.DeepCopy()
+	latestPod.Spec.Volumes = nil
+	latestPod.Spec.Containers[0].VolumeMounts = nil
+	podManager.SetPods([]*v1.Pod{latestPod})
+	vm.actualStateOfWorld.PodRemovedFromVolume(uniquePodName, uniqueVol1)
+	vm.desiredStateOfWorld.DeletePodFromVolume(uniquePodName, uniqueVol1)
+	shortCtx7, cancel7 := context.WithTimeout(tCtx, 50*time.Millisecond)
+	defer cancel7()
+	require.NoError(t, vm.WaitForAttachAndMount(shortCtx7, stalePod), "volume removed by a dynamic pod update must not block WaitForAttachAndMount")
 }
 
 func podWithUID(p *v1.Pod, uid kubetypes.UID) *v1.Pod {

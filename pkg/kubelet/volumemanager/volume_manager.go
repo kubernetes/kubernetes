@@ -228,6 +228,7 @@ func NewVolumeManager(
 			blockVolumePathHandler)),
 		actuatedState:    actuatedState,
 		podStateProvider: podStateProvider,
+		podManager:       podManager,
 	}
 	if triggerPodSync != nil {
 		onDynamicVolumeRemoved := func(podUID k8stypes.UID) {
@@ -337,6 +338,11 @@ type volumeManager struct {
 
 	// podStateProvider reports whether a pod's runtime and volumes are being torn down.
 	podStateProvider PodStateProvider
+
+	// podManager provides the latest pod specs. A pod sync can still be running with a
+	// snapshot taken before a dynamic pod update, so waiting for volumes that update
+	// removed from the pod spec would block until podAttachAndMountTimeout.
+	podManager PodManager
 }
 
 type VolumeAttachLimitExceededError struct {
@@ -495,6 +501,28 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 	})
 	if len(expectedVolumes) == 0 {
 		return nil
+	}
+
+	// A sync can run with a pod snapshot taken before a dynamic pod update: by the time it
+	// reaches this wait, the pod manager already holds the updated spec, the populator has
+	// dropped volumes the update removed from desiredStateOfWorld, and the reconciler has
+	// unmounted them. Waiting for such volumes can never succeed and would stall the sync
+	// (and its pod status update) until podAttachAndMountTimeout, so skip volumes that the
+	// latest pod spec no longer mounts.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && vm.podManager != nil {
+		if latestPod, ok := vm.podManager.GetPodByUID(pod.UID); ok && latestPod != nil && latestPod.UID == pod.UID {
+			latestMounts, latestDevices, _ := util.GetPodVolumeNames(latestPod, false)
+			expectedVolumes = slices.DeleteFunc(expectedVolumes, func(volName string) bool {
+				if latestMounts.Has(volName) || latestDevices.Has(volName) {
+					return false
+				}
+				logger.V(3).Info("Skipping volume removed from the latest pod spec in WaitForAttachAndMount", "pod", klog.KObj(pod), "volumeName", volName)
+				return true
+			})
+			if len(expectedVolumes) == 0 {
+				return nil
+			}
+		}
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && actuatedPod != nil && actuatedPod.Name != "" {
