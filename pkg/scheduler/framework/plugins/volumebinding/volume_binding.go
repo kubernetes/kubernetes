@@ -377,6 +377,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, po
 			boundClaims:                podVolumeClaims.boundClaims,
 			unboundClaimsDelayBinding:  podVolumeClaims.unboundClaimsDelayBinding,
 			unboundVolumesDelayBinding: podVolumeClaims.unboundVolumesDelayBinding,
+			capacityIndex:              podVolumeClaims.capacityIndex,
 		},
 	})
 	return nil, nil
